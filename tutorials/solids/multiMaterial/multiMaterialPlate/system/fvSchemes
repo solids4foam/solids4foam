@@ -28,10 +28,7 @@ ddtSchemes
 
 gradSchemes
 {
-    default            none;
-    // With more than one material, the gradient has to keep each cell's
-    // stencil within its own material
-    grad(D)            leastSquaresS4f;
+    default            leastSquaresS4f;
 }
 
 divSchemes
@@ -52,10 +49,6 @@ snGradSchemes
 interpolationSchemes
 {
     default            linear;
-
-    // For multi-material cases, linear seems better for linGeomSolid, whereas
-    // harmonic seems better for unsLinGeomSolid
-    interpolate(gammaStabilisation) linear;
     interpolate(impK)  harmonic;
 }
 

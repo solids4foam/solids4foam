@@ -6,7 +6,7 @@ sort: 2
 
 ---
 
-Prepared by Ivan Batistić
+Prepared by Željko Tuković, Ivan Batistić and Philip Cardiff
 
 ---
 
@@ -30,15 +30,18 @@ materials has a length of $$1.5W$$. The mid-layer thickness $$h$$ is the only
 variable geometry parameter: $$h = 0.002W$$, $$0.005W$$ or $$0.01W$$, or
 $$h = 0$$, where materials 1 and 2 are bonded directly. Because of symmetry,
 one quarter of the specimen is modelled, with symmetry planes at the top and
-right boundaries; the origin of the coordinate system is at their intersection.
-The left boundary has a prescribed tensile stress $$\sigma_0 = 1$$ MPa, and the
-bottom boundary is a stress-free edge. The problem is considered _plane
-strain_ and is simulated as a steady state using one loading step. The material
-properties are given in Table 1.
+right boundaries. The left boundary has a prescribed tensile stress
+$$\sigma_0 = 1$$ MPa, and the bottom boundary is a stress-free edge. The problem
+is considered _plane strain_ and is simulated as a steady state using one
+loading step. Gravity is neglected. The material properties are given in Table 1.
 
-![Figure 1: Problem geometry](./images/multiMaterialPlate-geometry.png)
+![Figure 1: Problem geometry [1]](./images/multiMaterialPlate-geometry.png)
 
-Figure 1: Problem geometry (the mid-layer thickness is exaggerated)
+Figure 1: Problem geometry [1]
+
+![Figure 2: Computational mesh](./images/multiMaterialPlate-mesh.png)
+
+Figure 2: Computational mesh ($$h=0.01W$$)
 
 Table 1: Material properties [1]
 
@@ -72,31 +75,51 @@ thicknesses are selected by passing $$h/W$$ to the script:
 ./Allrun 0
 ```
 
-Run `> ./Allclean` before selecting another thickness. The `Allrun` script
-first creates the dictionaries that depend on the mid-layer thickness:
+By default, the case is solved with the implicit segregated solution
+algorithm. If solids4foam is built with PETSc, the Jacobian-free Newton-Krylov
+algorithm of PETSc SNES can be selected instead by adding `petscSnes` to the
+arguments, in any order:
 
-- `system/blockMeshDict` from `system/blockMeshDict.m4`, using `m4`;
-- `system/sample` from `system/sample.m4`, using `m4`, and its copy
-  `system/sampleDict`, which foam-extend reads instead;
+```bash
+./Allrun petscSnes
+./Allrun 0.002 petscSnes
+```
+
+Run `> ./Allclean` before selecting another thickness or solution algorithm.
+The `Allrun` script first creates `constant/solidProperties` and
+`system/fvSolution` from their `.segregated` or `.petscSnes` copies, and the
+dictionaries that depend on the mid-layer thickness. With a mid-layer, these
+are the three-material dictionaries, where `m4` sets the thickness in the mesh
+and in the sampling lines:
+
+- `system/blockMeshDict` from `system/blockMeshDict.threeMaterials.m4`;
+- `system/sample` from `system/sample.threeMaterials.m4`;
 - `constant/mechanicalProperties` from
-  `constant/mechanicalProperties.threeMaterials`, or from
-  `constant/mechanicalProperties.twoMaterials` if $$h = 0$$.
+  `constant/mechanicalProperties.threeMaterials`.
+
+For $$h = 0$$, they are copies of `system/blockMeshDict.twoMaterials`,
+`system/sample.twoMaterials` and `constant/mechanicalProperties.twoMaterials`.
+In both cases, `system/sample` is copied to `system/sampleDict`, which
+foam-extend reads instead.
 
 It then creates the mesh using `blockMesh` (`> blockMesh`) and runs the
 `solids4Foam` solver (`> solids4Foam`). As the last step, the `sample` utility
 is used to extract the stress along the interfaces. Optionally, if `gnuplot` is
-installed, the stress distributions are plotted in the `sigmaxx.png` file. The
-run takes from about 20 s for $$h = 0$$ to about 2 min for $$h = 0.01W$$ on
-one processor.
+installed, the stress distributions are plotted in the `sigmaxx.png` and
+`sigmaxxMidLine.png` files. On
+one processor, the solver takes from about 20 s for $$h = 0$$ to about 2 min
+for $$h = 0.01W$$ with the segregated algorithm, and from about 1 s to about
+5 s with PETSc SNES; the two give the same stress distributions.
 
-Each block in `system/blockMeshDict.m4` is given the name of its material:
+Each block in `system/blockMeshDict.threeMaterials.m4` is given the name of its
+material:
 
 ```c++
 blocks
 (
-    hex (L0 A0 A1 L1 L2 A2 A3 L3) material1 (nxSide ny 1) ...
-    hex (B0 R0 R1 B1 B2 R2 R3 B3) material2 (nxSide ny 1) ...
-    hex (A0 B0 B1 A1 A2 B2 B3 A3) material3 (nxMid ny 1) ...
+    hex (0 1 5 4 8 9 13 12) material1 (120 240 1) ...
+    hex (2 3 7 6 10 11 15 14) material2 (120 240 1) ...
+    hex (1 2 6 5 9 10 14 13) material3 (nxMid 240 1) ...
 );
 ```
 
@@ -162,7 +185,7 @@ Table 2: Order of the stress singularity
 | 13 | 1 and 3 | 0.2823 |
 | 23 | 2 and 3 | 0.2392 |
 
-Figure 2 shows the normal stress $$\sigma_{xx}$$ along the two interfaces for
+Figure 3 shows the normal stress $$\sigma_{xx}$$ along the two interfaces for
 $$h = 0.01W$$, together with the singular term $$K r^{-p}$$ drawn with the
 analytical order from Table 2 and an intensity $$K$$ fitted to the numerical
 stress in $$10^{-4} < r/W < 3 \times 10^{-4}$$. Close to the free edge, the
@@ -175,32 +198,52 @@ is not resolved by the mesh. For the thinner mid-layers, the singular term of
 interface 23 dominates only closer to the free edge than the mesh resolves, so
 the line drawn for interface 23 is then only indicative.
 
-![Figure 2: Normal stress along the interfaces for h = 0.01W](./images/multiMaterialPlate-sigmaxx.png)
+The green and orange lines are the boundary element results of Ioka et al.
+[2] for the two interfaces. They are digitised from the published figure with
+WebPlotDigitizer, so they are drawn for a visual comparison only; the
+numerical stress follows them over the whole range they cover. The digitised
+curves are stored in `verification/reference`.
 
-Figure 2: Normal stress along the interfaces for $$h = 0.01W$$
+![Figure 3: Normal stress along the interfaces for h = 0.01W](./images/multiMaterialPlate-sigmaxx.png)
 
-Figure 3 shows the corresponding result for $$h = 0$$, where there is a single
+Figure 3: Normal stress along the interfaces for $$h = 0.01W$$
+
+Figure 4 shows the corresponding result for $$h = 0$$, where there is a single
 interface between materials 1 and 2. The weaker singularity of this pair of
-materials is followed over more than two decades of $$r$$.
+materials is followed over more than two decades of $$r$$, and the numerical
+stress again follows the digitised result of Ioka et al. [2].
 
-![Figure 3: Normal stress along the interface for h = 0](./images/multiMaterialPlate-sigmaxx-h0.png)
+![Figure 4: Normal stress along the interface for h = 0](./images/multiMaterialPlate-sigmaxx-h0.png)
 
-Figure 3: Normal stress along the interface for $$h = 0$$
+Figure 4: Normal stress along the interface for $$h = 0$$
+
+Figure 5 shows the normal stress along the mid-line of the plate,
+$$y = W/2$$, for $$h = 0.01W$$, with the region around the mid-layer enlarged.
+The dashed lines mark the two interfaces. The stress is continuous across
+them, although the Young's modulus changes there by factors of 42 and 14.
+
+![Figure 5: Normal stress along the mid-line for h = 0.01W](./images/multiMaterialPlate-sigmaxxMidLine.png)
+
+Figure 5: Normal stress along the mid-line for $$h = 0.01W$$
 
 The plots above are created automatically within the `Allrun` script using
-the `sample` utility and `gnuplot`. Figures 4 and 5 collect the results of the
-four runs, one for each mid-layer thickness, and can be compared with the
-distributions given in [1, 2]. The thinner the mid-layer, the closer to the
-free edge the stress leaves the distribution of the bi-material plate
-($$h = 0$$).
+the `sample` utility and `gnuplot`, in the `sigmaxx.png` and
+`sigmaxxMidLine.png` files. Figures 6 and 7 collect the results of the four
+runs, one for each mid-layer thickness; they are produced by the thickness
+study in the `verification` directory. The lines are the digitised results of
+Ioka et al. [2], which the numerical stress follows on both interfaces for all
+four thicknesses. The thinner the mid-layer, the closer to the free edge the
+stress leaves the distribution of the bi-material plate ($$h = 0$$).
 
-![Figure 4: Normal stress along interface 13 for the four mid-layer thicknesses](./images/multiMaterialPlate-interface13.png)
+![Figure 6: Normal stress along interface 13 for the four mid-layer thicknesses](./images/multiMaterialPlate-interface13.png)
 
-Figure 4: Normal stress along interface 13 for the four mid-layer thicknesses
+Figure 6: Normal stress along interface 13 for the four mid-layer thicknesses
+(lines: Ioka et al. [2])
 
-![Figure 5: Normal stress along interface 23 for the four mid-layer thicknesses](./images/multiMaterialPlate-interface23.png)
+![Figure 7: Normal stress along interface 23 for the four mid-layer thicknesses](./images/multiMaterialPlate-interface23.png)
 
-Figure 5: Normal stress along interface 23 for the four mid-layer thicknesses
+Figure 7: Normal stress along interface 23 for the four mid-layer thicknesses
+(lines: Ioka et al. [2])
 
 The stress is sampled along lines that run from the free edge to the symmetry
 plane, $$0.05$$ $$\mu$$m to the side of each interface:
@@ -219,15 +262,15 @@ sets
     {
         type            face;
         axis            y;
-        start           (-0.04530005 -0.03 0.0005);
-        end             (-0.04530005 0 0.0005);
+        start           (0.04499995 0 0.0005);
+        end             (0.04499995 0.03 0.0005);
     }
     interface23
     {
         type            face;
         axis            y;
-        start           (-0.04499995 -0.03 0.0005);
-        end             (-0.04499995 0 0.0005);
+        start           (0.04530005 0 0.0005);
+        end             (0.04530005 0.03 0.0005);
     }
 );
 ```
@@ -235,7 +278,36 @@ sets
 The `cellPointFace` scheme interpolates the stress from the cells on both
 sides of the interface. This is appropriate for the normal stress
 $$\sigma_{xx}$$, which is continuous across the interface, but not for the
-$$\sigma_{yy}$$ and $$\sigma_{zz}$$ components, which are not.
+$$\sigma_{yy}$$ and $$\sigma_{zz}$$ components, which are not. The mid-line is
+sampled in the same way by the `midLine` set, and again around the mid-layer
+by the `midLineZoom` set.
+
+---
+
+## Verification and Convergence Study
+
+The opt-in [`verification/`](verification/) directory holds two studies. The
+thickness study runs the four mid-layer thicknesses and plots the normal
+stress along the interfaces against the boundary element results of Ioka et
+al. [2], which are digitised from the published figure and so are for a
+visual comparison only. The mesh study coarsens and refines the mesh for
+$$h = 0.01W$$, from $$11\,100$$ to $$710\,400$$ cells, and checks that the
+stress along the interfaces converges:
+
+```bash
+cd verification
+./Allverify
+```
+
+With PETSc SNES, the whole study takes about one minute. The stress along
+both interfaces follows the curves of Ioka et al. for the four thicknesses,
+the order fitted for the bi-material plate is within 2% of the
+analytical one, and the change in the stress along the interfaces between
+successive meshes falls by a factor of 4 to 5 for each halving of the cell
+size. The study is separate from `regressionTest.sh` and is not run by the
+normal tutorial test suites. See the
+[verification README](verification/README.md) for the options, the mesh
+levels, the acceptance criteria and the recorded results.
 
 ---
 

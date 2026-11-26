@@ -36,8 +36,6 @@ cycleWrite      0;
 
 writeFormat     ascii;
 
-// The cells at the free edge are a fraction of a micrometre in size, so the
-// sampled coordinates need more than six digits
 writePrecision  12;
 
 writeCompression no;

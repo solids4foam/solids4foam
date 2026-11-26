@@ -14,7 +14,8 @@ fi
 # ============================================================
 # multiMaterialPlate regression test
 # Runs the default case, with a mid-layer of thickness
-# h = 0.01W, and checks the normal stress sampled along the
+# h = 0.01W, with the segregated and the PETSc SNES solution
+# algorithms, and checks the normal stress sampled along the
 # two interfaces.
 # ============================================================
 
@@ -28,7 +29,10 @@ NU2=0.345
 NU3=0.33
 
 # Equilibrium: the mean of the normal stress over an interface is the applied
-# stress, whatever the materials. It is 1 +- 2e-6 on OpenFOAM.com v2412
+# stress, whatever the materials. It is 1 +- 2e-6 on OpenFOAM.com v2412. The
+# sample utility of foam-extend does not write the last point of the line, on
+# the symmetry plane, so the stress is taken as uniform from the last sampled
+# point to the symmetry plane, where its gradient is zero
 MEAN_STRESS_ERR_MAX=1e-3
 
 # The order of the singularity is fitted in R_MIN < r/W < R_MAX and compared
@@ -53,6 +57,13 @@ EXTREMA_REL_ERR_MAX=0.01
 
 SOLVER_LOGFILE="log.solids4Foam"
 ALLRUN_LOGFILE="log.Allrun"
+
+# The two solution algorithms agree to within 2e-6 in the quantities checked,
+# so they share the references above
+APPROACHES=(
+    segregated
+    petscSnes
+)
 
 echo "============================================================"
 echo "multiMaterialPlate regression test"
@@ -115,7 +126,7 @@ analytical_order() {
 interface_stress() {
     awk -v W="${W}" -v sigma0="${SIGMA0}" -v rMin="${R_MIN}" -v rMax="${R_MAX}" '
     NF >= 7 {
-        r = ($1 + W)/W
+        r = $1/W
         s = $2/sigma0
 
         if (n > 0) { integral += 0.5*(s + sPrev)*(r - rPrev) }
@@ -136,6 +147,7 @@ interface_stress() {
     }
     END {
         if (n < 2 || m < 2 || !haveMin || !haveMax) { exit 1 }
+        integral += sPrev*(1 - rPrev)
         printf "%.8g\t%.8g\t%.8g\t%.8g\n", integral, \
             -(m*sxy - sx*sy)/(m*sxx - sx*sx), sMin, sMax
     }' "$1"
@@ -172,74 +184,102 @@ for arg in "$@"; do
     esac
 done
 
-if [ "$CHECK_ONLY" = false ]; then
-    prepare_case
-    ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
-    ( cd "${CASE_DIR}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 )
-else
-    echo "Running in check-only mode: skipping Allclean and Allrun"
-fi
+check_case() {
+    # Three materials, each with its own law
+    local n_laws
+    n_laws=$({ grep -c "Selecting mechanical constitutive law" \
+        "${CASE_DIR}/${SOLVER_LOGFILE}" 2> /dev/null || true; })
 
-if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
-    echo "Skipping regression checks because the tutorial skipped in this environment"
-    exit 0
-fi
+    if [[ "${n_laws}" == 3 ]]; then
+        echo "PASS: the case constructed three mechanical constitutive laws"
+    else
+        echo "FAIL: the case constructed ${n_laws:-0} mechanical constitutive" \
+            "laws, not three"
+        failures=$((failures + 1))
+    fi
+
+    local interface data_file result mean order s_min s_max
+    local p order_tol ref_min ref_max
+
+    for interface in 13 23; do
+        data_file="$(sample_file "interface${interface}")"
+
+        if [[ -z "${data_file}" || ! -f "${data_file}" ]]; then
+            echo "FAIL: Could not find the sampled stress of interface" \
+                "${interface}"
+            failures=$((failures + 1))
+            continue
+        fi
+
+        if ! result=$(interface_stress "${data_file}"); then
+            echo "FAIL: Could not extract the stress of interface ${interface}"
+            failures=$((failures + 1))
+            continue
+        fi
+
+        IFS=$'\t' read -r mean order s_min s_max <<< "${result}"
+
+        if [[ "${interface}" == 13 ]]; then
+            p=$(analytical_order "${E1}" "${NU1}" "${E3}" "${NU3}")
+            order_tol="${ORDER13_REL_ERR_MAX}"
+            ref_min="${REF_MIN13}"
+            ref_max="${REF_MAX13}"
+        else
+            p=$(analytical_order "${E2}" "${NU2}" "${E3}" "${NU3}")
+            order_tol="${ORDER23_REL_ERR_MAX}"
+            ref_min="${REF_MIN23}"
+            ref_max="${REF_MAX23}"
+        fi
+
+        check_value "Interface ${interface}: mean stress" \
+            "${mean}" 1 1 "${MEAN_STRESS_ERR_MAX}"
+        check_value "Interface ${interface}: singularity order" \
+            "${order}" "${p}" "${p}" "${order_tol}"
+        check_value "Interface ${interface}: local minimum stress" \
+            "${s_min}" "${ref_min}" "${ref_min}" "${EXTREMA_REL_ERR_MAX}"
+        check_value "Interface ${interface}: local maximum stress" \
+            "${s_max}" "${ref_max}" "${ref_max}" "${EXTREMA_REL_ERR_MAX}"
+    done
+}
 
 failures=0
 
-# Three materials, each with its own law
-n_laws=$({ grep -c "Selecting mechanical constitutive law" \
-    "${CASE_DIR}/${SOLVER_LOGFILE}" 2> /dev/null || true; })
-
-if [[ "${n_laws}" == 3 ]]; then
-    echo "PASS: the case constructed three mechanical constitutive laws"
-else
-    echo "FAIL: the case constructed ${n_laws:-0} mechanical constitutive" \
-        "laws, not three"
-    failures=$((failures + 1))
-fi
-
-for interface in 13 23; do
-    data_file="$(sample_file "interface${interface}")"
-
-    if [[ -z "${data_file}" || ! -f "${data_file}" ]]; then
-        echo "FAIL: Could not find the sampled stress of interface ${interface}"
-        failures=$((failures + 1))
-        continue
-    fi
-
-    if ! result=$(interface_stress "${data_file}"); then
-        echo "FAIL: Could not extract the stress of interface ${interface}"
-        failures=$((failures + 1))
-        continue
-    fi
-
-    IFS=$'\t' read -r mean order s_min s_max <<< "${result}"
-
-    if [[ "${interface}" == 13 ]]; then
-        p=$(analytical_order "${E1}" "${NU1}" "${E3}" "${NU3}")
-        order_tol="${ORDER13_REL_ERR_MAX}"
-        ref_min="${REF_MIN13}"
-        ref_max="${REF_MAX13}"
-    else
-        p=$(analytical_order "${E2}" "${NU2}" "${E3}" "${NU3}")
-        order_tol="${ORDER23_REL_ERR_MAX}"
-        ref_min="${REF_MIN23}"
-        ref_max="${REF_MAX23}"
-    fi
-
-    check_value "Interface ${interface}: mean stress" \
-        "${mean}" 1 1 "${MEAN_STRESS_ERR_MAX}"
-    check_value "Interface ${interface}: singularity order" \
-        "${order}" "${p}" "${p}" "${order_tol}"
-    check_value "Interface ${interface}: local minimum stress" \
-        "${s_min}" "${ref_min}" "${ref_min}" "${EXTREMA_REL_ERR_MAX}"
-    check_value "Interface ${interface}: local maximum stress" \
-        "${s_max}" "${ref_max}" "${ref_max}" "${EXTREMA_REL_ERR_MAX}"
-done
-
 if [ "$CHECK_ONLY" = false ]; then
+    prepare_case
+
+    for approach in "${APPROACHES[@]}"; do
+        echo
+        echo "------------------------------------------------------------"
+        echo "Testing approach: ${approach}"
+        echo "------------------------------------------------------------"
+
+        ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
+        (
+            cd "${CASE_DIR}"
+            ./Allrun "${approach}" > "${ALLRUN_LOGFILE}" 2>&1
+        )
+
+        if solids4Foam::regressionCaseSkipped \
+            "${CASE_DIR}/${ALLRUN_LOGFILE}"
+        then
+            echo "Skipping ${approach} because it is unavailable in this" \
+                "environment"
+            continue
+        fi
+
+        check_case
+    done
+
     ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
+else
+    echo "Running in check-only mode: skipping Allclean and Allrun"
+
+    if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
+        echo "Skipping regression checks because the tutorial skipped in this environment"
+        exit 0
+    fi
+
+    check_case
 fi
 
 echo

@@ -1,0 +1,29 @@
+{
+  "half_width_m": 0.03,
+  "applied_stress_pa": 1.0e6,
+  "materials": {
+    "1": {"E_pa": 206.0e9, "nu": 0.3},
+    "2": {"E_pa": 70.3e9, "nu": 0.345},
+    "3": {"E_pa": 4.93e9, "nu": 0.33}
+  },
+  "default_variants": ["petscSnes"],
+  "variants": {
+    "petscSnes": {"approach": "petscSnes"},
+    "segregated": {"approach": "segregated"}
+  },
+  "tutorial_level": 3,
+  "order_fit_window_r_over_w": [1.0e-4, 3.0e-4],
+  "thickness_study": {
+    "thicknesses": ["0", "0.002", "0.005", "0.01"],
+    "reference_curve": "ioka_sigmaxx_interface{interface}_hOverW_{thickness}.dat"
+  },
+  "mesh_study": {
+    "thickness": "0.01",
+    "default_levels": [1, 2, 3, 4],
+    "change_window_r_over_w": [1.0e-4, 1.0]
+  },
+  "acceptance": {
+    "mean_stress_error_tolerance": 1.0e-3,
+    "bimaterial_order_relative_error_tolerance": 0.05
+  }
+}

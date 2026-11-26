@@ -6,29 +6,58 @@
 # Source solids4Foam scripts
 source solids4FoamScripts.sh
 
-# "./Allrun" runs the plate with a mid-layer of thickness h = 0.01W;
-# "./Allrun <h/W>" selects the thickness, where <h/W> is 0.002, 0.005, 0.01 or
-# 0, which is the bi-material plate with no mid-layer
-H_OVER_W="${1:-0.01}"
-case "${H_OVER_W}" in
-    0)
-        MATERIALS="twoMaterials"
-        ;;
-    0.002|0.005|0.01)
-        MATERIALS="threeMaterials"
-        ;;
-    *)
-        echo "Usage: ./Allrun [0|0.002|0.005|0.01]"
-        exit 1
-        ;;
-esac
+# "./Allrun" runs the plate with a mid-layer of thickness h = 0.01W using the
+# segregated solution algorithm. The arguments, in any order, select
+#   - the thickness as h/W: 0.002, 0.005, 0.01 or 0, which is the bi-material
+#     plate with no mid-layer
+#   - the solution algorithm: segregated or petscSnes
+H_OVER_W="0.01"
+APPROACH="segregated"
+for arg in "$@"
+do
+    case "${arg}" in
+        0|0.002|0.005|0.01)
+            H_OVER_W="${arg}"
+            ;;
+        segregated|petscSnes)
+            APPROACH="${arg}"
+            ;;
+        *)
+            echo "Usage: ./Allrun [0|0.002|0.005|0.01] [segregated|petscSnes]"
+            exit 1
+            ;;
+    esac
+done
 
-# Create the dictionaries that depend on the mid-layer thickness
-echo "Creating the case for h/W = ${H_OVER_W}"
-m4 -P -DhOverW="${H_OVER_W}" system/blockMeshDict.m4 > system/blockMeshDict
-m4 -P -DhOverW="${H_OVER_W}" system/sample.m4 > system/sample
+if [[ "${H_OVER_W}" == "0" ]]
+then
+    MATERIALS="twoMaterials"
+else
+    MATERIALS="threeMaterials"
+fi
+
+if [[ "${APPROACH}" == "petscSnes" ]]
+then
+    solids4Foam::requirePetscOrExitSilently
+fi
+
+# Create the dictionaries for the selected mid-layer thickness and solution
+# algorithm
+echo "Creating the case for h/W = ${H_OVER_W} with the ${APPROACH} approach"
+if [[ "${MATERIALS}" == "twoMaterials" ]]
+then
+    cp system/blockMeshDict.twoMaterials system/blockMeshDict
+    cp system/sample.twoMaterials system/sample
+else
+    m4 -P -DhOverW="${H_OVER_W}" system/blockMeshDict.threeMaterials.m4 \
+        > system/blockMeshDict
+    m4 -P -DhOverW="${H_OVER_W}" system/sample.threeMaterials.m4 \
+        > system/sample
+fi
 cp system/sample system/sampleDict
 cp "constant/mechanicalProperties.${MATERIALS}" constant/mechanicalProperties
+cp "constant/solidProperties.${APPROACH}" constant/solidProperties
+cp "system/fvSolution.${APPROACH}" system/fvSolution
 
 # Check case version is correct
 solids4Foam::convertCaseFormat .
@@ -50,7 +79,7 @@ fi
 # Create plots
 if command -v gnuplot &> /dev/null
 then
-    echo "Generating sigmaxx.png using gnuplot"
+    echo "Generating sigmaxx.png and sigmaxxMidLine.png using gnuplot"
     gnuplot -e "hOverW=${H_OVER_W}" plot.gnuplot &> /dev/null
 else
     echo "Please install gnuplot if you would like to generate the plots"

@@ -20,25 +20,24 @@ FoamFile
 m4_changecom(//)m4_changequote([,])
 m4_define(calc, [m4_esyscmd(perl -e 'printf ($1)')])
 
-// Thickness of the mid-layer relative to W: 0, 0.002, 0.005 or 0.01. Allrun
+// Thickness of the mid-layer relative to W: 0.002, 0.005 or 0.01. Allrun
 // sets it with "m4 -DhOverW=<value>"
 m4_ifdef([hOverW], [], [m4_define(hOverW, 0.01)])
-
-// The first argument is kept if there is a mid-layer, the second if not
-m4_define(ifMidLayer, [m4_ifelse(hOverW, 0, [$2], [$1])])
-
-// GEOMETRY, in m
-m4_define(W, 0.03)
-m4_define(h, calc(hOverW*W))
 
 // The lines run along the interfaces from the free edge to the symmetry
 // plane, 0.05 micrometres inside materials 1 and 2 rather than on the
 // interface faces themselves: this is within the first cell next to the
 // interface, which is 0.33 micrometres wide
-m4_define(offset, 5e-8)
-m4_define(xInterface13, calc(-1.5*W - h - offset))
-m4_define(xInterface23, calc(-1.5*W + offset))
-m4_define(yBottom, calc(-W))
+m4_define(W, 0.03)
+m4_define(h, calc(hOverW*W))
+m4_define(xInterface23, calc(1.5*W + h + 5e-8))
+
+// The mid-line runs across the plate at half its height. The part of it
+// around the mid-layer is sampled again on its own, as the sample utility of
+// foam-extend skips cells that are smaller than 1e-5 of the length of a line
+m4_define(xRight, calc(3*W + h))
+m4_define(xZoomStart, calc(1.5*W - h))
+m4_define(xZoomEnd, calc(1.5*W + 2*h))
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -58,20 +57,34 @@ fields
 
 sets
 (
-    ifMidLayer([interface13], [interface12])
+    interface13
     {
         type            face;
         axis            y;
-        start           (xInterface13 yBottom 0.0005);
-        end             (xInterface13 0 0.0005);
-    }ifMidLayer([
+        start           (0.04499995 0 0.0005);
+        end             (0.04499995 0.03 0.0005);
+    }
     interface23
     {
         type            face;
         axis            y;
-        start           (xInterface23 yBottom 0.0005);
-        end             (xInterface23 0 0.0005);
-    }])
+        start           (xInterface23 0 0.0005);
+        end             (xInterface23 0.03 0.0005);
+    }
+    midLine
+    {
+        type            face;
+        axis            x;
+        start           (0 0.015 0.0005);
+        end             (xRight 0.015 0.0005);
+    }
+    midLineZoom
+    {
+        type            face;
+        axis            x;
+        start           (xZoomStart 0.015 0.0005);
+        end             (xZoomEnd 0.015 0.0005);
+    }
 );
 
 surfaces
