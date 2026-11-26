@@ -211,22 +211,37 @@ void pimpleFluid::correctFluxConsistentPatches
     // boundary velocity flux to O(rAtU h d2p/dn2) (grad(p)_P.n - snGrad(p)
     // = -(h/4) d2p/dn2 for a fixed-value pressure): an O(deltaT h) term,
     // formally first order in time at a fixed mesh. The fixed pressure stays
-    // implicit in the pressure equation
+    // implicit in the pressure equation.
+    // On a patch whose velocity condition does not fix the value, e.g. a
+    // prescribed (non-zero) normal gradient, HbyA_b is the cell value, so the
+    // flux is that of the cell-centre velocity, U_P.S_f, which differs from
+    // U_b.S_f by (h/2) dU/dn.S_f: the pressure equation corrects this O(h)
+    // flux error with an O(h^2/deltaT) pressure error in the boundary cells.
+    // There the increment (U_b - U_P).S_f of the velocity condition is added
+    // to the flux, which keeps the current HbyA (and any ddtCorr) and leaves
+    // a zero-gradient velocity unchanged
     forAll(fluxConsistentPatches_, i)
     {
         const label patchI = fluxConsistentPatches_[i];
+        const fvPatchVectorField& Ub = U().boundaryField()[patchI];
 
-        const vectorField gradpP
-        (
-            gradp().boundaryField()[patchI].patchInternalField()
-        );
-
-        phiHbyA.boundaryFieldRef()[patchI] =
+        if (Ub.assignable())
+        {
+            phiHbyA.boundaryFieldRef()[patchI] +=
+                (Ub - Ub.patchInternalField())
+              & mesh().Sf().boundaryField()[patchI];
+        }
+        else
+        {
+            const vectorField gradpP
             (
-                U().boundaryField()[patchI]
-              + rAtU.boundaryField()[patchI]*gradpP
-            )
-          & mesh().Sf().boundaryField()[patchI];
+                gradp().boundaryField()[patchI].patchInternalField()
+            );
+
+            phiHbyA.boundaryFieldRef()[patchI] =
+                (Ub + rAtU.boundaryField()[patchI]*gradpP)
+              & mesh().Sf().boundaryField()[patchI];
+        }
     }
 }
 
@@ -312,17 +327,12 @@ pimpleFluid::pimpleFluid
         {
             const label patchI = fluxConsistentPatches_[i];
 
-            if
-            (
-                U().boundaryField()[patchI].assignable()
-             || !p().boundaryField()[patchI].fixesValue()
-            )
+            if (!p().boundaryField()[patchI].fixesValue())
             {
                 FatalErrorInFunction
                     << "fluxConsistentPatches: patch "
                     << mesh().boundary()[patchI].name()
-                    << " needs a velocity condition that fixes the boundary"
-                    << " value (fixedValue or mixed) and a fixed pressure"
+                    << " needs a fixed pressure"
                     << abort(FatalError);
             }
         }

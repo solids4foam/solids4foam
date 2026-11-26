@@ -415,6 +415,14 @@ release. For complete commit-level details and contributor information, see the
 
 ### Changed
 
+- `pimpleFluid` `fluxConsistentPatches` also accepts fixed-pressure patches
+  whose velocity condition does not fix the value, such as a prescribed
+  normal velocity gradient. There the boundary flux was that of the
+  boundary-cell velocity, an O(h) flux error that the pressure equation
+  turned into an O(h²/Δt) pressure error in the boundary cells (first order
+  with Δt ∝ h, and growing as Δt falls). In the manufactured-solution FSI
+  case, the outlet layer goes and the fluid velocity and pressure converge at
+  second order (#750). Patches not listed are unchanged.
 - The `beamInCrossFlow` tutorial now follows the stationary 3-D benchmark of
   Richter (2012), section 7.2: the plate moves to x = 0.4-0.5 m, the solid is
   St Venant-Kirchhoff with E = 1.4 MPa (was 10 kPa) and nu = 0.4, and the

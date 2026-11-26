@@ -107,8 +107,13 @@ class pimpleFluid
         //  of the boundary cell, so the flux is the boundary velocity flux
         //  to O(rAU h), i.e. O(deltaT h): formally first order in time at a
         //  fixed mesh, with a coefficient that vanishes with h (the same
-        //  order as a standard fixed-pressure outlet). Read from the PIMPLE
-        //  dictionary; empty by default
+        //  order as a standard fixed-pressure outlet). The patches may also
+        //  have a velocity condition that does not fix the value, e.g. a
+        //  prescribed normal gradient: HbyA_b is then the cell value, and
+        //  the flux that of the cell-centre velocity, an O(h) flux error
+        //  that becomes an O(h^2/deltaT) pressure error in the boundary
+        //  cells; there the increment (U_b - U_P).S_f is added to the flux.
+        //  Read from the PIMPLE dictionary; empty by default
         labelList fluxConsistentPatches_;
 
         //- Cumulative continuity errors
@@ -140,7 +145,8 @@ class pimpleFluid
         void updateRobinFsiInterface(surfaceScalarField& phiHbyA);
 
         //- Set phiHbyA on fluxConsistentPatches to
-        //  (U_b + rAtU_b grad(p)_P).S_f
+        //  (U_b + rAtU_b grad(p)_P).S_f, or add (U_b - U_P).S_f where the
+        //  velocity condition does not fix the value
         void correctFluxConsistentPatches
         (
             surfaceScalarField& phiHbyA,
