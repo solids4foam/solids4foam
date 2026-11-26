@@ -119,8 +119,11 @@ $$
 
 with $\beta = 0.2$, as in the Hessenthaler et al. (2017) benchmark. On
 backflow faces the traction cancels a fraction $2\beta$ of the incoming
-kinetic energy flux; on outflow faces the condition is zero gradient. The
-condition is smooth as faces change between outflow and backflow, so with
+kinetic energy flux; on outflow faces the condition is zero gradient. With
+`pimpleFluid`, the peak kinetic energy influx through the outlet is about
+half that of a zero-gradient outlet ($1.7 \times 10^{-5}$ of the outflux,
+against $3.3 \times 10^{-5}$), while the backflow flux itself is about the
+same. The condition is smooth as faces change between outflow and backflow, so with
 `newtonIcoFluid` it converges in at most three Newton iterations per time
 step here. `./Allclean` restores the default `0/U`.
 
