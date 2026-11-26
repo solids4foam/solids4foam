@@ -23,6 +23,7 @@ License
 #include "surfaceFields.H"
 #include "fvcMeshPhi.H"
 #include "backwardDdtScheme.H"
+#include "bdfFsiCheck.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -256,6 +257,13 @@ void elasticWallVelocityFvPatchVectorField::updateCoeffs()
 #else
         mesh.schemesDict().ddtScheme("ddt(" + U.name() +')')
 #endif
+    );
+
+    bdfFsiCheck
+    (
+        ddtScheme,
+        "ddt(" + U.name() + ')',
+        "elasticWallVelocityFvPatchVectorField::updateCoeffs"
     );
 
     // Compute velocity vector

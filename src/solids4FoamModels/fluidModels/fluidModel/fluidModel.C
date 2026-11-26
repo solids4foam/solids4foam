@@ -26,6 +26,7 @@ License
 #include "elasticWallVelocityFvPatchVectorField.H"
 #include "EulerDdtScheme.H"
 #include "backwardDdtScheme.H"
+#include "bdfFsiCheck.H"
 #include "addToRunTimeSelectionTable.H"
 #include "fluxCorrectedVelocityFvPatchVectorField.H"
 #include "compatibilityFunctions.H"
@@ -335,6 +336,13 @@ void Foam::fluidModel::updateRobinFsiInterface
 #else
                 mesh().schemesDict().ddtScheme("ddt(" + U.name() +')');
 #endif
+
+            bdfFsiCheck
+            (
+                ddtScheme,
+                "ddt(" + U.name() + ')',
+                "fluidModel::updateRobinFsiInterface"
+            );
 
             if (ddtScheme == fv::EulerDdtScheme<vector>::typeName)
             {

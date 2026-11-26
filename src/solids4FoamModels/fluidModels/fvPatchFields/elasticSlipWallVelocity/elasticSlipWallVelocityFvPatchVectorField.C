@@ -23,6 +23,7 @@ License
 #include "surfaceFields.H"
 #include "fvcMeshPhi.H"
 #include "backwardDdtScheme.H"
+#include "bdfFsiCheck.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -249,6 +250,13 @@ void elasticSlipWallVelocityFvPatchVectorField::updateCoeffs()
 #else
         mesh.schemesDict().ddtScheme("ddt(" + U.name() +')')
 #endif
+    );
+
+    bdfFsiCheck
+    (
+        ddtScheme,
+        "ddt(" + U.name() + ')',
+        "elasticSlipWallVelocityFvPatchVectorField::updateCoeffs"
     );
 
     if (ddtScheme == fv::backwardDdtScheme<vector>::typeName)

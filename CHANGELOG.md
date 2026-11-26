@@ -125,9 +125,11 @@ release. For complete commit-level details and contributor information, see the
   exactly, reducing to `backward`'s at order 2. The volume history holds the
   volumes each step ended with, also when the mesh moves again after the last
   ddt call of a step (`additionalMeshCorrection`). On a moving mesh a restart
-  ramps the order up from Euler again, and the Robin-Neumann FSI coupling,
-  which selects its form by the names `Euler` and `backward`, is not yet
-  consistent with `BDF`. `fieldWeights(vf)` returns the weights the scheme
+  ramps the order up from Euler again. The Robin-Neumann FSI coupling and the
+  FSI wall conditions select their form by the names `Euler` and `backward`,
+  so they now stop with a fatal error if the fluid ddt is `BDF`, rather than
+  quietly taking their Euler form. `fieldWeights(vf)` returns the weights the
+  scheme
   applies to `vf` on the current step, for code that must use the same
   ones. The `bdfDdtMovingMesh` regression test
   (`applications/test/bdfDdtMovingMesh/case`) runs `Test-bdfDdtMovingMesh`,

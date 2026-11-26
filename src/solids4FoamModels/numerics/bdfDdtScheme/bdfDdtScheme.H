@@ -187,13 +187,16 @@ Description
 
     FSI. Parts of the fluid models and FSI boundary conditions choose their
     form by the name of the ddt scheme, "Euler" or "backward": the Robin
-    interface updates of pimpleFluid and fluidModel, elasticWallVelocity,
-    elasticSlipWallVelocity, newMovingWallVelocity and the Robin coefficient
-    of elasticWallPressure. With BDF they take their Euler form or skip the
-    update, so the Robin-Neumann coupling is not yet consistent with a fluid
-    ddt of order 2 or above, and BDF 2 does not reproduce backward exactly in
-    FSI. Code that must use the weights of the scheme can take them from
-    fieldWeights.
+    interface updates of pimpleFluid, fluidModel and interFluid,
+    elasticWallVelocity, elasticSlipWallVelocity, newMovingWallVelocity and
+    the Robin coefficient of elasticWallPressure. With BDF they would take
+    their Euler form or skip the update, so they stop with a fatal error
+    instead (bdfFsiCheck.H) and BDF cannot yet be used for the fluid of an
+    FSI case. They can take the weights of the scheme from fieldWeights,
+    which would make BDF usable there. Fluid-only cases, on static or moving
+    meshes, do not reach them unless they use newMovingWallVelocity;
+    OpenFOAM's movingWallVelocity, whose normal wall velocity comes from
+    meshPhi, can be used with BDF.
 
 Author
     David Kelly, UCD.
