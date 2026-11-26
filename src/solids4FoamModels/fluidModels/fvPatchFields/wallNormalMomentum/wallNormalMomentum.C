@@ -78,27 +78,47 @@ tmp<volVectorField> field
     const volScalarField nuEff(model.nuEff());
     const volTensorField gradU(fvc::grad(U));
     const volTensorField gradUT(gradU.T());
-    const volTensorField nuDevGradUT(nuEff*dev2(gradUT));
+    const volTensorField devGradUT(dev2(gradUT));
+
+    // Variable density (a registered rho field, e.g. interFluid): the
+    // momentum equation has the stress divergence of rho*nuEff, which is
+    // divided by rho to give an acceleration. Such solvers do not apply the
+    // fvOptions to the momentum equation, so the sources are not included
+    const bool variableDensity = db.foundObject<volScalarField>("rho");
+
+    const volScalarField muEff
+    (
+        variableDensity
+      ? volScalarField(db.lookupObject<volScalarField>("rho")*nuEff)
+      : nuEff
+    );
+
+    const volTensorField muDevGradUT(muEff*devGradUT);
 
     // The transpose part is the Gauss linear divergence, as usually in the
     // fluid momentum equation, written with linearly interpolated face values
     // so that it needs no divergence or interpolation scheme of its own
-    const surfaceVectorField nuDevGradUTf
+    const surfaceVectorField muDevGradUTf
     (
-        U.mesh().Sf() & linearInterpolate(nuDevGradUT)
+        U.mesh().Sf() & linearInterpolate(muDevGradUT)
     );
 
     tmp<volVectorField> tterm
     (
-        fvc::laplacian(nuEff, U) + fvc::div(nuDevGradUTf)
+        fvc::laplacian(muEff, U) + fvc::div(muDevGradUTf)
     );
+
+    if (variableDensity)
+    {
+        tmpRef(tterm) /= db.lookupObject<volScalarField>("rho");
+    }
 
 #ifdef OPENFOAM_COM
     // Momentum sources (fvOptions), e.g. a body force: "M & U" evaluates the
     // source matrix (Su + Sp*U) per unit volume
     fv::options& fvOptions = fv::options::New(U.mesh());
 
-    if (fvOptions.optionList::size())
+    if (!variableDensity && fvOptions.optionList::size())
     {
         volVectorField& Uref = const_cast<volVectorField&>(U);
         const tmp<fvVectorMatrix> tM(fvOptions(Uref));

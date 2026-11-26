@@ -43,18 +43,19 @@ Description
     with the ddt scheme of U.
 
     Enclosed domains: if no boundary of the pressure fixes its value, the
-    pressure equation needs the net prescribed boundary flux to vanish, which
-    the discrete acceleration and viscous terms only satisfy approximately;
-    the solver then stops in adjustPhi ("Continuity error cannot be removed").
-    In this case the weighted mean of the gradient over all
+    net flux of the prescribed gradient must vanish for the flux treatment
+    below, which neither the discrete wall acceleration nor the other terms
+    satisfy in general; the solver then stops in adjustPhi ("Continuity error
+    cannot be removed"). In this case the weighted mean of the gradient over all
     movingWallPressure patches of the field is subtracted, with the weights
     rAU*|Sf| (|Sf| if rAU is not registered). These are the weights of the
     flux rAU*snGrad(p)*|Sf| that pimpleFluid adds to the predicted flux for
     this condition; pimpleFluid updates the condition just before, so that
     the predicted flux and the pressure equation use the same gradient and
-    the net flux checked by adjustPhi is that of the wall velocity. For an
-    incompressible fluid the exact mean of n & a over a closed boundary is
-    zero, so this removes a discretisation-level imbalance.
+    the net flux checked by adjustPhi is that of the wall velocity. This is
+    a compatibility projection: it removes the uniform part of the
+    gradient, which the pressure of an enclosed domain cannot represent. In
+    the ringAddedMass case it is a discretisation-level correction.
 
 Usage
     \verbatim
