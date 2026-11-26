@@ -86,6 +86,32 @@ tmp<volVectorField> field
     // fvOptions to the momentum equation, so the sources are not included
     const bool variableDensity = db.foundObject<volScalarField>("rho");
 
+#ifndef OPENFOAM_COM
+    // Only the OpenFOAM.com interFluid adds the corresponding interface flux
+    // and uses this form of the viscous term: elsewhere the term is omitted
+    // for variable density
+    if (variableDensity)
+    {
+        return tmp<volVectorField>
+        (
+            new volVectorField
+            (
+                IOobject
+                (
+                    "wallNormalMomentum",
+                    U.time().timeName(),
+                    U.mesh(),
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE,
+                    false
+                ),
+                U.mesh(),
+                dimensionedVector("zero", dimAcceleration, vector::zero)
+            )
+        );
+    }
+#endif
+
     const volScalarField muEff
     (
         variableDensity

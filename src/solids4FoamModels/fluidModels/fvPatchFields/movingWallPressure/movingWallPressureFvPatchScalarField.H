@@ -52,10 +52,10 @@ Description
     flux rAU*snGrad(p)*|Sf| that pimpleFluid adds to the predicted flux for
     this condition; pimpleFluid updates the condition just before, so that
     the predicted flux and the pressure equation use the same gradient and
-    the net flux checked by adjustPhi is that of the wall velocity. This is
-    a compatibility projection: it removes the uniform part of the
-    gradient, which the pressure of an enclosed domain cannot represent. In
-    the ringAddedMass case it is a discretisation-level correction.
+    the net flux checked by adjustPhi is that of the wall velocity. The
+    subtraction makes the prescribed gradient compatible with this flux
+    treatment; in the ringAddedMass case it is a discretisation-level
+    correction.
 
 Usage
     \verbatim

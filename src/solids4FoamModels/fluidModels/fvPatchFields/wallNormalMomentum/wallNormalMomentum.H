@@ -42,7 +42,9 @@ Description
     With a registered rho field (variable density, e.g. interFluid) the
     viscous term is that of rho*nuEff, divided by rho, and the fvOptions,
     which these solvers do not apply to the momentum equation, are not
-    included.
+    included. On OpenFOAM.org and foam-extend, whose interFluid does not add
+    the corresponding interface flux, the terms are omitted (zero) for
+    variable density.
 
     The evaluation uses finite volume operators on the whole field, i.e.
     processor-boundary communication: all processors must call it together.
