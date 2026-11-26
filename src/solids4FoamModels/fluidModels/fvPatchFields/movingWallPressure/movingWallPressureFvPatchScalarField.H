@@ -110,9 +110,6 @@ class movingWallPressureFvPatchScalarField
         //- Return the fluid density on the patch
         tmp<scalarField> patchDensity() const;
 
-        //- Return the viscous term of the momentum equation in all cells
-        tmp<volVectorField> viscousTermField() const;
-
         //- Return the normal gradient from the wall-normal momentum
         //  equation, before the enclosed-domain correction; viscousPtr is
         //  the viscous term field, or null if it is not needed

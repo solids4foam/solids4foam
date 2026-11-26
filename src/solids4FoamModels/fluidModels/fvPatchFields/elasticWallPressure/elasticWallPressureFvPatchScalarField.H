@@ -82,6 +82,15 @@ Description
     exactly, as for a Dirichlet velocity condition, without changing the
     Robin condition itself.
 
+    Viscous term (viscousTerm, default yes): the wall-normal momentum
+    equation is dp/dn = rho_f*(V - a_n), where V is the normal component of
+    the viscous term of the momentum equation in the wall cells (see
+    wallNormalViscousTerm), as in movingWallPressure. The Robin condition
+    then uses a_s - V in place of the solid normal acceleration a_s, and
+    pimpleFluid and interFluid add rAU*V*|Sf| (times rho for interFluid) to
+    the interface flux, so that the converged flux is unchanged. viscousTerm
+    no gives the condition of solids4foam v2.4 and earlier, which omits V.
+
     Example:
     \verbatim
     interface
@@ -89,6 +98,7 @@ Description
         type            elasticWallPressure;
         hsModel         secant;             // Optional, default
         hsScale         1;                  // Optional
+        viscousTerm     yes;                // Optional, default
         value           uniform 0;
     }
     \endverbatim
@@ -233,6 +243,14 @@ class elasticWallPressureFvPatchScalarField
 
         //- Optional user-specified nonuniform hs on the fluid patch
         autoPtr<scalarField> hsUserPtr_;
+
+        //- Include the viscous term of the wall-normal momentum equation
+        Switch viscousTerm_;
+
+        //- Normal viscous term of the momentum equation in the cells next
+        //  to the patch (kinematic, acceleration units), from the last
+        //  update; zero with viscousTerm no
+        scalarField viscousNormal_;
 
         //- Local solid wall thickness on the solid patch
         mutable autoPtr<scalarField> solidThicknessPtr_;
@@ -475,6 +493,19 @@ public:
             tmp<scalarField> prevNormalAcceleration() const
             {
                 return patch().nf() & prevAcceleration_;
+            }
+
+            //- Return true if the viscous term is included
+            bool viscousTerm() const
+            {
+                return viscousTerm_;
+            }
+
+            //- Return the normal viscous term of the momentum equation in
+            //  the cells next to the patch (kinematic), from the last update
+            const scalarField& viscousNormal() const
+            {
+                return viscousNormal_;
             }
 
             //- Set by the FSI coupling: is the fluid interface moved to the

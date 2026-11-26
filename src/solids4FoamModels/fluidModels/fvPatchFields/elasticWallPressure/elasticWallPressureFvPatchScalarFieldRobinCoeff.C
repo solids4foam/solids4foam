@@ -796,6 +796,9 @@ elasticWallPressureFvPatchScalarField::fluidNormalAcceleration() const
         }
     }
 
+    // With the viscous term, dp/dn = rho_f*(V - a_n)
+    tmpRef(tacc) += viscousNormal_;
+
     return tacc;
 }
 

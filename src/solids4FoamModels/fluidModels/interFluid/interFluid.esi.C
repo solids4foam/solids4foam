@@ -156,6 +156,27 @@ void interFluid::updateRobinFsiInterfacePhi
             }
 
             pRobin.setKinematicConsistency(consistent);
+
+            // With the viscous term the Robin condition imposes
+            // snGrad(p_rgh) = gSrc + rho*(V - a_n), with V the normal viscous
+            // term: rAU*rho*V*|Sf| is added here, so that the converged flux
+            // is unchanged. The condition is updated first, so that the
+            // pressure equation uses the same V
+            if (pRobin.viscousTerm())
+            {
+                pRobin.updateCoeffs();
+
+                const scalarField& rhoB =
+                    mesh().lookupObject<volScalarField>
+                    (
+                        "rho"
+                    ).boundaryField()[patchI];
+
+                phiHbyA.boundaryFieldRef()[patchI] +=
+                    rAU.boundaryField()[patchI]
+                   *mesh().magSf().boundaryField()[patchI]
+                   *rhoB*pRobin.viscousNormal();
+            }
         }
         else if
         (

@@ -177,6 +177,22 @@ void pimpleFluid::updateRobinFsiInterface
             }
 
             pRobin.setKinematicConsistency(consistent);
+
+            // With the viscous term the Robin condition imposes
+            // dp/dn = rho_f*(V - a_n), with V the normal viscous term, and
+            // the pressure equation removes rAU*(V - a_n)*|Sf| from the
+            // flux: rAU*V*|Sf| is added here, so that the converged flux is
+            // unchanged. The condition is updated first, so that the
+            // pressure equation uses the same V
+            if (pRobin.viscousTerm())
+            {
+                pRobin.updateCoeffs();
+
+                phiHbyA.boundaryFieldRef()[patchI] +=
+                    rAU_.boundaryField()[patchI]
+                   *pRobin.viscousNormal()
+                   *mesh().magSf().boundaryField()[patchI];
+            }
         }
         else if
         (

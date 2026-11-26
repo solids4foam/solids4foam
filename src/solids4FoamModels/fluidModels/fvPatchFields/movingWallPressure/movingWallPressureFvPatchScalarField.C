@@ -23,14 +23,9 @@ License
 #include "volFields.H"
 #include "surfaceFields.H"
 #include "fvc.H"
-#include "linear.H"
 #include "newMovingWallVelocityFvPatchVectorField.H"
+#include "wallNormalViscousTerm.H"
 #include "compatibilityFunctions.H"
-#ifdef OPENFOAM_ORG
-    #include "momentumTransportModel.H"
-#else
-    #include "turbulenceModel.H"
-#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -111,55 +106,6 @@ tmp<scalarField> movingWallPressureFvPatchScalarField::patchDensity() const
     const dimensionedScalar rho(transportProperties.lookup("rho"));
 
     return tmp<scalarField>(new scalarField(patch().size(), rho.value()));
-}
-
-
-tmp<volVectorField>
-movingWallPressureFvPatchScalarField::viscousTermField() const
-{
-#ifdef OPENFOAM_ORG
-    typedef momentumTransportModel viscosityModelType;
-#elif defined(OPENFOAM_COM)
-    typedef turbulenceModel viscosityModelType;
-#else
-    typedef incompressible::turbulenceModel viscosityModelType;
-#endif
-
-    const wordList modelNames
-    (
-        db().lookupClass<viscosityModelType>().toc()
-    );
-
-    if (modelNames.size() != 1)
-    {
-        FatalErrorInFunction
-            << "Patch " << patch().name() << ": the viscous term needs one "
-            << "turbulence (momentum transport) model in the fluid region, "
-            << "found " << modelNames.size() << nl
-            << "Set viscousTerm no to omit the viscous term"
-            << abort(FatalError);
-    }
-
-    const viscosityModelType& model =
-        db().lookupObject<viscosityModelType>(modelNames[0]);
-
-    const volVectorField& U = db().lookupObject<volVectorField>("U");
-
-    // Named intermediates: a reused tmp would alias an input of the products
-    const volScalarField nuEff(model.nuEff());
-    const volTensorField gradU(fvc::grad(U));
-    const volTensorField gradUT(gradU.T());
-    const volTensorField nuDevGradUT(nuEff*dev2(gradUT));
-
-    // The transpose part is the Gauss linear divergence, as usually in the
-    // fluid momentum equation, written with linearly interpolated face values
-    // so that it needs no divergence or interpolation scheme of its own
-    const surfaceVectorField nuDevGradUTf
-    (
-        U.mesh().Sf() & linearInterpolate(nuDevGradUT)
-    );
-
-    return fvc::laplacian(nuEff, U) + fvc::div(nuDevGradUTf);
 }
 
 
@@ -328,7 +274,10 @@ void movingWallPressureFvPatchScalarField::updateCoeffs()
 
     if (needViscous)
     {
-        viscousFieldPtr.reset(viscousTermField().ptr());
+        viscousFieldPtr.reset
+        (
+            wallNormalViscousTerm::field(db(), "U", patch().name()).ptr()
+        );
     }
 
     const volVectorField* viscousPtr =

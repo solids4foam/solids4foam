@@ -18,6 +18,7 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "elasticWallPressureFvPatchScalarField.H"
+#include "wallNormalViscousTerm.H"
 #include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
 #include "surfaceFields.H"
@@ -270,6 +271,8 @@ void elasticWallPressureFvPatchScalarField::resetRobinState()
     secantNumField_ = 0.0;
     secantDenField_.setSize(patch().size(), 0.0);
     secantDenField_ = 0.0;
+    viscousNormal_.setSize(patch().size(), 0.0);
+    viscousNormal_ = 0.0;
     prevDeltaPNorm_ = -1;
     nDiverging_ = 0;
 }
@@ -312,7 +315,8 @@ elasticWallPressureFvPatchScalarField::elasticWallPressureFvPatchScalarField
     robinNumberTimeIndex_(-1),
     constantHs_(-1.0),
     hsControls_(),
-    hsUserPtr_()
+    hsUserPtr_(),
+    viscousTerm_(true)
 {
     safeguardScale_ = 1.0;
     resetRobinState();
@@ -339,7 +343,8 @@ elasticWallPressureFvPatchScalarField::elasticWallPressureFvPatchScalarField
     robinNumberTimeIndex_(-1),
     constantHs_(ptf.constantHs_),
     hsControls_(ptf.hsControls_),
-    hsUserPtr_()
+    hsUserPtr_(),
+    viscousTerm_(ptf.viscousTerm_)
 {
     if (ptf.hsUserPtr_.valid())
     {
@@ -376,7 +381,8 @@ elasticWallPressureFvPatchScalarField::elasticWallPressureFvPatchScalarField
     robinNumberTimeIndex_(-1),
     constantHs_(dict.lookupOrDefault<scalar>("constantHs", -1.0)),
     hsControls_(dict, constantHs_),
-    hsUserPtr_()
+    hsUserPtr_(),
+    viscousTerm_(dict.lookupOrDefault<Switch>("viscousTerm", true))
 {
     if (dict.found("value"))
     {
@@ -472,7 +478,8 @@ elasticWallPressureFvPatchScalarField::elasticWallPressureFvPatchScalarField
     robinNumberTimeIndex_(-1),
     constantHs_(pivpvf.constantHs_),
     hsControls_(pivpvf.hsControls_),
-    hsUserPtr_()
+    hsUserPtr_(),
+    viscousTerm_(pivpvf.viscousTerm_)
 {
     if (pivpvf.hsUserPtr_.valid())
     {
@@ -499,7 +506,8 @@ elasticWallPressureFvPatchScalarField::elasticWallPressureFvPatchScalarField
     robinNumberTimeIndex_(-1),
     constantHs_(pivpvf.constantHs_),
     hsControls_(pivpvf.hsControls_),
-    hsUserPtr_()
+    hsUserPtr_(),
+    viscousTerm_(pivpvf.viscousTerm_)
 {
     if (pivpvf.hsUserPtr_.valid())
     {
@@ -596,9 +604,26 @@ void elasticWallPressureFvPatchScalarField::updateCoeffs()
     const dimensionSet& pDims =
         mesh.lookupObject<volScalarField>(fieldName).dimensions();;
 
+    // Normal viscous term of the momentum equation in the wall cells
+    if (viscousTerm_)
+    {
+        viscousNormal_ =
+            wallNormalViscousTerm::patchNormal
+            (
+                patch(),
+                wallNormalViscousTerm::field(db(), "U", patch().name())()
+            );
+    }
+
     // The previous acceleration is updated at the end of each
-    // FSI iteration in the fluidSolidInterface
-    const scalarField prevDdtUn(patch().nf() & prevAcceleration_);
+    // FSI iteration in the fluidSolidInterface. With the viscous term, the
+    // wall-normal momentum equation is dp/dn = rho_f*(V - a_n), with V the
+    // normal viscous term, so the Robin condition uses a_n - V in place of
+    // the solid normal acceleration
+    const scalarField prevDdtUn
+    (
+        (patch().nf() & prevAcceleration_) - viscousNormal_
+    );
 
     // Check if a density field is present
     if (fsi().fluid().mesh().foundObject<volScalarField>("rho"))
@@ -711,6 +736,8 @@ void elasticWallPressureFvPatchScalarField::patchFlux
 void elasticWallPressureFvPatchScalarField::write(Ostream& os) const
 {
     robinFvPatchScalarField::write(os);
+    os.writeKeyword("viscousTerm")
+        << viscousTerm_ << token::END_STATEMENT << nl;
 #ifdef OPENFOAM_ORG
     writeEntry(os, "prevPressure", prevPressure_);
 #else
