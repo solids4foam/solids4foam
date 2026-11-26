@@ -145,7 +145,8 @@ void linGeomTotalDispSolid::checkVolumetricClosure() const
             << "    The pressure equation assumes a volumetric response of "
             << "K*tr(epsilon), with K taken from the mechanical model. The "
             << "law returned something else: the largest difference is "
-            << err << " against a response of order " << scale << '.' << nl << nl
+            << err << " against a response of order " << scale << '.'
+            << nl << nl
             << "    Separating the volumetric response is not enough on its "
             << "own - the pressure equation has to be solving for the same "
             << "thing, or the two halves describe different materials."
@@ -226,7 +227,7 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
             // Add stabilisation to the traction
             // We add this before enforcing the traction condition as the
             // stabilisation is set to zero on traction boundaries
-            momentumStabilisation().updateVector(D(), &gradD());
+            updateMomentumStabilisation(D(), gradD());
             traction += impKf_*momentumStabilisation().faceVector();
 
             // Enforce traction boundary conditions
@@ -543,7 +544,7 @@ bool linGeomTotalDispSolid::evolveExplicit()
     // Add stabilisation to the traction
     // We add this before enforcing the traction condition as the
     // stabilisation is set to zero on traction boundaries
-    momentumStabilisation().updateVector(D, &gradD);
+    updateMomentumStabilisation(D, gradD);
     traction += impKf_*momentumStabilisation().faceVector();
 
     // Enforce traction boundary conditions
@@ -906,8 +907,8 @@ void linGeomTotalDispSolid::setDeltaT(Time& runTime)
         // time-step. This means that we use 1/(2*d) == 0.5*deltaCoeff when
         // calculating the required stable time-step
         // i.e. deltaT = (1.0/(0.5*deltaCoeff)/waveSpeed
-        // For safety, we should use a time-step smaller than this e.g. Abaqus uses
-        // stableTimeStep/sqrt(2): we will default to this value
+        // For safety, we should use a time-step smaller than this e.g. Abaqus
+        // uses stableTimeStep/sqrt(2): we will default to this value
         const scalar requiredDeltaT =
             1.0/
             gMax
@@ -1117,7 +1118,7 @@ label linGeomTotalDispSolid::formResidual
         const volVectorField gradp(fvc::grad(p));
 
         // Re-calculate the pressure stabilisation parameter
-        pressureStabilisation().updateScalar(p, &gradp);
+        updatePressureStabilisation(p, gradp);
 
         // Dimensional consistency factor
         const dimensionedScalar one
@@ -1176,7 +1177,7 @@ label linGeomTotalDispSolid::formResidual
     // Add stabilisation to the traction
     // We add this before enforcing the traction condition as the
     // stabilisation is set to zero on traction boundaries
-    momentumStabilisation().updateVector(D, &gradD());
+    updateMomentumStabilisation(D, gradD());
     traction += impKf_*momentumStabilisation().faceVector();
 
     // Enforce traction boundary conditions
@@ -1286,8 +1287,9 @@ label linGeomTotalDispSolid::formJacobian
                 "one", dimensionSet(-2, 4, 4, 0, 0, 0, 0), 1.0
             );
 
-            // Compute the positive face-interpolated reciprocal of the approximate
-            // momentum equation diagonal (solid analogue of rAUf), [Pa]
+            // Compute the positive face-interpolated reciprocal of the
+            // approximate momentum equation diagonal (solid analogue of rAUf),
+            // [Pa]
             {
                 fvVectorMatrix approxMomJ
                 (
@@ -1385,9 +1387,23 @@ label linGeomTotalDispSolid::formJacobian
 
             hofvm::laplacianIntoPETScMatrix(jac, *this, reconstruction, D, mu);
 
-            hofvm::laplacianTransposeIntoPETScMatrix(jac, *this, reconstruction, D, mu);
+            hofvm::laplacianTransposeIntoPETScMatrix
+            (
+                jac,
+                *this,
+                reconstruction,
+                D,
+                mu
+            );
 
-            hofvm::laplacianTraceIntoPETScMatrix(jac, *this, reconstruction, D, lambda);
+            hofvm::laplacianTraceIntoPETScMatrix
+            (
+                jac,
+                *this,
+                reconstruction,
+                D,
+                lambda
+            );
         }
 
         if (momentumStabilisation().supportsHighOrderResidual())

@@ -434,7 +434,7 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveImplicitSegregated()
         // Add stabilisation to the traction
         // We add this before enforcing the traction condition as the stabilisation
         // is set to zero on traction boundaries
-        momentumStabilisation().updateVector(D(), &gradD());
+        updateMomentumStabilisation(D(), gradD());
         traction += impKf_*momentumStabilisation().faceVector();
 
         // Calculate the force at the faces
@@ -446,7 +446,8 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveImplicitSegregated()
         // Momentum equation total displacement total Lagrangian form
 #ifndef OPENFOAM_COM
         // Assemble the RHS in stages.
-        // The equivalent chained tmp fvMatrix expression is stable on OpenFOAM.com.
+        // The equivalent chained tmp fvMatrix expression is stable on
+        // OpenFOAM.com.
         tmp<fvVectorMatrix> tRhsEqn
         (
             fvm::laplacian(impKf_, D(), "laplacian(DD,D)")
@@ -1366,7 +1367,7 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
         const volVectorField gradp(fvc::grad(p));
 
         // Re-calculate the pressure stabilisation parameter
-        pressureStabilisation().updateScalar(p, &gradp);
+        updatePressureStabilisation(p, gradp);
 
         // Dimensional consistency factor
         const dimensionedScalar one
@@ -1446,7 +1447,7 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
     // Note: in the high-order case, the stabilisation is referred to the
     // undeformed configuration; it vanishes on convergence, so this does not
     // change the converged answer
-    momentumStabilisation().updateVector(D, &gradD());
+    updateMomentumStabilisation(D, gradD());
     traction += impKf_*momentumStabilisation().faceVector();
 
     // Calculate the force at the faces
@@ -1565,8 +1566,9 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
                 "one", dimensionSet(-2, 4, 4, 0, 0, 0, 0), 1.0
             );
 
-            // Compute the positive face-interpolated reciprocal of the approximate
-            // momentum equation diagonal (solid analogue of rAUf), [Pa]
+            // Compute the positive face-interpolated reciprocal of the
+            // approximate momentum equation diagonal (solid analogue of rAUf),
+            // [Pa]
             {
                 fvVectorMatrix approxMomJ
                 (
@@ -1608,7 +1610,8 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
                 jac,
                 0,                         // row offset
                 blockSize_ - 1,            // column offset
-                solidModel::twoD() ? 2 : 3 // number of scalar equations to insert
+                solidModel::twoD() ? 2 : 3 // number of scalar equations to
+                                           // insert
             );
         }
     }

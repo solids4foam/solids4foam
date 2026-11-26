@@ -443,8 +443,10 @@ void Foam::neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw::evaluate
             symm(relFbari & bEbar0[i] & relFbari.T())
         );
 
-        // Trial deviatoric Kirchhoff stress
-        const symmTensor sTrial(mu*dev(bEbarTrial));
+        // Trial deviatoric Kirchhoff stress. I is subtracted before dev(),
+        // which changes nothing since dev(I) = 0, so that the stress is
+        // exactly zero at rest, as in neoHookeanElastic
+        const symmTensor sTrial(mu*dev(bEbarTrial - I));
 
         const scalar Ibar = tr(bEbarTrial)/3.0;
         const scalar muBar = Ibar*mu;

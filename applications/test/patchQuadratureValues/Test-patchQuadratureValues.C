@@ -165,9 +165,10 @@ bool checkFixedValue
 //  the file descriptor fd
 //  This runs in a child process. It writes "C" once the patch field is
 //  constructed. It then writes "N" if the patch field does not fix the value.
-//  Otherwise it writes the kind of patch field, "I" (quadratureValuePatchField),
-//  "V" (fixedValue) or "O" (other), before evaluating it, and then "P"
-//  (passed) or "F" (failed) followed by a description of the outcome.
+//  Otherwise it writes the kind of patch field, "I"
+//  (quadratureValuePatchField), "V" (fixedValue) or "O" (other), before
+//  evaluating it, and then "P" (passed) or "F" (failed) followed by a
+//  description of the outcome.
 template<class Type>
 void testTypeInChild
 (

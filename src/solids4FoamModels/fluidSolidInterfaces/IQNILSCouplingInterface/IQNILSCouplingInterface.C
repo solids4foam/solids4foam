@@ -166,7 +166,10 @@ IQNILSCouplingInterface::IQNILSCouplingInterface
             "residualPreconditioningEpsilon", SMALL
         )
     ),
-    predictSolid_(fsiProperties().lookupOrAddDefault<bool>("predictSolid", true)),
+    predictSolid_
+    (
+        fsiProperties().lookupOrAddDefault<bool>("predictSolid", true)
+    ),
     skipModesOnSolidPredictor_
     (
         fsiProperties().lookupOrAddDefault<bool>
@@ -583,7 +586,10 @@ void IQNILSCouplingInterface::applyCombinedCorrection
 }
 
 
-void IQNILSCouplingInterface::filterRelativeCouplingModes(const label interfaceI)
+void IQNILSCouplingInterface::filterRelativeCouplingModes
+(
+    const label interfaceI
+)
 {
     if
     (
@@ -1346,7 +1352,8 @@ void IQNILSCouplingInterface::updateDisplacement()
                      && orthNorm < qrFilterTolerance_*refNorm
                     )
                     {
-                        Info<< "Ignoring IQN-ILS combined solve column: |v_orth| = "
+                        Info<< "Ignoring IQN-ILS combined solve column: "
+                               "|v_orth| = "
                             << orthNorm << " < qrFilterTolerance*|v| = "
                             << qrFilterTolerance_*refNorm << endl;
                         continue;
@@ -1692,7 +1699,8 @@ void IQNILSCouplingInterface::updateDisplacement()
 
                             if (reorthogonalizeCouplingColumns_)
                             {
-                                const scalar correction = sum(solveQ[i] & solveQ[j]);
+                                const scalar correction =
+                                    sum(solveQ[i] & solveQ[j]);
                                 R[i][j] += correction;
                                 solveQ[j] -= correction*solveQ[i];
                             }
@@ -1811,7 +1819,8 @@ void IQNILSCouplingInterface::updateDisplacement()
 
                 if ((outerCorr() == 1) && predictor())
                 {
-                    fluidZonesPointsDispls()[interfaceI] += residuals()[interfaceI];
+                    fluidZonesPointsDispls()[interfaceI] +=
+                        residuals()[interfaceI];
                 }
                 else
                 {

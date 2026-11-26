@@ -573,7 +573,7 @@ void kExactLeastSquares::calcFaceGradCoeffs() const
 {
     if (debug)
     {
-        InfoInFunction << "start" << endl;
+        InfoInFunction<< "start" << endl;
     }
 
     if
@@ -1613,7 +1613,7 @@ void kExactLeastSquares::calcFaceGradCoeffs() const
 
     if (debug)
     {
-        InfoInFunction << "end" << endl;
+        InfoInFunction<< "end" << endl;
     }
 }
 
@@ -1724,7 +1724,7 @@ kExactLeastSquares::QRSolution kExactLeastSquares::QRSolve
 
      result.A = Rbar.colPivHouseholderQr().solve(QbarBhat);
 
-     if(calcConditionNumber_)
+     if (calcConditionNumber_)
      {
          Eigen::JacobiSVD<Eigen::MatrixXd> svd
          (
@@ -1747,7 +1747,7 @@ void kExactLeastSquares::calcCellCoeffs() const
 {
     if (debug)
     {
-        InfoInFunction << "start" << endl;
+        InfoInFunction<< "start" << endl;
     }
 
     if
@@ -2206,7 +2206,7 @@ void kExactLeastSquares::calcCellCoeffs() const
     }
     if (debug)
     {
-        InfoInFunction << "end" << endl;
+        InfoInFunction<< "end" << endl;
     }
 }
 

@@ -21,7 +21,7 @@ solvers
     "p|pFinal"
     {
         solver          GAMG;
-        tolerance       1e-06;
+        tolerance       1e-10;
         relTol          0;
         minIter         1;
         maxIter         1000;
@@ -40,7 +40,7 @@ solvers
     "cellMotionU|cellDisplacement"
     {
         solver          GAMG;
-        tolerance       1e-06;
+        tolerance       1e-12;
         relTol          0;
         minIter         1;
         maxIter         100;
@@ -60,7 +60,7 @@ solvers
     {
         solver          PBiCG;
         preconditioner  DILU;
-        tolerance       1e-06;
+        tolerance       1e-10;
         relTol          0;
         minIter         1;
     }
@@ -69,7 +69,12 @@ solvers
 PIMPLE
 {
     momentumPredictor   on;
-    nOuterCorrectors    1;
+    // Three PIMPLE correctors per FSI iteration make the fluid response to the
+    // interface motion independent of the history of the coupling iterations,
+    // so the strict coupling test converges (verification/README.md,
+    // finding 1). The tight p and U tolerances above avoid spurious,
+    // history-dependent steady states (finding 2)
+    nOuterCorrectors    3;
     nCorrectors         3;
     nNonOrthogonalCorrectors 1;
 

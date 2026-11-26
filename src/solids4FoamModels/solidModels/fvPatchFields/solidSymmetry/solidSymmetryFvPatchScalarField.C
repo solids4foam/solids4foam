@@ -18,6 +18,7 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "solidSymmetryFvPatchScalarField.H"
+#include "patchCorrectionVectors.H"
 #include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
 #include "compatibilityFunctions.H"
@@ -85,7 +86,7 @@ solidSymmetryFvPatchScalarField::solidSymmetryFvPatchScalarField
 :
     symmetryFvPatchField<scalar>(p, iF, dict)
 {
-    Info << "Symmetry boundary condition with non-orthogonal correction"
+    Info<< "Symmetry boundary condition with non-orthogonal correction"
         << endl;
 
     if (!isType<symmetryFvPatch>(p))
@@ -158,11 +159,8 @@ tmp<Field<scalar> > solidSymmetryFvPatchScalarField::snGrad() const
 
     if (applyCorrection)
     {
-        // Delta vectors
-        const vectorField delta(patch().delta());
-
         // Non-orthogonal correction vectors
-        const vectorField k((I - sqr(n)) & delta);
+        const vectorField k(patchCorrectionVectors(patch()));
 
         // Lookup the gradient of displacement field
         const fvPatchField<vector>& gradU =
@@ -220,11 +218,8 @@ void solidSymmetryFvPatchScalarField::evaluate(const Pstream::commsTypes)
 
     if (applyCorrection)
     {
-        // Delta vectors
-        const vectorField delta(patch().delta());
-
         // Non-orthogonal correction vectors
-        const vectorField k((I - sqr(n)) & delta);
+        const vectorField k(patchCorrectionVectors(patch()));
 
         // Lookup the gradient of displacement field
         const fvPatchField<vector>& gradU =

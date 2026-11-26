@@ -76,7 +76,8 @@ Foam::newAMIInterpolation<SourcePatch, TargetPatch>::interpolationMethodToWord
 
 
 template<class SourcePatch, class TargetPatch>
-typename Foam::newAMIInterpolation<SourcePatch, TargetPatch>::interpolationMethod
+typename
+Foam::newAMIInterpolation<SourcePatch, TargetPatch>::interpolationMethod
 Foam::newAMIInterpolation<SourcePatch, TargetPatch>::wordTointerpolationMethod
 (
     const word& im

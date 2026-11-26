@@ -158,7 +158,7 @@ void Foam::faceCracker::setBreak
         // Check faces to break
         DynamicList<label> bouFacesInZone(facesToBreak.size());
 
-        forAll (facesToBreak, faceI)
+        forAll(facesToBreak, faceI)
         {
             if (!mesh.isInternalFace(facesToBreak[faceI]))
             {

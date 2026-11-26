@@ -378,7 +378,8 @@ void solidTractionFvPatchVectorField::setTractionQuadrature
     if (tractionQuadrature.size() != size())
     {
         FatalErrorInFunction
-            << "Expected quadrature values for " << size() << " patch faces but "
+            << "Expected quadrature values for " << size()
+            << " patch faces but "
             << "received " << tractionQuadrature.size() << abort(FatalError);
     }
 
@@ -391,7 +392,8 @@ void solidTractionFvPatchVectorField::setTractionQuadrature
         if (tractionQuadratureRef[faceI].size() != nPoints)
         {
             FatalErrorInFunction
-                << "Expected " << nPoints << " quadrature values for patch face "
+                << "Expected " << nPoints
+                << " quadrature values for patch face "
                 << faceI << " but received "
                 << tractionQuadratureRef[faceI].size()
                 << abort(FatalError);

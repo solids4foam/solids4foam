@@ -342,7 +342,7 @@ bool meshMotionTotalDispSolid::evolve()
         // Add stabilisation to the traction
         // We add this before enforcing the traction condition as the
         // stabilisation is set to zero on traction boundaries
-        momentumStabilisation().updateVector(D(), &gradD());
+        updateMomentumStabilisation(D(), gradD());
         traction += impKf_*momentumStabilisation().faceVector();
 
         // Enforce traction boundary conditions

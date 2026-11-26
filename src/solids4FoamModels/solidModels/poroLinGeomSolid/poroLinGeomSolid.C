@@ -276,7 +276,7 @@ Foam::tmp<Foam::surfaceScalarField> poroLinGeomSolid::makeImpKf() const
 
 bool poroLinGeomSolid::evolve()
 {
-    Info << "Evolving poro solid solver" << endl;
+    Info<< "Evolving poro solid solver" << endl;
 
     // Refresh time-varying loads before assembling the explicit face traction
     D().correctBoundaryConditions();
@@ -330,7 +330,7 @@ bool poroLinGeomSolid::evolve()
         // Store fields for under-relaxation and residual calculation
         D().storePrevIter();
 
-        momentumStabilisation().updateVector(D(), &gradD());
+        updateMomentumStabilisation(D(), gradD());
 
         const surfaceVectorField n(mesh().Sf()/mesh().magSf());
         // linearInterpolate is deliberate: it reproduces the Gauss linear

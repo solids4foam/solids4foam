@@ -355,7 +355,8 @@ void Foam::fluidModel::updateRobinFsiInterface
 #ifdef OPENFOAM_NOT_EXTEND
                     phi.boundaryFieldRef()[patchI] =
                         phi.oldTime().boundaryField()[patchI];
-                    rAUf.boundaryFieldRef()[patchI] = runTime().deltaT().value();
+                    rAUf.boundaryFieldRef()[patchI] =
+                        runTime().deltaT().value();
 #else
                     phi.boundaryField()[patchI] =
                         phi.oldTime().boundaryField()[patchI];
@@ -1035,7 +1036,8 @@ Foam::fluidModel::fluidModel
         pMax_.dimensions().reset(p().dimensions());
         if (mesh().solutionDict().found("fieldBounds"))
         {
-            dictionary fieldBounds = mesh().solutionDict().subDict("fieldBounds");
+            dictionary fieldBounds =
+                mesh().solutionDict().subDict("fieldBounds");
             fieldBounds.lookup(p().name())
                 >> pMin_.value() >> pMax_.value();
             fieldBounds.lookup(U().name())
@@ -1047,19 +1049,19 @@ Foam::fluidModel::fluidModel
     // Check if any finite volume models is present
     if (!fvModels_.PtrListDictionary<fvModel>::size())
     {
-        Info << "No fvModels present" << endl;
+        Info<< "No fvModels present" << endl;
     }
 
     // Check if any finite volume constrains is present
     if (!fvConstraints_.PtrListDictionary<fvConstraint>::size())
     {
-        Info << "No fvConstraints present" << endl;
+        Info<< "No fvConstraints present" << endl;
     }
 #elif defined(OPENFOAM_COM)
     // Check if any finite volume option is present
     if (!fvOptions_.optionList::size())
     {
-        Info << "No finite volume options present\n" << endl;
+        Info<< "No finite volume options present\n" << endl;
     }
 #endif
 }

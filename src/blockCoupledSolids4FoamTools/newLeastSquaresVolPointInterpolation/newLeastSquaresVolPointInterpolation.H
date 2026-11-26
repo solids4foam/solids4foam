@@ -102,7 +102,8 @@ class newLeastSquaresVolPointInterpolation
         mutable autoPtr<Map<labelList> > pointAxisEdgesPtr_;
 
         //- Global point ngb processor boundary face centres
-        mutable autoPtr<Map<Field<vector> > > globalPointNgbProcBndFaceCentresPtr_;
+        mutable autoPtr<Map<Field<vector> > >
+            globalPointNgbProcBndFaceCentresPtr_;
 
         //- Global point ngb processor cell centres
         mutable autoPtr<Map<Field<vector> > > globalPointNgbProcCellCentresPtr_;
@@ -132,7 +133,8 @@ class newLeastSquaresVolPointInterpolation
         mutable autoPtr<Field<vector> > originsPtr_;
 
         //- Mirror plane normals and transformation tensors
-        mutable autoPtr<List<Tuple2<vector, tensor> > > mirrorPlaneTransformationPtr_;
+        mutable autoPtr<List<Tuple2<vector, tensor> > >
+            mirrorPlaneTransformationPtr_;
 
         //- Interpolation matrices
         mutable PtrList<scalarRectangularMatrix> invLsMatrices_;
