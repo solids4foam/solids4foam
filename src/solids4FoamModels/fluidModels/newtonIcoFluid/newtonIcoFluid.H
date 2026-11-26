@@ -25,7 +25,7 @@ Description
     Optional entries in newtonIcoFluidCoeffs:
 
         // Include the convection term (default yes). Without it, the model
-        // solves the unsteady Stokes equations
+        // solves the unsteady Stokes equations, on static meshes only
         convection      no;
 
         // High-order (k-exact least-squares) residual, in the format of the
@@ -146,7 +146,7 @@ class newtonIcoFluid
         const label blockSize_;
 
         //- Include the convection term; without it, the model solves the
-        //  unsteady Stokes equations
+        //  unsteady Stokes equations, on static meshes only
         const Switch convection_;
 
         //- Use the high-order (k-exact least-squares) residual

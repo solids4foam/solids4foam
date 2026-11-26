@@ -15,7 +15,8 @@ release. For complete commit-level details and contributor information, see the
   reconstructions of U and p, the `alpha` pressure stabilisation uses its
   high-order form, and the second-order Jacobian is kept as the
   preconditioner. It needs `convection no`, a new switch that drops the
-  convection term (the default keeps it), a static mesh and a serial run.
+  convection term on static meshes (the default keeps it), a static mesh and a
+  serial run.
   `newtonIcoFluid` also reads an optional `momentumSource` field, and the
   `leastSquaresReconstruction` registry gains a `velocity` role. The
   `decayingTaylorGreenVortex` verification has steady (forced) and unsteady

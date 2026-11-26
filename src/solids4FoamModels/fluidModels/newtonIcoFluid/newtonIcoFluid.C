@@ -961,6 +961,15 @@ label newtonIcoFluid::formResidual
     volScalarField& p = const_cast<volScalarField&>(this->p());
     surfaceScalarField& phi = const_cast<surfaceScalarField&>(this->phi());
 
+    // phi is relative to the mesh motion, so dropping div(phi, U) on a moving
+    // mesh would also drop the mesh motion flux
+    if (!convection_ && mesh.moving())
+    {
+        FatalErrorInFunction
+            << "'convection no' is only implemented for static meshes"
+            << exit(FatalError);
+    }
+
     // Copy x into the U field
     vectorField& UI = U;
     foamPetscSnesHelper::ExtractFieldComponents<vector>
@@ -1215,6 +1224,15 @@ label newtonIcoFluid::formResidual
             << "reference configuration" << exit(FatalError);
     }
 
+    // phi is relative to the motion, so dropping div(phi, U) would also drop
+    // the mesh motion flux
+    if (!convection_)
+    {
+        FatalErrorInFunction
+            << "'convection no' is not implemented for a moving reference "
+            << "configuration" << exit(FatalError);
+    }
+
     // Take references
     //const Time& runTime = fluidModel::runTime();
     dynamicFvMesh& mesh = this->mesh();
@@ -1355,14 +1373,9 @@ label newtonIcoFluid::formResidual
         fvc::div(deformedSf & stressf)
       - (Jm*invFm.T() & gradp())
       - Jm*fvc::ddt(U)
+      - fvc::div(phi, U)
+      + momentumStabilisation().cellVector(&nuEfff, true)
     );
-
-    if (convection_)
-    {
-        residual -= primitiveField(fvc::div(phi, U)());
-    }
-
-    residual += momentumStabilisation().cellVector(&nuEfff, true);
 
     // Add the optional momentum source, scaled by the volume ratio of the
     // reference configuration like the inertia term
@@ -1416,12 +1429,8 @@ label newtonIcoFluid::formResidual
     (
         fvm::laplacian(turbulence_->nuEff(), U)
       - fvm::ddt(U)
+      - fvm::div(phi, U)
     );
-
-    if (convection_)
-    {
-        pressureStabUEqn -= fvm::div(phi, U);
-    }
 
     rAUf() = -fvc::interpolate(1.0/pressureStabUEqn.A());
 
