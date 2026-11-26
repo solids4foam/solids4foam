@@ -430,6 +430,24 @@ public:
             const point& x
         ) const;
 
+        //- Field values at the face quadrature points of a patch, from the
+        //  owner cell's reconstruction; one collective field exchange per
+        //  call, unlike a point-by-point valueAtPoint
+        template<class Type>
+        autoPtr<CompactListList<Type>> extrapolatedPatchFaceQuadValues
+        (
+            const GeometricField<Type, fvPatchField, volMesh>& vf,
+            const label patchI
+        ) const;
+
+        //- Vector field values at the face quadrature points of a patch that
+        //  prescribes no value, from the owner cell's reconstruction
+        virtual autoPtr<CompactListList<vector>> extrapolatedPatchFaceQuadValues
+        (
+            const volVectorField& vf,
+            const label patchI
+        ) const;
+
         //- Cell centre gradient field
         template<class Type>
         tmp<GeometricField<

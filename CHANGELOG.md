@@ -8,6 +8,20 @@ release. For complete commit-level details and contributor information, see the
 
 ### Added
 
+- `viscousHolzapfelOgden`: `localTangentShearModulus`, a scalar tangent
+  evaluated from the local material state (matrix stiffness at the current
+  stretch plus the fibre, sheet and coupling shares, switched off where a
+  family is slack), bounded by `tangentShearModulusMin` and
+  `tangentShearModulusMax`. With `impKUpdate timeStep` in
+  `nonLinearGeometryTotalLagrangianTotalDisplacement`, the implicit stiffness,
+  and so the finite-volume momentum stabilisation, then follow the material
+  instead of one global constant.
+- `nonLinearGeometryTotalLagrangianTotalDisplacement`:
+  `pressureStabilisationStiffness` (`impK`, `momentum` or `bulk`) and
+  `pressureStabilisationStiffnessFactor` choose the stiffness behind the
+  pressure-stabilisation coefficient of the mixed formulation, so that the
+  solved pressure can follow the law's penalty relation at the cell scale.
+  Both new keywords default to the previous behaviour.
 - Cardiac elastodynamics benchmark tutorials of Aróstica et al. (2025),
   `tutorials/solids/hyperelasticity/ArosticaEtAl2025`: `benchmark1`, an
   idealised left ventricle (steps 0A, 0B, 1 and the blinded 2A to 2C) on an
@@ -31,6 +45,14 @@ release. For complete commit-level details and contributor information, see the
 - `solids4Foam::downloadFile` in `solids4FoamScripts.sh`: download a
   tutorial's input data once, e.g. from the solids4foam website, and check its
   SHA-256 sum.
+- Optional spectral normalisation of the stabilisation models (`normalise`,
+  `referenceNyquistDirections`), and the `stabilisationFourierCheck`
+  utility that verifies it, by Aaron Mullen-Hales.
+- Optional scaling of the mixed displacement-pressure system of
+  `nonLinearGeometryTotalLagrangianTotalDisplacement` (`scaleMixedPetScFields`,
+  `pressureUnknownScale`, `pressureScaleByTwoMu`, `pressureScaleFactor`),
+  ported from Philip Cardiff's earlier work on the mixed solver. Off by
+  default.
 - Cook's membrane verification studies now store the per-mesh tip
   displacements of the published references migrated from solid-benchmarks
   (Simo and Armero, César de Sá et al., Areias and Abaqus for the

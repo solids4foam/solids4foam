@@ -24,6 +24,58 @@ InClass
 #include "fvc.H"
 #include "compatibilityFunctions.H"
 
+namespace Foam
+{
+namespace
+{
+label readReferenceNyquistDirections
+(
+    const fvMesh& mesh,
+    const dictionary& dict,
+    const bool normalise
+)
+{
+    if (!normalise)
+    {
+        return 0;
+    }
+
+    if (!dict.found("referenceNyquistDirections"))
+    {
+        FatalIOErrorInFunction(dict)
+            << "referenceNyquistDirections is required when normalise is true"
+            << exit(FatalIOError);
+    }
+
+    const label referenceNyquistDirections = readLabel
+    (
+        dict.lookup("referenceNyquistDirections")
+    );
+
+    if (referenceNyquistDirections <= 0)
+    {
+        FatalIOErrorInFunction(dict)
+            << "referenceNyquistDirections must be greater than zero, found "
+            << referenceNyquistDirections << exit(FatalIOError);
+    }
+
+    const label maxReferenceNyquistDirections =
+        min(label(3), mesh.nSolutionD());
+
+    if (referenceNyquistDirections > maxReferenceNyquistDirections)
+    {
+        FatalIOErrorInFunction(dict)
+            << "referenceNyquistDirections must be in the valid range 1 .. "
+            << maxReferenceNyquistDirections
+            << " = min(3, mesh.nSolutionD()), found "
+            << referenceNyquistDirections << exit(FatalIOError);
+    }
+
+    return referenceNyquistDirections;
+}
+}
+}
+
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
 namespace Foam
@@ -49,6 +101,11 @@ Foam::stabilisationModel::stabilisationModel
     (
         dict.lookupOrDefault<scalar>("scaleFactorJacobian", 1.0)
     ),
+    normalise_(dict.lookupOrDefault<Switch>("normalise", false)),
+    referenceNyquistDirections_
+    (
+        readReferenceNyquistDirections(mesh, dict, normalise_)
+    ),
     faceScalarPtr_(),
     faceVectorPtr_(),
     scalarJacobianPtr_(),
@@ -56,7 +113,14 @@ Foam::stabilisationModel::stabilisationModel
     cellScalarPtr_(),
     cellVectorPtr_(),
     h2Ptr_()
-{}
+{
+    if (!normalise_ && dict.found("referenceNyquistDirections"))
+    {
+        WarningInFunction
+            << "Ignoring referenceNyquistDirections because normalise is false"
+            << endl;
+    }
+}
 
 
 // * * * * * * * * * * * * * * * Member functions * * * * * * * * * * * * * * //
@@ -103,7 +167,77 @@ Foam::autoPtr<Foam::stabilisationModel> Foam::stabilisationModel::New
     auto* ctorPtr = cstrIter();
 #endif
 
-    return autoPtr<stabilisationModel>(ctorPtr(mesh, dict, dims));
+    autoPtr<stabilisationModel> modelPtr(ctorPtr(mesh, dict, dims));
+
+    if (modelPtr->normalise() && !modelPtr->supportsSpectralNormalisation())
+    {
+        FatalIOErrorInFunction(dict)
+            << "Spectral normalisation is not supported by stabilisation "
+            << "model " << modelType << exit(FatalIOError);
+    }
+
+    return modelPtr;
+}
+
+
+Foam::scalar Foam::stabilisationModel::nyquistNormalisation
+(
+    const label paperOrder
+) const
+{
+    if (!normalise_)
+    {
+        return 1.0;
+    }
+
+    scalar referenceResponse = 1.0;
+    const scalar directionalResponse = 4.0*referenceNyquistDirections_;
+
+    for (label i = 0; i < paperOrder; ++i)
+    {
+        referenceResponse *= directionalResponse;
+    }
+
+    return 1.0/referenceResponse;
+}
+
+
+void Foam::stabilisationModel::writeSpectralNormalisationInfo
+(
+    const string& responseDescription,
+    const scalar factor
+) const
+{
+    if (normalise_)
+    {
+        Info<< "Spectral normalisation: model " << word(dict_.lookup("type"))
+            << ", referenceNyquistDirections "
+            << referenceNyquistDirections_
+            << ", " << responseDescription.c_str()
+            << ", factor " << factor << endl;
+    }
+}
+
+
+void Foam::stabilisationModel::writeSpectralNormalisationInfo
+(
+    const label paperOrder,
+    const bool usesIdealLaplacianStencil
+) const
+{
+    string responseDescription("paper order ");
+    responseDescription += Foam::name(paperOrder);
+
+    if (usesIdealLaplacianStencil)
+    {
+        responseDescription += ", using ideal m=1 snGrad stencil";
+    }
+
+    writeSpectralNormalisationInfo
+    (
+        responseDescription,
+        nyquistNormalisation(paperOrder)
+    );
 }
 
 
