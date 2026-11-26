@@ -189,6 +189,7 @@ REGRESSION_TESTS=(
     "fluidSolidInteraction/channelLeaflet"
     "fluidSolidInteraction/fillingElasticContainer"
     "fluidSolidInteraction/hessenthalerFsi"
+    "fluidSolidInteraction/manufacturedSolutionFSI"
     "fluidSolidInteraction/membraneRoof"
     "fluidSolidInteraction/ringAddedMass"
     "fluidSolidInteraction/womersleyTube"

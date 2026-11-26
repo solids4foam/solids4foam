@@ -1,0 +1,41 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      fsiProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Dirichlet-Neumann coupling with Aitken relaxation
+fluidSolidInterface Aitken;
+
+AitkenCoeffs
+{
+    // Solid and fluid interface patches
+    solidPatch          interface;
+    fluidPatch          interface;
+
+    // Tolerance and maximum number of the outer FSI correctors per time step
+    outerCorrTolerance  1e-6;
+    nOuterCorr          200;
+
+    interfaceTransferMethod directMap;
+    coupled             yes;
+    predictor           yes;
+    writeResidualsToFile yes;
+
+    // Relaxation factor of the second outer corrector of each time step
+    relaxationFactor    0.05;
+}
+
+// ************************************************************************* //
