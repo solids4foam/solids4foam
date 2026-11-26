@@ -439,6 +439,15 @@ release. For complete commit-level details and contributor information, see the
   them. Solid results are unchanged. The new `Test-patchQuadratureValues`
   utility checks the behaviour of every registered patch field type.
 
+- The stabilisation models no longer look up the solid model. The
+  second-order `alpha` stabilisation can now be used in any model, e.g. as
+  the `newtonIcoFluid` pressure stabilisation, where it used to stop with
+  "Could not find solidModel_region0", and it has a scalar Jacobian, which
+  the `newtonIcoFluid` pressure needs. The high-order form is a separate
+  call, `updateScalarHighOrder` or `updateVectorHighOrder`, which takes the
+  least-squares scheme from the caller; the solid models make this call when
+  `highOrderResidual` is on. Solid results are unchanged.
+
 - The tutorials that used the `pointCellsLeastSquares` gradient scheme now use
   `leastSquaresS4f`, which is implemented in solids4foam and so is the same
   scheme in all OpenFOAM variants. The case conversion script no longer
@@ -807,6 +816,17 @@ release. For complete commit-level details and contributor information, see the
   OpenFOAM.com and OpenFOAM.org, as it already did on foam-extend and as
   `pimpleFluid` does, because the corrected velocity conditions read it
   (#748).
+
+- The `neoHookeanElastic`, `neoHookeanElasticMisesPlastic`,
+  `MooneyRivlinElastic`, `HolzapfelGasserOgdenElastic` and
+  `viscousHolzapfelOgden` laws now give exactly zero stress at the undeformed
+  state. Where the compiler fused the multiply-add in `dev()`, `dev(I)` left a
+  round-off residual of about `5.6e-17*mu`, which was enough to derail an
+  initially unloaded PETSc solve. The identity is now subtracted before
+  `dev()`, which leaves the stress algebraically unchanged. The two
+  Holzapfel-Ogden laws likewise form their fibre strains from `C - I`, since
+  `|N|^2` of a unit fibre direction is not exactly 1 in floating point, and
+  `HolzapfelGasserOgdenElastic` now normalises its fibre directions.
 
 - `IQNILS`: the `preciceStyleCouplingQR` least-squares solve, per interface
   and with `combinedCouplingSystem`, had the wrong sign and moved the interface

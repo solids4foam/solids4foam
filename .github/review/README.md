@@ -248,15 +248,18 @@ Each run has an 8.5-minute analysis deadline (inside a ten-minute step timeout)
 and at most two Messages API requests: the second only to fix an invalid report
 or after one transient API error (408, 409, 429, 5xx or overloaded), after
 waiting as the server's Retry-After asks. SDK retries are off, so every request
-is counted. Each request allows up to 40,000 output tokens (USD 0.80 at most
-at Opus 5.5 prices of USD 4/20 per million input/output tokens) and a full
-prompt budget of about 250,000 input tokens (about USD 1). A small PR costs a
-few cents. #719 (335 KB of raw patches, 403 KB as the escaped prompt) costs
-about USD 1. At the old 90 KB budget its partial review used 37,000 input
-tokens and took 63 seconds; both models have 1M-token context, and reading
-input is fast, so the deadline should hold. Check the first large live run.
-A safety fallback can re-run a request on the fallback model inside the same
-request, which adds its tokens. Set a monthly spending limit on the API
+is counted. Each request allows up to 40,000 output tokens (USD 0.80 at most at
+Opus 5.5 prices of USD 4/20 per million input/output tokens) and a full prompt
+budget of about 250,000 input tokens (about USD 1). Before full files were
+added, the 31 completed reviews from 17 to 24 November 2026 averaged 52,000
+input and 8,600 output tokens (about USD 0.38). Full files raise input towards
+the budget for PRs that edit large source files; even a full budget on every run
+is about USD 1.20 per review. #719 (335 KB of raw patches, 403 KB as the escaped
+prompt) costs about USD 1. At the old 90 KB budget its partial review used
+37,000 input tokens and took 63 seconds; both models have 1M-token context, and
+reading input is fast, so the deadline should hold. Check the first large live
+run. A safety fallback can re-run a request on the fallback model inside the
+same request, which adds its tokens. Set a monthly spending limit on the API
 workspace below the available credit.
 Opus 5.5 and explicit high effort are selected in the workflow. Organisation
 spending limits are still needed: a public contributor can trigger repeated
@@ -277,17 +280,35 @@ patches (binary, empty files, renames) and budget-excluded files are listed as
 not reviewed in the prompt and report. Their paths still contribute to the risk
 floor.
 
+Patches always come first. Whatever budget they leave is filled with the full
+post-change text of changed files, so the reviewer sees the rest of a
+half-edited function, the matching header and nearby callers
+([#729](https://github.com/solids4foam/solids4foam/issues/729)). The collector
+fetches each file at the PR head SHA through the contents API, as data, with the
+job's read-only token; PR code is still never checked out or run. Only modified
+or renamed files with a reviewed patch qualify (an added file's patch is already
+the whole file). C/C++ sources and headers in `src/` and `applications/` come
+first, with a class's `.C` and `.H` together, then other C/C++ and `Make` lists,
+then other text. `CHANGELOG.md` (its patch is enough), tutorial mesh/field/CSV
+data, binaries, non-UTF-8 files and files of 1 MB or more are skipped, and at
+most 40 files are fetched per run, well within the token's rate limit. A file
+that cannot be fetched is left out without failing the review. The prompt labels
+them `full_files` (path, head SHA, content), and the report lists them under
+"Seen in full". A large PR such as #719 fills the budget with patches and keeps
+patch-only coverage. The local second review builds the same prompt.
+
 A successful assessment can have COMPLETE or PARTIAL **patch** coverage. Neither
-means the surrounding source, linked plots, CI logs, or numerical cases were
-independently inspected. Partial coverage alone does not fail the job. No
-reviewable patches, an incomplete file listing (3000 or more files), oversized
-metadata, collection/API errors, timeouts, or invalid model output produce an
-INCOMPLETE comment with a safe reason code and a failing job. Failure signalling
-is retained so it cannot be confused with success. Risk then defaults to HIGH. A
-cancelled run attempts to publish INCOMPLETE if its SHA is still current, but
-infrastructure/forced cancellation can prevent any comment. Publication failure
-also fails the job. **No current-SHA report means no completed AI review.** A
-green job is not an approval. Humans must inspect the complete diff and context.
+means that source outside the patches and full files, linked plots, CI logs, or
+numerical cases were independently inspected. Partial coverage alone does not
+fail the job. No reviewable patches, an incomplete file listing (3000 or more
+files), oversized metadata, collection/API errors, timeouts, or invalid model
+output produce an INCOMPLETE comment with a safe reason code and a failing job.
+Failure signalling is retained so it cannot be confused with success. Risk then
+defaults to HIGH. A cancelled run attempts to publish INCOMPLETE if its SHA is
+still current, but infrastructure/forced cancellation can prevent any comment.
+Publication failure also fails the job. **No current-SHA report means no
+completed AI review.** A green job is not an approval. Humans must inspect the
+complete diff and context.
 
 ## Attempt status
 

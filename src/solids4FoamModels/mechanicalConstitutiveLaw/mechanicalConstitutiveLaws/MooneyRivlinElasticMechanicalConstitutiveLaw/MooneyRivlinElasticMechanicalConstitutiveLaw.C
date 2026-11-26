@@ -188,11 +188,14 @@ void Foam::MooneyRivlinElasticMechanicalConstitutiveLaw::evaluate
         const scalar I1 = tr(isoB);
         const scalar I2 = 0.5*(sqr(I1) - tr(sqrB));
 
-        // Isochoric stress
+        // Isochoric stress, less a multiple of I that dev() removes anyway.
+        // Taking I from isoB and inv(isoB) makes s, and so the stress,
+        // exactly zero at rest, which dev() of a multiple of I is not, by
+        // round-off, when the compiler fuses the multiply-add in its diagonal
         const symmTensor s
         (
-            2.0*(c10 + c11*(I2 - 3.0))*isoB
-          - 2.0*(c01 + c11*(I1 - 3.0))*inv(isoB)
+            2.0*(c10 + c11*(I2 - 3.0))*(isoB - I)
+          - 2.0*(c01 + c11*(I1 - 3.0))*(inv(isoB) - I)
         );
 
         // Hydrostatic stress, unsmoothed: see the note in the header. A

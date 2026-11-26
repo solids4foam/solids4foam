@@ -314,16 +314,25 @@ void Foam::viscousHolzapfelOgdenMechanicalConstitutiveLaw::evaluate
         const scalar I1bar = tr(bBar);
         const scalar psi1 = 0.5*a*boundedExp(b_*(I1bar - 3.0));
 
-        symmTensor sigmaI(2.0*rJ*psi1*dev(bBar));
+        // I is subtracted before dev(), which changes nothing since
+        // dev(I) = 0, so that this term is exactly zero at rest, as in
+        // neoHookeanElastic
+        symmTensor sigmaI(2.0*rJ*psi1*dev(bBar - I));
 
-        // Pushed-forward fibre and sheet directions
-        const vector ff(Fi & (f0[i]/magF0));
-        const vector ss(Fi & (s0[i]/magS0));
+        // Unit and pushed-forward fibre and sheet directions
+        const vector f0i(f0[i]/magF0);
+        const vector s0i(s0[i]/magS0);
+        const vector ff(Fi & f0i);
+        const vector ss(Fi & s0i);
 
         // Fibre and sheet families, on the full invariants:
         //     sigma = (2/J) dPsi/dI4 (F f0) (x) (F f0)
-        const scalar I4f = ff & ff;
-        const scalar I4s = ss & ss;
+        // I4 = f0.C.f0 is formed as 1 + (C - I) && f0*f0, which is the same
+        // for a unit f0, but exactly 1 at rest: ff & ff there is f0 & f0,
+        // which is not exactly 1 in floating point
+        const symmTensor CmI(symm(Fi.T() & Fi) - I);
+        const scalar I4f = 1.0 + (CmI && symm(f0i*f0i));
+        const scalar I4s = 1.0 + (CmI && symm(s0i*s0i));
 
         sigmaI += 2.0*rJ*dPsidI4(I4f, af, bf_)*sqr(ff);
         sigmaI += 2.0*rJ*dPsidI4(I4s, as, bs_)*sqr(ss);

@@ -227,7 +227,7 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
             // Add stabilisation to the traction
             // We add this before enforcing the traction condition as the
             // stabilisation is set to zero on traction boundaries
-            momentumStabilisation().updateVector(D(), &gradD());
+            updateMomentumStabilisation(D(), gradD());
             traction += impKf_*momentumStabilisation().faceVector();
 
             // Enforce traction boundary conditions
@@ -544,7 +544,7 @@ bool linGeomTotalDispSolid::evolveExplicit()
     // Add stabilisation to the traction
     // We add this before enforcing the traction condition as the
     // stabilisation is set to zero on traction boundaries
-    momentumStabilisation().updateVector(D, &gradD);
+    updateMomentumStabilisation(D, gradD);
     traction += impKf_*momentumStabilisation().faceVector();
 
     // Enforce traction boundary conditions
@@ -1117,7 +1117,7 @@ label linGeomTotalDispSolid::formResidual
         const volVectorField gradp(fvc::grad(p));
 
         // Re-calculate the pressure stabilisation parameter
-        pressureStabilisation().updateScalar(p, &gradp);
+        updatePressureStabilisation(p, gradp);
 
         // Dimensional consistency factor
         const dimensionedScalar one
@@ -1176,7 +1176,7 @@ label linGeomTotalDispSolid::formResidual
     // Add stabilisation to the traction
     // We add this before enforcing the traction condition as the
     // stabilisation is set to zero on traction boundaries
-    momentumStabilisation().updateVector(D, &gradD());
+    updateMomentumStabilisation(D, gradD());
     traction += impKf_*momentumStabilisation().faceVector();
 
     // Enforce traction boundary conditions
