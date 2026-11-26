@@ -61,7 +61,9 @@ NEWTON_LIFT_MAX=0.058
 # the written times: 1.7e-05 (OpenFOAM-v2512), against 3.3e-05 with zero
 # gradient; beta = 0.5 and 1 give 1.0e-05 and 0.5e-05. The traction does
 # not reduce the backflow flux itself with pimpleFluid (0.99%, against
-# 0.96% with zero gradient), so that is not checked.
+# 0.96% with zero gradient), so that is not checked. The OpenFOAM-9 CI
+# image gives a different pimpleFluid solution from the first time step,
+# whatever the outlet condition (issue #773).
 # newtonIcoFluid: peak backflow flux, -sum(phi < 0)/sum(phi > 0), 0.747%,
 # against 0.812% with zero gradient (OpenFOAM-v2512).
 # With foam-extend the wake does not reverse the outlet flow, for either
