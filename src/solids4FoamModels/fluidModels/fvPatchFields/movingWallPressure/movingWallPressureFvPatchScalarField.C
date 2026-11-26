@@ -24,7 +24,7 @@ License
 #include "surfaceFields.H"
 #include "fvc.H"
 #include "newMovingWallVelocityFvPatchVectorField.H"
-#include "wallNormalViscousTerm.H"
+#include "wallNormalMomentum.H"
 #include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -276,7 +276,7 @@ void movingWallPressureFvPatchScalarField::updateCoeffs()
     {
         viscousFieldPtr.reset
         (
-            wallNormalViscousTerm::field(db(), "U", patch().name()).ptr()
+            wallNormalMomentum::field(db(), "U", patch().name()).ptr()
         );
     }
 

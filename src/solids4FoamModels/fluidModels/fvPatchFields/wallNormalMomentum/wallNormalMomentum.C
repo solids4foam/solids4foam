@@ -17,10 +17,15 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#include "wallNormalViscousTerm.H"
+#include "wallNormalMomentum.H"
 #include "surfaceFields.H"
 #include "fvc.H"
+#include "compatibilityFunctions.H"
 #include "linear.H"
+#ifdef OPENFOAM_COM
+    #include "fvOptions.H"
+    #include "fvMatrices.H"
+#endif
 #ifdef OPENFOAM_ORG
     #include "momentumTransportModel.H"
 #else
@@ -32,7 +37,7 @@ License
 namespace Foam
 {
 
-namespace wallNormalViscousTerm
+namespace wallNormalMomentum
 {
 
 // * * * * * * * * * * * * * * * * Functions * * * * * * * * * * * * * * * * //
@@ -83,20 +88,40 @@ tmp<volVectorField> field
         U.mesh().Sf() & linearInterpolate(nuDevGradUT)
     );
 
-    return fvc::laplacian(nuEff, U) + fvc::div(nuDevGradUTf);
+    tmp<volVectorField> tterm
+    (
+        fvc::laplacian(nuEff, U) + fvc::div(nuDevGradUTf)
+    );
+
+#ifdef OPENFOAM_COM
+    // Momentum sources (fvOptions), e.g. a body force: "M & U" evaluates the
+    // source matrix (Su + Sp*U) per unit volume
+    fv::options& fvOptions = fv::options::New(U.mesh());
+
+    if (fvOptions.optionList::size())
+    {
+        volVectorField& Uref = const_cast<volVectorField&>(U);
+        const tmp<fvVectorMatrix> tM(fvOptions(Uref));
+        const volVectorField source(tM() & Uref);
+
+        tmpRef(tterm) += source;
+    }
+#endif
+
+    return tterm;
 }
 
 
 tmp<scalarField> patchNormal
 (
     const fvPatch& patch,
-    const volVectorField& viscousTerm
+    const volVectorField& term
 )
 {
     const vectorField n(patch.nf());
     const vectorField viscousP
     (
-        viscousTerm.boundaryField()[patch.index()].patchInternalField()
+        term.boundaryField()[patch.index()].patchInternalField()
     );
 
     return tmp<scalarField>(new scalarField(n & viscousP));
@@ -105,7 +130,7 @@ tmp<scalarField> patchNormal
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-} // End namespace wallNormalViscousTerm
+} // End namespace wallNormalMomentum
 
 } // End namespace Foam
 

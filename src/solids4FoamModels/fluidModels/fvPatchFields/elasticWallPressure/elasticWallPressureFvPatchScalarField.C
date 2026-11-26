@@ -18,7 +18,7 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "elasticWallPressureFvPatchScalarField.H"
-#include "wallNormalViscousTerm.H"
+#include "wallNormalMomentum.H"
 #include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
 #include "surfaceFields.H"
@@ -608,10 +608,10 @@ void elasticWallPressureFvPatchScalarField::updateCoeffs()
     if (viscousTerm_)
     {
         viscousNormal_ =
-            wallNormalViscousTerm::patchNormal
+            wallNormalMomentum::patchNormal
             (
                 patch(),
-                wallNormalViscousTerm::field(db(), "U", patch().name())()
+                wallNormalMomentum::field(db(), "U", patch().name())()
             );
     }
 

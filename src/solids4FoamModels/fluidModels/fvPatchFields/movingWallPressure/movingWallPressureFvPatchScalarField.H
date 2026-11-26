@@ -32,9 +32,11 @@ Description
 
     is evaluated in the cells next to the wall at the current iterate, with
     nuEff from the fluid's turbulence (momentum transport) model, as in the
-    fluid momentum equation. The gradient is multiplied by the fluid density
-    when the pressure has the dimensions of pressure; rho is then the rho
-    field, if registered, or else the rho entry of transportProperties.
+    fluid momentum equation; on OpenFOAM.com it includes the momentum source
+    of the fvOptions (see wallNormalMomentum). The gradient is multiplied by
+    the fluid density when the pressure has the dimensions of pressure; rho
+    is then the rho field, if registered, or else the rho entry of
+    transportProperties.
 
     The acceleration is that of a newMovingWallVelocity patch; for any other
     velocity condition it is the time derivative of the boundary velocity

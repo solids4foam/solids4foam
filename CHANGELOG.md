@@ -818,7 +818,8 @@ release. For complete commit-level details and contributor information, see the
     coupling.
   - It includes the viscous term of the wall-normal momentum equation,
     `n & (laplacian(nuEff, U) + div(nuEff*dev2(T(grad(U)))))` in the wall
-    cells, by default. **This changes the results of existing cases.**
+    cells, and on OpenFOAM.com the normal fvOptions momentum source, by
+    default. **This changes the results of existing cases.**
     `viscousTerm no` restores the earlier condition, which prescribes only
     the acceleration term; with a fixed-pressure boundary it reproduces the
     earlier results exactly.
@@ -828,12 +829,12 @@ release. For complete commit-level details and contributor information, see the
     `transportProperties`, which are no longer read from disk at every
     update.
 - `elasticWallPressure` (Robin-Neumann coupling) includes the same viscous
-  term by default: the Robin condition uses the solid normal acceleration
-  minus the normal viscous term, and `pimpleFluid` and `interFluid` add the
+  and source terms by default: the Robin condition uses the solid normal
+  acceleration minus these terms, and `pimpleFluid` and `interFluid` add the
   corresponding flux, so that the converged interface flux still equals the
   mesh flux. **This changes the results of existing Robin-Neumann cases.**
-  `viscousTerm no` restores the earlier condition exactly. The viscous term
-  of both conditions is evaluated by the new `wallNormalViscousTerm`.
+  `viscousTerm no` restores the earlier condition exactly. The terms are
+  evaluated for both conditions by the new `wallNormalMomentum`.
 - A high-order (face-quadrature) parallel run no longer stops at the end of the
   first time step when a processor holds no cells. The constitutive law manager
   decided from the row count whether a compact integration-point layout was

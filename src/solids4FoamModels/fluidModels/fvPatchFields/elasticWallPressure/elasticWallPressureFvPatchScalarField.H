@@ -84,8 +84,9 @@ Description
 
     Viscous term (viscousTerm, default yes): the wall-normal momentum
     equation is dp/dn = rho_f*(V - a_n), where V is the normal component of
-    the viscous term of the momentum equation in the wall cells (see
-    wallNormalViscousTerm), as in movingWallPressure. The Robin condition
+    the viscous term of the momentum equation in the wall cells, plus the
+    fvOptions momentum source on OpenFOAM.com (see wallNormalMomentum), as
+    in movingWallPressure. The Robin condition
     then uses a_s - V in place of the solid normal acceleration a_s, and
     pimpleFluid and interFluid add rAU*V*|Sf| (times rho for interFluid) to
     the interface flux, so that the converged flux is unchanged. viscousTerm
