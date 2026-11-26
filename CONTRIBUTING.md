@@ -150,8 +150,8 @@ not post another full AI review unless it adds something specific.
 ### 3. Second independent AI review (MEDIUM and HIGH)
 
 A core maintainer runs it once the PR is close to final, and again only after
-substantive changes. The reviewer gets the same instructions and patches as
-the Claude report, but not the report or any PR comment, so the two are
+substantive changes. The reviewer gets the same instructions, patches and full
+files as the Claude report, but not the report or any PR comment, so the two are
 independent. From an up-to-date `development` checkout:
 
 ```bash
