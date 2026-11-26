@@ -2046,6 +2046,7 @@ int main(int argc, char *argv[])
 
         manager.updateStressSmallStrain
         (
+            mechanicalConstitutiveLawManager::compactLayout::cells,
             compactGradD,
             compactGradD0,
             dt,
@@ -2077,6 +2078,7 @@ int main(int argc, char *argv[])
                 {
                     manager.updateStressSmallStrain
                     (
+                        mechanicalConstitutiveLawManager::compactLayout::cells,
                         compactGradD,
                         oddGradD0,
                         dt,

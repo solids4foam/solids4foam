@@ -68,7 +68,8 @@ void amiInterfaceToInterfaceMapping::makeInterpolator() const
             zoneBRef(),
             faceAreaIntersect::tmMesh, // triMode
             true,   // requireMatch
-            //amiZoneInterpolation::imFaceAreaWeight, // interpolationMethodNames
+            //amiZoneInterpolation::imFaceAreaWeight,
+            //    // interpolationMethodNames
             -1,     // lowWeightCorrection
             false,  // reverseTarget
             true    // use globalPolyPatch
@@ -125,7 +126,10 @@ void amiInterfaceToInterfaceMapping::checkZoneAToZoneBError() const
 // void amiInterfaceToInterfaceMapping::checkZoneBToZoneAError() const
 // {
 //     const vectorField zoneBPointsAtFluid =
-//         interpolator().interpolateToSourcePointInterpolate(zoneB().localPoints());
+//         interpolator().interpolateToSourcePointInterpolate
+//         (
+//             zoneB().localPoints()
+//         );
 
 //     const vectorField& zoneAPoints = zoneA().localPoints();
 

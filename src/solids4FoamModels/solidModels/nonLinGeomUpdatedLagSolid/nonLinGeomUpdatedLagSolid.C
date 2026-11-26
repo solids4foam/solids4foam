@@ -347,7 +347,7 @@ bool nonLinGeomUpdatedLagSolid::evolveImplicitSegregated()
         // Add stabilisation to the traction
         // We add this before enforcing the traction condition as the stabilisation
         // is set to zero on traction boundaries
-        momentumStabilisation().updateVector(DD(), &gradDD());
+        updateMomentumStabilisation(DD(), gradDD());
         traction += impKf_*momentumStabilisation().faceVector();
 
         // Calculate the force at the faces
@@ -571,6 +571,7 @@ void Foam::solidModels::nonLinGeomUpdatedLagSolid::correctStressQuad()
 
     mechanicalManager().updateStressFiniteStrain
     (
+        mechanicalConstitutiveLawManager::compactLayout::faces,
         FQuadPtr_(),
         FQuadOldPtr_(),
         FinvQuadPtr_(),
@@ -853,7 +854,8 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
 
     // Refused here, at construction, rather than at the first residual
     // evaluation, so that a case asking for it stops before it runs.
-    // The mixed formulation has not been ported to this model. nonLinGeomTotalLagTotalDispSolid asks each law for its isochoric
+    // The mixed formulation has not been ported to this model.
+    // nonLinGeomTotalLagTotalDispSolid asks each law for its isochoric
     // stress and its volumetric response apart, and replaces the second with
     // the solved pressure; this one asks for a total stress and takes dev()
     // of it, which is the same thing only where what remains is trace free.
@@ -1205,7 +1207,7 @@ label nonLinGeomUpdatedLagSolid::formResidual
         const volVectorField gradp(fvc::grad(p));
 
         // Re-calculate the pressure stabilisation parameter
-        pressureStabilisation().updateScalar(p, &gradp);
+        updatePressureStabilisation(p, gradp);
 
         // Dimensional consistency factor
         const dimensionedScalar one
@@ -1276,7 +1278,7 @@ label nonLinGeomUpdatedLagSolid::formResidual
     // Note: in the high-order case, the stabilisation is referred to the
     // configuration at the start of the time step; it vanishes on convergence,
     // so this does not change the converged answer
-    momentumStabilisation().updateVector(DD, &gradDD());
+    updateMomentumStabilisation(DD, gradDD());
     traction += impKf_*momentumStabilisation().faceVector();
 
     // Calculate the force at the faces
@@ -1377,8 +1379,9 @@ label nonLinGeomUpdatedLagSolid::formJacobian
                 "one", dimensionSet(-2, 4, 4, 0, 0, 0, 0), 1.0
             );
 
-            // Compute the positive face-interpolated reciprocal of the approximate
-            // momentum equation diagonal (solid analogue of rAUf), [Pa]
+            // Compute the positive face-interpolated reciprocal of the
+            // approximate momentum equation diagonal (solid analogue of
+            // rAUf), [Pa]
             {
                 fvVectorMatrix approxMomJ
                 (

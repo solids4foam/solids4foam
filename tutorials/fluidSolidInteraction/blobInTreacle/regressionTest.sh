@@ -22,11 +22,10 @@ DISP_END_TOL=0.005
 FORCE_END_TOL=0.01
 
 # Reference values for all forks: OpenFOAM v2512, serial, Linux, with the
-# continuity-based wall-normal velocity gradient (#670). OpenFOAM-9 agrees to
-# 5e-5 and foam-extend 4.1 to 2.4e-3
-REF_DISP_T1=0.0561279
-REF_DISP_END=0.116476
-REF_FORCE_END=15.7449
+# finite-strain neo-Hookean solid and couplingReuse 0
+REF_DISP_T1=0.059643
+REF_DISP_END=0.135583
+REF_FORCE_END=15.7508
 
 # Log files
 ALLRUN_LOGFILE="log.Allrun"

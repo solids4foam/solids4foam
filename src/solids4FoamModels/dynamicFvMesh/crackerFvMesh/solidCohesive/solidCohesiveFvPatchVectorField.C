@@ -18,6 +18,7 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "solidCohesiveFvPatchVectorField.H"
+#include "patchCorrectionVectors.H"
 #include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
 #include "lookupSolidModel.H"
@@ -457,14 +458,8 @@ void solidCohesiveFvPatchVectorField::evaluate(const Pstream::commsTypes)
             "grad(" + fieldName_ + ")"
         );
 
-    // Patch unit normals
-    const vectorField n(patch().nf());
-
-    // Delta vectors
-    const vectorField delta(patch().delta());
-
     // Correction vectors
-    const vectorField k = delta - n*(n&delta);
+    const vectorField k(patchCorrectionVectors(patch()));
 
     // Set value on the boundary
     Field<vector>::operator=

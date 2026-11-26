@@ -118,8 +118,10 @@ void Foam::clampedMomentFaPatchScalarField::updateCoeffs()
         patch().lookupPatchField<areaTensorField, tensor>("grad(theta)");
 
     // Calculate correction vectors
+    // (the real edge-face vector: on OpenFOAM.com, faPatch::delta() is its
+    // normal part only, which would make k zero)
     const vectorField n(patch().edgeNormals());
-    const vectorField delta(patch().delta());
+    const vectorField delta(patch().edgeCentres() - patch().edgeFaceCentres());
     const vectorField k((I - sqr(n)) & delta);
 
     // Calculate the patch internal field and correction for non-orthogonality

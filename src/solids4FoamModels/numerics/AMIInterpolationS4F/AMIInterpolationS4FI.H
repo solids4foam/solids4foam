@@ -99,7 +99,8 @@ inline Foam::label Foam::AMIInterpolationS4F::singlePatchProc() const
 }
 
 
-inline const Foam::List<Foam::scalar>& Foam::AMIInterpolationS4F::srcMagSf() const
+inline const Foam::List<Foam::scalar>&
+Foam::AMIInterpolationS4F::srcMagSf() const
 {
     return srcMagSf_;
 }
@@ -147,7 +148,8 @@ inline Foam::scalarField& Foam::AMIInterpolationS4F::srcWeightsSum()
 }
 
 
-inline const Foam::pointListList& Foam::AMIInterpolationS4F::srcCentroids() const
+inline const Foam::pointListList&
+Foam::AMIInterpolationS4F::srcCentroids() const
 {
     return srcCentroids_;
 }
@@ -165,7 +167,8 @@ inline const Foam::mapDistribute& Foam::AMIInterpolationS4F::srcMap() const
 }
 
 
-inline const Foam::List<Foam::scalar>& Foam::AMIInterpolationS4F::tgtMagSf() const
+inline const Foam::List<Foam::scalar>&
+Foam::AMIInterpolationS4F::tgtMagSf() const
 {
     return tgtMagSf_;
 }

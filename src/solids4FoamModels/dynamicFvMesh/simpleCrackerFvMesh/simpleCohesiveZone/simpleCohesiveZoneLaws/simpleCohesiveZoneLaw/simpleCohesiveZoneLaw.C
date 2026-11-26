@@ -41,7 +41,7 @@ Foam::autoPtr<Foam::simpleCohesiveZoneLaw> Foam::simpleCohesiveZoneLaw::New
 {
     if (debug)
     {
-        Info << "Selecting cohesive law: " << modelType << endl;
+        Info<< "Selecting cohesive law: " << modelType << endl;
     }
 
 #ifdef OPENFOAM_COM

@@ -35,7 +35,7 @@ namespace Foam
 void tractionPressureDisplacementFvPatchVectorField::
 makeInterpolationPoints()
 {
-    // Info << "makeInterpolationPoints()" << endl;
+    // Info<< "makeInterpolationPoints()" << endl;
 
     const fvMesh& mesh = this->patch().boundaryMesh().mesh();
 
@@ -90,7 +90,7 @@ makeInterpolationPoints()
 
             label patchID = mesh.boundaryMesh().whichPatch(curFace);
 
-            if(mesh.isInternalFace(curFace))
+            if (mesh.isInternalFace(curFace))
             {
                 if (curCell == owner[curFace])
                 {
@@ -302,8 +302,8 @@ makeInterpolationPoints()
         }
         else
         {
-            Info << this->patch().name() << ", "<< faceI
-                 << ", detLsMat: " << detLsMat << endl;
+            Info<< this->patch().name() << ", "<< faceI
+                << ", detLsMat: " << detLsMat << endl;
 
             scalarRectangularMatrix curInvMatrix
             (
@@ -380,7 +380,7 @@ extrapolatedDerivative
 
             label patchID = mesh.boundaryMesh().whichPatch(curFace);
 
-            if(mesh.isInternalFace(curFace))
+            if (mesh.isInternalFace(curFace))
             {
                 if (curCell == owner[curFace])
                 {
@@ -609,7 +609,7 @@ extrapolatedGradient
 
             label patchID = mesh.boundaryMesh().whichPatch(curFace);
 
-            if(mesh.isInternalFace(curFace))
+            if (mesh.isInternalFace(curFace))
             {
                 if (curCell == owner[curFace])
                 {
@@ -805,7 +805,7 @@ extrapolatedDisplacement()
 
             label patchID = mesh.boundaryMesh().whichPatch(curFace);
 
-            if(mesh.isInternalFace(curFace))
+            if (mesh.isInternalFace(curFace))
             {
                 if (curCell == owner[curFace])
                 {

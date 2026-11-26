@@ -38,7 +38,7 @@ Author
 #define alphaStab_H
 
 #include "stabilisationModel.H"
-#include "lookupSolidModel.H"
+#include "leastSquaresScheme.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -60,6 +60,12 @@ class alphaStab
 
 
     // Private Member Functions
+
+        //- Initialise the scalar face stabilisation field, if required
+        void initFaceScalar(const volScalarField& field) const;
+
+        //- Initialise the vector face stabilisation field, if required
+        void initFaceVector(const volVectorField& field) const;
 
         //- Template calculation of the stabilisation
         template<class GeoField, class GradField, class SurfaceField>
@@ -112,20 +118,44 @@ public:
 
         // Access
 
-            //- Re-calculate the scalar stabilisation
-            //  Provide the primary variable field and optionally its gradient
+            //- Re-calculate the second-order scalar stabilisation
+            //  Provide the primary variable field and its gradient
             virtual void updateScalar
             (
                 const volScalarField& field,
                 const volVectorField* gradPtr = nullptr
             ) const;
 
-            //- Re-calculate the vector stabilisation
-            // Provide the primary variable field and optionally its gradient
+            //- Re-calculate the second-order vector stabilisation
+            //  Provide the primary variable field and its gradient
             virtual void updateVector
             (
                 const volVectorField& field,
                 const volTensorField* gradPtr = nullptr
+            ) const;
+
+            //- Re-calculate the scalar stabilisation with the given
+            //  high-order least-squares reconstruction of the field
+            virtual void updateScalarHighOrder
+            (
+                const volScalarField& field,
+                const leastSquaresScheme& reconstruction
+            ) const;
+
+            //- Re-calculate the vector stabilisation with the given
+            //  high-order least-squares reconstruction of the field
+            virtual void updateVectorHighOrder
+            (
+                const volVectorField& field,
+                const leastSquaresScheme& reconstruction
+            ) const;
+
+            //- Provide an approximate implicit Jacobian contribution
+            virtual const fvScalarMatrix& scalarJacobian
+            (
+                const volScalarField& field,
+                const surfaceScalarField* gammaPtr = nullptr,
+                const bool rebuild = false
             ) const;
 
             //- Provide an approximate implicit Jacobian contribution

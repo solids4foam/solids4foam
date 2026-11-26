@@ -160,8 +160,10 @@ blockSolidTractionFvPatchVectorField::snGrad() const
 
     // Calculate correction vector
     vectorField n = this->patch().nf();
-    vectorField delta = this->patch().delta();
-    vectorField k = ((I - sqr(n)) & delta);
+    // Non-orthogonal correction vectors from the real face-cell vector
+    // (on OpenFOAM.com, fvPatch::delta() is its normal part only)
+    const vectorField delta(patch().Cf() - patch().Cn());
+    const vectorField k((I - sqr(n)) & delta);
 
     return
     (

@@ -117,6 +117,29 @@ Current expectation:
 
 This avoids forcing more specialised interfaces for each stabilisation family.
 
+## High-Order Residual
+
+Models that support the high-order residual (`supportsHighOrderResidual()`
+returns `true`, currently only `alpha`) also implement:
+
+```text
+updateScalarHighOrder(field, reconstruction)
+updateVectorHighOrder(field, reconstruction)
+```
+
+where `reconstruction` is the `leastSquaresScheme` of the field. The caller
+owns the scheme, so these work in any model, e.g. a fluid model, without a
+solid model.
+
+`updateScalar(...)` and `updateVector(...)` always compute the second-order
+stabilisation from `gradPtr`; the stabilisation models do not look up the solid
+model. The solid models choose between the two through
+`solidModel::updateMomentumStabilisation(D, gradD)` and
+`solidModel::updatePressureStabilisation(p, gradp)`, which call the high-order
+version with the displacement or pressure least-squares scheme when
+`highOrderResidual` is on and the model supports it, and the second-order
+version otherwise.
+
 ## Jacobian Caching
 
 Some models provide an approximate Jacobian through `scalarJacobian(...)` or
@@ -180,7 +203,8 @@ Jacobian (it must be one of the entries in `models`).
 
 The `highOrderResidual` option is allowed with `multiple` only if every
 sub-model returns `true` from `supportsHighOrderResidual()`. Currently only the
-`alpha` model satisfies this requirement.
+`alpha` model satisfies this requirement. The high-order updates of `multiple` call
+the high-order updates of every sub-model.
 
 ## Volumetric Strain Rate Stabilisation
 
@@ -259,7 +283,8 @@ When adding a new stabilisation model:
 - keep the interface consistent with the existing `update...()` and cached
   accessor pattern unless there is a strong reason to change the framework,
 - if the new model is compatible with `highOrderResidual` calculation, override
-  `supportsHighOrderResidual()` to return `true`.
+  `supportsHighOrderResidual()` to return `true` and implement
+  `updateScalarHighOrder(...)` and `updateVectorHighOrder(...)`.
 
 The current framework is being validated first with
 `linGeomTotalDispSolid`. Wider adoption across the other solid models can

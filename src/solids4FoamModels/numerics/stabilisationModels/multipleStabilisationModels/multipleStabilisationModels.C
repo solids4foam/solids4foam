@@ -79,23 +79,13 @@ Foam::multipleStabilisationModels::~multipleStabilisationModels()
 {}
 
 
-// * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+// * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
-void Foam::multipleStabilisationModels::updateScalar
+void Foam::multipleStabilisationModels::sumFaceScalars
 (
-    const volScalarField& field,
-    const volVectorField* gradPtr
+    const word& fieldName
 ) const
 {
-    clearCellScalarCache();
-
-    // Update all sub-models; a fatal error propagates if any do not support
-    // scalar stabilisation
-    forAll(models_, i)
-    {
-        models_[i].updateScalar(field, gradPtr);
-    }
-
     // Initialise the composite face field from the first sub-model
     faceScalarPtr().reset
     (
@@ -103,7 +93,7 @@ void Foam::multipleStabilisationModels::updateScalar
         (
             IOobject
             (
-                "faceStabilisation(" + field.name() + ")",
+                "faceStabilisation(" + fieldName + ")",
                 mesh().time().timeName(),
                 mesh(),
                 IOobject::NO_READ,
@@ -124,21 +114,11 @@ void Foam::multipleStabilisationModels::updateScalar
 }
 
 
-void Foam::multipleStabilisationModels::updateVector
+void Foam::multipleStabilisationModels::sumFaceVectors
 (
-    const volVectorField& field,
-    const volTensorField* gradPtr
+    const word& fieldName
 ) const
 {
-    clearCellVectorCache();
-
-    // Update all sub-models; a fatal error propagates if any do not support
-    // vector stabilisation
-    forAll(models_, i)
-    {
-        models_[i].updateVector(field, gradPtr);
-    }
-
     // Initialise the composite face field from the first sub-model
     faceVectorPtr().reset
     (
@@ -146,7 +126,7 @@ void Foam::multipleStabilisationModels::updateVector
         (
             IOobject
             (
-                "faceStabilisation(" + field.name() + ")",
+                "faceStabilisation(" + fieldName + ")",
                 mesh().time().timeName(),
                 mesh(),
                 IOobject::NO_READ,
@@ -164,6 +144,84 @@ void Foam::multipleStabilisationModels::updateVector
 
     // Apply the outer scale factor (defaults to 1.0 if not specified)
     autoPtrRef(faceVectorPtr()) *= scaleFactor();
+}
+
+
+// * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+void Foam::multipleStabilisationModels::updateScalar
+(
+    const volScalarField& field,
+    const volVectorField* gradPtr
+) const
+{
+    clearCellScalarCache();
+
+    // Update all sub-models; a fatal error propagates if any do not support
+    // scalar stabilisation
+    forAll(models_, i)
+    {
+        models_[i].updateScalar(field, gradPtr);
+    }
+
+    sumFaceScalars(field.name());
+}
+
+
+void Foam::multipleStabilisationModels::updateVector
+(
+    const volVectorField& field,
+    const volTensorField* gradPtr
+) const
+{
+    clearCellVectorCache();
+
+    // Update all sub-models; a fatal error propagates if any do not support
+    // vector stabilisation
+    forAll(models_, i)
+    {
+        models_[i].updateVector(field, gradPtr);
+    }
+
+    sumFaceVectors(field.name());
+}
+
+
+void Foam::multipleStabilisationModels::updateScalarHighOrder
+(
+    const volScalarField& field,
+    const leastSquaresScheme& reconstruction
+) const
+{
+    clearCellScalarCache();
+
+    // Update all sub-models; a fatal error propagates if any do not support
+    // high-order scalar stabilisation
+    forAll(models_, i)
+    {
+        models_[i].updateScalarHighOrder(field, reconstruction);
+    }
+
+    sumFaceScalars(field.name());
+}
+
+
+void Foam::multipleStabilisationModels::updateVectorHighOrder
+(
+    const volVectorField& field,
+    const leastSquaresScheme& reconstruction
+) const
+{
+    clearCellVectorCache();
+
+    // Update all sub-models; a fatal error propagates if any do not support
+    // high-order vector stabilisation
+    forAll(models_, i)
+    {
+        models_[i].updateVectorHighOrder(field, reconstruction);
+    }
+
+    sumFaceVectors(field.name());
 }
 
 

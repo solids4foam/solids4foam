@@ -302,7 +302,7 @@ void Foam::solidContactFvPatchVectorField::calcZoneToZones() const
 
     zoneToZones_.setSize(shadowPatchNames().size());
 
-    forAll (zoneToZones_, shadPatchI)
+    forAll(zoneToZones_, shadPatchI)
     {
         const solidContactFvPatchVectorField& shadowPatchField =
             refCast<const solidContactFvPatchVectorField>

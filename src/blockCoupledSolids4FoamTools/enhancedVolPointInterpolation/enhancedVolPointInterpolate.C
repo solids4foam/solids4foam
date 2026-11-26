@@ -169,7 +169,8 @@ void Foam::enhancedVolPointInterpolation::interpolateDimensionedInternalField
 {
     if (debug)
     {
-        Pout<< "enhancedVolPointInterpolation::interpolateDimensionedInternalField("
+        Pout<< "enhancedVolPointInterpolation::"
+               "interpolateDimensionedInternalField("
             << "const DimensionedField<Type, volMesh>&, "
             << "DimensionedField<Type, pointMesh>&) : "
             << "interpolating field " << vf.name() << " from cells to points "
@@ -221,7 +222,8 @@ void Foam::enhancedVolPointInterpolation::interpolateDimensionedInternalField
 
 
 template<class Type>
-Foam::tmp<Foam::Field<Type>> Foam::enhancedVolPointInterpolation::flatBoundaryField
+Foam::tmp<Foam::Field<Type>>
+Foam::enhancedVolPointInterpolation::flatBoundaryField
 (
     const GeometricField<Type, fvPatchField, volMesh>& vf
 ) const
@@ -373,7 +375,8 @@ void Foam::enhancedVolPointInterpolation::interpolate
 {
     if (debug)
     {
-        Pout<< "enhancedVolPointInterpolation::interpolateDimensionedInternalField("
+        Pout<< "enhancedVolPointInterpolation::"
+               "interpolateDimensionedInternalField("
             << "const DimensionedField<Type, volMesh>&, "
             << "const DimensionedField<GradType, volMesh>&, "
             << "DimensionedField<Type, pointMesh>&) : "
@@ -612,7 +615,12 @@ Foam::enhancedVolPointInterpolation::interpolate
     const GeometricField<Type, fvPatchField, volMesh>& vf
 ) const
 {
-    return interpolate(vf, "enhancedVolPointInterpolate(" + vf.name() + ')', false);
+    return interpolate
+    (
+        vf,
+        "enhancedVolPointInterpolate(" + vf.name() + ')',
+        false
+    );
 }
 
 
@@ -714,7 +722,12 @@ Foam::enhancedVolPointInterpolation::interpolate
     const DimensionedField<Type, volMesh>& vf
 ) const
 {
-    return interpolate(vf, "enhancedVolPointInterpolate(" + vf.name() + ')', false);
+    return interpolate
+    (
+        vf,
+        "enhancedVolPointInterpolate(" + vf.name() + ')',
+        false
+    );
 }
 
 
