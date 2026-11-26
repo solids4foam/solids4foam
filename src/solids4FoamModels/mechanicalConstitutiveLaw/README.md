@@ -419,7 +419,7 @@ laws and mesh of its own case: `layeredPipe` (more than one material),
 `perforatedPlate` and `cylinderExpansion` (history-dependent plasticity, where
 a tangent query has history to disturb), `viscoTube` (viscoelasticity),
 `blockPunch`, `longWall`, `rotatingCylinder`, `ratCarotid`,
-`idealisedVentricle` and `LandEtAl2015/problem3` (hyperelasticity).
+`LandEtAl2015/problem2` and `LandEtAl2015/problem3` (hyperelasticity).
 
 `Test-prestress` checks the `prestress` switch on a case mesh with
 finite-strain laws: that the prestressed volField, surfaceField and flat-list

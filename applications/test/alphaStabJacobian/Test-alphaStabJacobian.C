@@ -95,7 +95,7 @@ vectorField explicitStabilisationResidual
 (
     const stabilisationModel& stabilisation,
     volVectorField& displacement,
-    const volTensorField& dummyGrad,
+    const leastSquaresScheme& reconstruction,
     const surfaceScalarField& diffusivity,
     const vectorField& values
 )
@@ -103,7 +103,7 @@ vectorField explicitStabilisationResidual
     Foam::primitiveFieldRef(displacement) = values;
     displacement.correctBoundaryConditions();
 
-    stabilisation.updateVector(displacement, &dummyGrad);
+    stabilisation.updateVectorHighOrder(displacement, reconstruction);
 
     const volVectorField& cellStabilisation =
         stabilisation.cellVector(&diffusivity, true);
@@ -123,7 +123,7 @@ vectorField finiteDifferenceJacobianVectorProduct
 (
     const stabilisationModel& stabilisation,
     volVectorField& displacement,
-    const volTensorField& dummyGrad,
+    const leastSquaresScheme& reconstruction,
     const surfaceScalarField& diffusivity,
     const vectorField& direction,
     const scalar epsilon
@@ -140,7 +140,7 @@ vectorField finiteDifferenceJacobianVectorProduct
     (
         stabilisation,
         displacement,
-        dummyGrad,
+        reconstruction,
         diffusivity,
         plusValues
     );
@@ -148,7 +148,7 @@ vectorField finiteDifferenceJacobianVectorProduct
     (
         stabilisation,
         displacement,
-        dummyGrad,
+        reconstruction,
         diffusivity,
         minusValues
     );
@@ -257,7 +257,6 @@ jacobianError runCheck
 (
     const stabilisationModel& stabilisation,
     volVectorField& displacement,
-    const volTensorField& dummyGrad,
     const leastSquaresScheme& reconstruction,
     const foamPetscSnesHelper& petscHelper,
     Mat jacobian,
@@ -274,7 +273,7 @@ jacobianError runCheck
         (
             stabilisation,
             displacement,
-            dummyGrad,
+            reconstruction,
             diffusivity,
             direction,
             epsilon
@@ -418,25 +417,6 @@ int main(int argc, char *argv[])
         );
     }
 
-    volTensorField dummyGrad
-    (
-        IOobject
-        (
-            "alphaStabJacobianDummyGrad",
-            runTime.timeName(),
-            mesh,
-            IOobject::NO_READ,
-            IOobject::NO_WRITE
-        ),
-        mesh,
-        dimensionedTensor
-        (
-            "zero",
-            displacement.dimensions()/dimLength,
-            tensor::zero
-        )
-    );
-
     surfaceScalarField internalDiffusivity
     (
         IOobject
@@ -509,7 +489,6 @@ int main(int argc, char *argv[])
     (
         stabilisation,
         displacement,
-        dummyGrad,
         reconstruction,
         petscHelper,
         internalJacobian.get(),
@@ -539,7 +518,6 @@ int main(int argc, char *argv[])
         (
             stabilisation,
             displacement,
-            dummyGrad,
             reconstruction,
             petscHelper,
             boundaryJacobian.get(),

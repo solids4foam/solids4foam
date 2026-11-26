@@ -596,6 +596,44 @@ Foam::solidModel::pressureLeastSquares() const
 }
 
 
+void Foam::solidModel::updateMomentumStabilisation
+(
+    const volVectorField& D,
+    const volTensorField& gradD
+) const
+{
+    const stabilisationModel& stab = momentumStabilisation();
+
+    if (highOrderResidual() && stab.supportsHighOrderResidual())
+    {
+        stab.updateVectorHighOrder(D, displacementLeastSquares());
+    }
+    else
+    {
+        stab.updateVector(D, &gradD);
+    }
+}
+
+
+void Foam::solidModel::updatePressureStabilisation
+(
+    const volScalarField& p,
+    const volVectorField& gradp
+) const
+{
+    const stabilisationModel& stab = pressureStabilisation();
+
+    if (highOrderResidual() && stab.supportsHighOrderResidual())
+    {
+        stab.updateScalarHighOrder(p, pressureLeastSquares());
+    }
+    else
+    {
+        stab.updateScalar(p, &gradp);
+    }
+}
+
+
 void Foam::solidModel::makeSigmaQuad() const
 {
     if (!sigmaQuadPtr_.empty())
