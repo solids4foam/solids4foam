@@ -805,6 +805,28 @@ release. For complete commit-level details and contributor information, see the
 
 ### Fixed
 
+- `movingWallPressure` (#721):
+  - It now works in enclosed fluid domains, where no boundary fixes the
+    pressure; it stopped in `adjustPhi` ("Continuity error cannot be
+    removed"). In such a domain the `rAU`-weighted mean of the prescribed
+    gradient over all `movingWallPressure` patches is subtracted, and
+    `pimpleFluid` updates the condition just before it adds the gradient
+    flux to the predicted flux, so that both use the same gradient. With
+    `movingWallPressure` instead of `zeroGradient` on the interface,
+    the IQN-ILS amplitude loss of `ringAddedMass` (2.1% per period on the
+    coarsest mesh at the strong level) disappears, as with Robin-Neumann
+    coupling.
+  - It includes the viscous term of the wall-normal momentum equation,
+    `n & (laplacian(nuEff, U) + div(nuEff*dev2(T(grad(U)))))` in the wall
+    cells, by default. **This changes the results of existing cases.**
+    `viscousTerm no` restores the earlier condition, which prescribes only
+    the acceleration term; with a fixed-pressure boundary it reproduces the
+    earlier results exactly.
+  - Any velocity condition can be used with it: the acceleration is that of
+    `newMovingWallVelocity`, or else the time derivative of the boundary
+    velocity. The density comes from the `rho` field or the fluid's
+    `transportProperties`, which are no longer read from disk at every
+    update.
 - A high-order (face-quadrature) parallel run no longer stops at the end of the
   first time step when a processor holds no cells. The constitutive law manager
   decided from the row count whether a compact integration-point layout was

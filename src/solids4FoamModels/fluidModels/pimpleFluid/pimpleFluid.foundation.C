@@ -146,6 +146,23 @@ void pimpleFluid::updateRobinFsiInterface(surfaceScalarField& phiHbyA)
             )
         )
         {
+            // Update the prescribed gradient first, from the current velocity
+            // and rAU, so that this flux and the pressure equation use the
+            // same gradient and the wall flux equals the wall velocity flux.
+            // The legacy condition (viscousTerm no, with a fixed-pressure
+            // boundary) keeps the gradient of the previous update, as before
+            if
+            (
+                p().needReference()
+             || refCast<const movingWallPressureFvPatchScalarField>
+                (
+                    p().boundaryField()[patchI]
+                ).viscousTerm()
+            )
+            {
+                p().boundaryFieldRef()[patchI].updateCoeffs();
+            }
+
             phiHbyA.boundaryFieldRef()[patchI] +=
                 rAU_.boundaryField()[patchI]
                *p().boundaryField()[patchI].snGrad()
