@@ -36,8 +36,9 @@ release. For complete commit-level details and contributor information, see the
   `sigma & n = rho*beta*min(U & n, 0)*U` (`beta` default 0.2, as in the
   Hessenthaler et al. 2017 benchmark), for outlets with a fixed pressure
   that see backflow. It is zero gradient on outflow faces and works with
-  `pimpleFluid` and `newtonIcoFluid`. `cylinderInChannel` gains
-  `./Allrun shortOutlet`, which exercises it.
+  `pimpleFluid` and `newtonIcoFluid`; it assumes laminar flow with a
+  constant viscosity and stops with an error otherwise.
+  `cylinderInChannel` gains `./Allrun shortOutlet`, which exercises it.
 - Cook's membrane verification studies now store the per-mesh tip
   displacements of the published references migrated from solid-benchmarks
   (Simo and Armero, César de Sá et al., Areias and Abaqus for the

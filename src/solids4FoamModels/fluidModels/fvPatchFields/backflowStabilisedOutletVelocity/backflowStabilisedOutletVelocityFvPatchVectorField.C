@@ -22,10 +22,14 @@ License
 #include "volFields.H"
 #include "IOdictionary.H"
 
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+namespace Foam
+{
+
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
-Foam::scalar Foam::backflowStabilisedOutletVelocityFvPatchVectorField::nu()
-const
+scalar backflowStabilisedOutletVelocityFvPatchVectorField::nu() const
 {
     if (nu_ > 0)
     {
@@ -59,7 +63,121 @@ const
 }
 
 
-Foam::scalar Foam::backflowStabilisedOutletVelocityFvPatchVectorField::eps
+void backflowStabilisedOutletVelocityFvPatchVectorField::checkLaminar()
+{
+    if (laminarChecked_)
+    {
+        return;
+    }
+
+    laminarChecked_ = true;
+
+    // The momentum transport model is read from turbulenceProperties
+    // (OpenFOAM.com, foam-extend) or momentumTransport (OpenFOAM.org)
+    const label nDicts = 2;
+    const word dictNames[nDicts] =
+    {
+        "turbulenceProperties",
+        "momentumTransport"
+    };
+
+    for (label i = 0; i < nDicts; ++i)
+    {
+        IOobject io
+        (
+            dictNames[i],
+            db().time().constant(),
+            db(),
+            IOobject::MUST_READ,
+            IOobject::NO_WRITE,
+            false
+        );
+
+#ifdef OPENFOAM_NOT_EXTEND
+        if (!io.typeHeaderOk<IOdictionary>(true))
+#else
+        if (!io.headerOk())
+#endif
+        {
+            continue;
+        }
+
+        const IOdictionary dict(io);
+
+        const word simulationType(dict.lookup("simulationType"));
+
+        if (simulationType != "laminar")
+        {
+            FatalErrorIn
+            (
+                "backflowStabilisedOutletVelocityFvPatchVectorField::"
+                "checkLaminar()"
+            )   << "The condition on patch " << patch().name()
+                << " assumes laminar flow with a constant viscosity, but "
+                << "simulationType is " << simulationType << " in "
+                << dictNames[i] << abort(FatalError);
+        }
+
+        // Laminar sub-model, e.g. generalisedNewtonian or Maxwell
+        if (dict.found("laminar"))
+        {
+            const dictionary& laminarDict = dict.subDict("laminar");
+
+            word model("Stokes");
+
+            if (laminarDict.found("model"))
+            {
+                model = word(laminarDict.lookup("model"));
+            }
+            else if (laminarDict.found("laminarModel"))
+            {
+                model = word(laminarDict.lookup("laminarModel"));
+            }
+
+            if (model != "Stokes")
+            {
+                FatalErrorIn
+                (
+                    "backflowStabilisedOutletVelocityFvPatchVectorField::"
+                    "checkLaminar()"
+                )   << "The condition on patch " << patch().name()
+                    << " assumes a Newtonian fluid with a constant "
+                    << "viscosity, but the laminar model is " << model
+                    << " in " << dictNames[i] << abort(FatalError);
+            }
+        }
+    }
+
+    // Non-Newtonian viscosity models of transportProperties
+    if (db().foundObject<IOdictionary>("transportProperties"))
+    {
+        const dictionary& transportProperties =
+            db().lookupObject<IOdictionary>("transportProperties");
+
+        if (transportProperties.found("transportModel"))
+        {
+            const word transportModel
+            (
+                transportProperties.lookup("transportModel")
+            );
+
+            if (transportModel != "Newtonian")
+            {
+                FatalErrorIn
+                (
+                    "backflowStabilisedOutletVelocityFvPatchVectorField::"
+                    "checkLaminar()"
+                )   << "The condition on patch " << patch().name()
+                    << " assumes a Newtonian fluid with a constant "
+                    << "viscosity, but transportModel is " << transportModel
+                    << " in transportProperties" << abort(FatalError);
+            }
+        }
+    }
+}
+
+
+scalar backflowStabilisedOutletVelocityFvPatchVectorField::eps
 (
     const volVectorField& U
 )
@@ -89,9 +207,11 @@ Foam::scalar Foam::backflowStabilisedOutletVelocityFvPatchVectorField::eps
 }
 
 
-void Foam::backflowStabilisedOutletVelocityFvPatchVectorField::
-updateValueFraction()
+void backflowStabilisedOutletVelocityFvPatchVectorField::updateValueFraction()
 {
+    // On the first call, once the momentum transport model has been read
+    checkLaminar();
+
     // Velocity of the patch-adjacent cells, from the velocity field rather
     // than from the field this condition belongs to, so that a field with
     // the same boundary types, e.g. a Newton correction, gets the same
@@ -143,7 +263,7 @@ updateValueFraction()
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-Foam::backflowStabilisedOutletVelocityFvPatchVectorField::
+backflowStabilisedOutletVelocityFvPatchVectorField::
 backflowStabilisedOutletVelocityFvPatchVectorField
 (
     const fvPatch& p,
@@ -156,7 +276,8 @@ backflowStabilisedOutletVelocityFvPatchVectorField
     smoothing_(0.01),
     nu_(0),
     eps_(0),
-    epsTimeIndex_(-1)
+    epsTimeIndex_(-1),
+    laminarChecked_(false)
 {
     refValue() = vector::zero;
     refGrad() = vector::zero;
@@ -164,7 +285,7 @@ backflowStabilisedOutletVelocityFvPatchVectorField
 }
 
 
-Foam::backflowStabilisedOutletVelocityFvPatchVectorField::
+backflowStabilisedOutletVelocityFvPatchVectorField::
 backflowStabilisedOutletVelocityFvPatchVectorField
 (
     const fvPatch& p,
@@ -178,7 +299,8 @@ backflowStabilisedOutletVelocityFvPatchVectorField
     smoothing_(dict.lookupOrDefault<scalar>("smoothing", 0.01)),
     nu_(dict.lookupOrDefault<scalar>("nu", 0)),
     eps_(0),
-    epsTimeIndex_(-1)
+    epsTimeIndex_(-1),
+    laminarChecked_(false)
 {
     if (beta_ < 0)
     {
@@ -231,7 +353,7 @@ backflowStabilisedOutletVelocityFvPatchVectorField
 }
 
 
-Foam::backflowStabilisedOutletVelocityFvPatchVectorField::
+backflowStabilisedOutletVelocityFvPatchVectorField::
 backflowStabilisedOutletVelocityFvPatchVectorField
 (
     const backflowStabilisedOutletVelocityFvPatchVectorField& ptf,
@@ -246,12 +368,13 @@ backflowStabilisedOutletVelocityFvPatchVectorField
     smoothing_(ptf.smoothing_),
     nu_(ptf.nu_),
     eps_(0),
-    epsTimeIndex_(-1)
+    epsTimeIndex_(-1),
+    laminarChecked_(false)
 {}
 
 
 #ifndef OPENFOAM_ORG
-Foam::backflowStabilisedOutletVelocityFvPatchVectorField::
+backflowStabilisedOutletVelocityFvPatchVectorField::
 backflowStabilisedOutletVelocityFvPatchVectorField
 (
     const backflowStabilisedOutletVelocityFvPatchVectorField& ptf
@@ -263,12 +386,13 @@ backflowStabilisedOutletVelocityFvPatchVectorField
     smoothing_(ptf.smoothing_),
     nu_(ptf.nu_),
     eps_(ptf.eps_),
-    epsTimeIndex_(ptf.epsTimeIndex_)
+    epsTimeIndex_(ptf.epsTimeIndex_),
+    laminarChecked_(ptf.laminarChecked_)
 {}
 #endif
 
 
-Foam::backflowStabilisedOutletVelocityFvPatchVectorField::
+backflowStabilisedOutletVelocityFvPatchVectorField::
 backflowStabilisedOutletVelocityFvPatchVectorField
 (
     const backflowStabilisedOutletVelocityFvPatchVectorField& ptf,
@@ -281,13 +405,14 @@ backflowStabilisedOutletVelocityFvPatchVectorField
     smoothing_(ptf.smoothing_),
     nu_(ptf.nu_),
     eps_(ptf.eps_),
-    epsTimeIndex_(ptf.epsTimeIndex_)
+    epsTimeIndex_(ptf.epsTimeIndex_),
+    laminarChecked_(ptf.laminarChecked_)
 {}
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-void Foam::backflowStabilisedOutletVelocityFvPatchVectorField::updateCoeffs()
+void backflowStabilisedOutletVelocityFvPatchVectorField::updateCoeffs()
 {
     if (updated())
     {
@@ -300,7 +425,7 @@ void Foam::backflowStabilisedOutletVelocityFvPatchVectorField::updateCoeffs()
 }
 
 
-void Foam::backflowStabilisedOutletVelocityFvPatchVectorField::evaluate
+void backflowStabilisedOutletVelocityFvPatchVectorField::evaluate
 (
     const Pstream::commsTypes commsType
 )
@@ -316,7 +441,7 @@ void Foam::backflowStabilisedOutletVelocityFvPatchVectorField::evaluate
 }
 
 
-void Foam::backflowStabilisedOutletVelocityFvPatchVectorField::write
+void backflowStabilisedOutletVelocityFvPatchVectorField::write
 (
     Ostream& os
 ) const
@@ -346,13 +471,14 @@ void Foam::backflowStabilisedOutletVelocityFvPatchVectorField::write
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-namespace Foam
-{
-    makePatchTypeField
-    (
-        fvPatchVectorField,
-        backflowStabilisedOutletVelocityFvPatchVectorField
-    );
-}
+makePatchTypeField
+(
+    fvPatchVectorField,
+    backflowStabilisedOutletVelocityFvPatchVectorField
+);
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+} // End namespace Foam
 
 // ************************************************************************* //

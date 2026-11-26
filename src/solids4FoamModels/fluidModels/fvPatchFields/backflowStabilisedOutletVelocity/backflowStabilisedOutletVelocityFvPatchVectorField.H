@@ -78,7 +78,21 @@ Description
     if it is not given, from the "nu" entry of transportProperties. It is
     a single constant laminar viscosity: the condition is not intended for
     turbulent or non-Newtonian flows, where the effective viscosity at the
-    outlet would be needed.
+    outlet would be needed, and it stops with an error if the momentum
+    transport model is not laminar Stokes (turbulenceProperties or
+    momentumTransport) or transportProperties selects a transportModel
+    other than Newtonian.
+
+    Since the traction is imposed through the viscous term alone,
+    |c|/deltaCoeffs = beta*|U & n|/(nu*deltaCoeffs) is a cell Reynolds
+    number: where it is large (low viscosity or a coarse outlet mesh),
+    the value fraction approaches one on backflow faces, and the boundary
+    velocity there approaches zero.
+
+    Like zeroGradient and inletOutlet, the condition is assignable, so
+    that pressure-velocity solvers interpolate the outlet flux from the
+    cells (constrainHbyA leaves the boundary HbyA free) rather than
+    treating the outlet as a fixed velocity.
 
     The newtonIcoFluid "physics" preconditioner creates its correction
     field from the boundary condition type names, so its copy of this
@@ -173,11 +187,18 @@ class backflowStabilisedOutletVelocityFvPatchVectorField
         //- Time index for which eps_ was computed (-1: not computed)
         label epsTimeIndex_;
 
+        //- Whether checkLaminar has been called
+        bool laminarChecked_;
+
 
     // Private Member Functions
 
         //- Return the kinematic viscosity
         scalar nu() const;
+
+        //- Stop with an error, on the first call, unless the flow is
+        //  laminar and Newtonian, as the constant viscosity assumes
+        void checkLaminar();
 
         //- Return the smoothing velocity for the current time step,
         //  computing it on the first call of the time step
@@ -274,6 +295,15 @@ public:
             virtual bool fixesValue() const
             {
                 return false;
+            }
+
+            //- Return true: on outflow faces the condition is zero
+            //  gradient, so, as for zeroGradient and inletOutlet, the
+            //  outlet flux is interpolated rather than fixed by the
+            //  boundary velocity (constrainHbyA)
+            virtual bool assignable() const
+            {
+                return true;
             }
 
 
