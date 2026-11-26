@@ -7,9 +7,11 @@
 #     ./run_checks.sh                     full variant, as used by the case
 #     ./run_checks.sh generated_flat 1 1 flat
 #
-# The derivation runs 11 symbolic and 40-digit checks, writes
-# <outDir>/mmsFsiExact.H and <outDir>/reference_values.txt, and
-# check_generated.C then checks the generated header independently. The
+# outDir is a directory name under derivation/. The derivation runs 11
+# symbolic and 40-digit checks and writes <outDir>/mmsFsiExact.H and
+# <outDir>/reference_values.txt; check_generated.C then checks the generated
+# header independently. The logs are <outDir>/log.derive and
+# <outDir>/log.check. The
 # full variant with the default parameters reproduces ../src/mmsFsiExact.H
 # and reference_values.txt; copy them there to update the case.
 #
@@ -17,6 +19,7 @@
 # C++17 compiler (CXX, default c++). Each variant takes about six minutes.
 
 cd "${0%/*}" || exit 1
+set -o pipefail
 
 out=${1:-generated}
 rhoF=${2:-1}
@@ -25,6 +28,13 @@ variant=${4:-full}
 muF=${5:-1/100}
 PY=${PYTHON:-python3}
 
+if [[ "$out" == */* ]]
+then
+    echo "outDir must be a directory name under derivation/, not a path"
+    exit 1
+fi
+mkdir -p "$out"
+
 if ! "$PY" -c "import sympy, symengine" > /dev/null 2>&1
 then
     echo "sympy and symengine are required: pip install sympy symengine"
@@ -32,15 +42,15 @@ then
 fi
 
 if ! "$PY" -u mms_fsi.py --outdir "$out" --rho-f "$rhoF" --rho-s "$rhoS" \
-    --variant "$variant" --mu-f "$muF" > "log.$out.derive" 2>&1
+    --variant "$variant" --mu-f "$muF" > "$out/log.derive" 2>&1
 then
-    tail -5 "log.$out.derive"
+    tail -5 "$out/log.derive"
     echo "DERIVATION CHECKS FAILED"
     exit 1
 fi
-grep -E "PASS|FAIL|checks passed" "log.$out.derive"
+grep -E "PASS|FAIL|checks passed" "$out/log.derive"
 
 ${CXX:-c++} -O1 -std=c++17 -I "$out" \
     -DREFFILE=\""$out"/reference_values.txt\" \
-    check_generated.C -o "check_$out" \
- && "./check_$out" | tee "log.$out.check"
+    check_generated.C -o "$out/check_generated" \
+ && "./$out/check_generated" | tee "$out/log.check"

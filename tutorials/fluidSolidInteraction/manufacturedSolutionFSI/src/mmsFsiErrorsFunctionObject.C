@@ -69,7 +69,7 @@ bool Foam::mmsFsiErrorsFunctionObject::writeErrors()
 {
     const scalar t = time_.value();
 
-    if (!filePtr_.valid() && Pstream::master())
+    if (!filePtr_ && Pstream::master())
     {
         const fileName dir(time_.globalPath()/"postProcessing"/"mmsFsiErrors");
         mkDir(dir);

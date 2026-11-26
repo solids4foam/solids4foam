@@ -105,8 +105,8 @@ runs `solids4Foam`.
   interface (`fixedRelaxation` with factor 1).
 
 Both use an outer coupling tolerance of 1e-6. The inlet velocity, the outlet
-velocity gradient and the outlet pressure are exact; the inlet, wall and
-interface pressures are `fixedFluxPressure`.
+velocity gradient and the outlet pressure are exact; the inlet and wall
+pressures are `fixedFluxPressure`.
 
 ## Verification and regression
 
@@ -151,11 +151,12 @@ cd derivation
 ./run_checks.sh     # about six minutes; Python 3 with sympy and symengine
 ```
 
-The full variant with the default parameters reproduces `src/mmsFsiExact.H`
-and `derivation/reference_values.txt`. The script also generates a `flat`
-variant, in which the interface stays flat and moves only vertically, and
-variants with other densities and viscosities; these are not used by the
-case.
+The default call, the full variant, writes `derivation/generated/` and
+reproduces `src/mmsFsiExact.H` and `derivation/reference_values.txt`. Its
+arguments select other variants, which the case does not use: for example
+`./run_checks.sh generated_flat 1 1 flat` gives the `flat` variant, in which
+the interface stays flat and moves only vertically, and the density and
+viscosity arguments change the fluid and solid parameters.
 
 ## Not included
 

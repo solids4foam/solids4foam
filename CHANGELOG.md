@@ -38,6 +38,7 @@ release. For complete commit-level details and contributor information, see the
   that see backflow. It is zero gradient on outflow faces and works with
   `pimpleFluid` and `newtonIcoFluid`; it assumes laminar flow with a
   constant viscosity and stops with an error otherwise.
+  `cylinderInChannel` gains `./Allrun shortOutlet`, which exercises it.
 - A method of manufactured solutions tutorial for transient ALE fluid-solid
   interaction, `tutorials/fluidSolidInteraction/manufacturedSolutionFSI`
   (OpenFOAM.com, with PETSc): a channel flow coupled to a compliant
@@ -51,7 +52,6 @@ release. For complete commit-level details and contributor information, see the
   the opt-in `verification/Allverify` runs the 16 to 64 cell combined
   space-time refinement study and reports the observed orders. The coarse
   case is part of `tutorials/Alltest-regression`.
-  `cylinderInChannel` gains `./Allrun shortOutlet`, which exercises it.
 - Cook's membrane verification studies now store the per-mesh tip
   displacements of the published references migrated from solid-benchmarks
   (Simo and Armero, César de Sá et al., Areias and Abaqus for the

@@ -35,6 +35,18 @@ REFERENCE_FILE = (
 # deltaT = DT_TIMES_NCELLS/nCells: 0.02 on the 16-cell mesh
 DT_TIMES_NCELLS = 0.32
 
+# Messages of the solids4FoamScripts.sh helpers with which Allrun skips the
+# case: on OpenFOAM.org, on foam-extend, or without PETSc
+SKIP_MESSAGES = (
+    "This case currently does not run with foam-extend",
+    "This case currently does not run with OpenFOAM.org",
+    "Skipping this case as PETSc is not installed",
+)
+
+
+class CaseSkipped(Exception):
+    """Allrun skipped the case in this environment."""
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -46,7 +58,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--levels",
-        help="comma-separated cells along the interface, multiples of 4",
+        help="comma-separated cells along the interface, multiples of 8",
     )
     parser.add_argument(
         "--quick",
@@ -155,6 +167,10 @@ def run_level(
                 f"{coupling} n{n_cells} failed; "
                 f"see {run_dir / 'log.Allverify'}"
             )
+        allrun_log = (run_dir / "log.Allverify").read_text()
+        for message in SKIP_MESSAGES:
+            if message in allrun_log:
+                raise CaseSkipped(message)
         if not solver_log.exists():
             raise RuntimeError(
                 f"solver log was not created in {run_dir}; "
@@ -275,9 +291,11 @@ def main() -> int:
         levels = [int(value) for value in reference["default_levels"]]
     if args.quick:
         levels = levels[:2]
-    if len(levels) < 2 or any(level <= 0 or level % 4 for level in levels):
+    # Multiples of 8: the solid has nCells/4 cells across, and
+    # deltaT = 0.32/nCells must step onto t = 0.2 and 0.4
+    if len(levels) < 2 or any(level <= 0 or level % 8 for level in levels):
         raise SystemExit(
-            "at least two levels, positive multiples of 4, are required"
+            "at least two levels, positive multiples of 8, are required"
         )
     if any(right <= left for left, right in zip(levels, levels[1:])):
         raise SystemExit("levels must be strictly increasing")
@@ -300,6 +318,10 @@ def main() -> int:
                 errors[n_cells] = run_level(
                     coupling, n_cells, times, args.reuse
                 )
+        except CaseSkipped as skip:
+            print(f"SKIP: {skip}")
+            print("Result: SKIPPED")
+            return 0
         except RuntimeError as error:
             print(f"ERROR: {error}")
             passed = False

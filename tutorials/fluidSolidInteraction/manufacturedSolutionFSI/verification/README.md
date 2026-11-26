@@ -16,7 +16,7 @@ cd tutorials/fluidSolidInteraction/manufacturedSolutionFSI/verification
 
 The default runs the Aitken coupling and takes about six minutes, most of it
 on the 64-cell level. Use `--couplings aitken,robin` to add the Robin-Neumann
-coupling, `--levels` for other cell counts (multiples of 4), `--quick` for the
+coupling, `--levels` for other cell counts (multiples of 8), `--quick` for the
 first two levels, and `--reuse` to keep completed cases:
 
 ```bash
@@ -47,12 +47,12 @@ errors of `U`, `p`, `D`, `intD`, `intTrac` and `intP` at both times:
 
 `--quick` checks the errors but not the orders. The reference errors are
 those of the verification paper (OpenFOAM v2512, macOS); the same study on
-the `development` branch reproduces them to within 0.5%.
+the `development` branch reproduces them to within 2%.
 
 ## Expected orders
 
 The partitioned `pimpleFluid` model is first order under this combined
-refinement. With the Aitken coupling, the L2 errors and orders are:
+refinement. With the Aitken coupling, the reference L2 errors and orders are:
 
 | quantity | t | n16 | n32 | n64 | orders |
 |---|---|---|---|---|---|
