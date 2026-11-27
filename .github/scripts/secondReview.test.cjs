@@ -47,7 +47,9 @@ test('second review builds the CI prompt from the base branch on GitHub, not the
 test('second review adds full files from the PR head SHA, with encoded paths', async () => {
   const api = fakeApi(pr, {'src/solids4FoamModels/numerics/x.C': 'int whole() { return 1; }\n'});
   const c = await collect(7, api);
-  assert.deepEqual(api.fetched, [`repos/solids4foam/solids4foam/contents/src/solids4FoamModels/numerics/x.C?ref=${pr.head.sha}`]);
+  // The unchanged matching header is tried too; here it does not exist.
+  assert.deepEqual(api.fetched, ['x.C', 'x.H'].map(name =>
+    `repos/solids4foam/solids4foam/contents/src/solids4FoamModels/numerics/${name}?ref=${pr.head.sha}`));
   assert.ok(api.raws.length === 3);
   assert.deepEqual(c.coverage.full_files, ['src/solids4FoamModels/numerics/x.C']);
   assert.ok(JSON.parse(c.data.split('UNTRUSTED PR DATA (JSON):\n')[1]).full_files[0].content

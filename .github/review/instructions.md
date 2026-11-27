@@ -82,12 +82,14 @@ pre-existing code. Missing context is uncertainty, not evidence of an
 omission.
 
 `full_files` holds the complete post-change text, at the reviewed head SHA, of
-some changed files whose patches are supplied. It is context for judging the
-changed lines: the rest of an edited function, matching declarations, and
-callers in the same file. Findings must still concern the changed lines or
-their direct consequences; do not review untouched code in those files. Cite
-line numbers from the full text when it is supplied. Files not in `full_files`
-were seen only as patch hunks.
+some changed files whose patches are supplied, and of the unchanged `.H` header
+matching a changed `.C` file (a full file absent from the PR file list is such
+a header). It is context for judging the changed lines: the rest of an edited
+function, matching declarations, and callers in the same file. Findings must
+still concern the changed lines or their direct consequences; do not review
+untouched code in those files. Each full-file line starts with its line number
+and `|`; cite these numbers for findings in those files. Files not in
+`full_files` were seen only as patch hunks.
 
 Apply a guide rule only where the supplied evidence supports it. If surrounding
 code or build lists are absent, ask a specific human-review question; do not

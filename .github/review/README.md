@@ -287,7 +287,10 @@ half-edited function, the matching header and nearby callers
 fetches each file at the PR head SHA through the contents API, as data, with the
 job's read-only token; PR code is still never checked out or run. Only modified
 or renamed files with a reviewed patch qualify (an added file's patch is already
-the whole file). C/C++ sources and headers in `src/` and `applications/` come
+the whole file), plus the unchanged `.H` of a reviewed `.C`, whose declarations,
+member data and virtual signatures are often needed to judge the `.C` change.
+Each line is prefixed with its number and `|`, so findings can cite exact lines.
+C/C++ sources and headers in `src/` and `applications/` come
 first, with a class's `.C` and `.H` together, then other C/C++ and `Make` lists,
 then other text. `CHANGELOG.md` (its patch is enough), tutorial mesh/field/CSV
 data, binaries, non-UTF-8 files and files of 1 MB or more are skipped, and at
