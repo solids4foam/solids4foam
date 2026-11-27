@@ -123,9 +123,12 @@ void Foam::calculateEigenValues
     sigmaMax = eValues[iMax];
     sigmaMid = eValues[iMid];
     sigmaMin = eValues[iMin];
-    sigmaMaxDir = vector(eVectors[3*iMax], eVectors[3*iMax + 1], eVectors[3*iMax + 2]);
-    sigmaMidDir = vector(eVectors[3*iMid], eVectors[3*iMid + 1], eVectors[3*iMid + 2]);
-    sigmaMinDir = vector(eVectors[3*iMin], eVectors[3*iMin + 1], eVectors[3*iMin + 2]);
+    sigmaMaxDir =
+        vector(eVectors[3*iMax], eVectors[3*iMax + 1], eVectors[3*iMax + 2]);
+    sigmaMidDir =
+        vector(eVectors[3*iMid], eVectors[3*iMid + 1], eVectors[3*iMid + 2]);
+    sigmaMinDir =
+        vector(eVectors[3*iMin], eVectors[3*iMin + 1], eVectors[3*iMin + 2]);
 }
 
 
@@ -249,7 +252,7 @@ void Foam::writePrincipalStressFields
     vectorField& sigmaMinDirI = primitiveFieldRef(sigmaMinDir);
     scalarField& sigmaDiffI = primitiveFieldRef(sigmaDiff);
 
-    forAll (sigmaI, cellI)
+    forAll(sigmaI, cellI)
     {
         calculateEigenValues
         (

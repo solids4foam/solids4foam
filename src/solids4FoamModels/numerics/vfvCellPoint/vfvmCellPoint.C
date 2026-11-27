@@ -890,8 +890,10 @@ void Foam::vfvm::laplacian
 //     const labelList& dualNei = dualMesh.neighbour();
 //     const vectorField& dualSf = dualMesh.faceAreas();
 //     const vectorField& pointVI = pointV;
-//     const labelList& dualFaceToCell = dualMesh.dualMeshMap().dualFaceToCell();
-//     const labelList& dualCellToPoint = dualMesh.dualMeshMap().dualCellToPoint();
+//     const labelList& dualFaceToCell =
+//         dualMesh.dualMeshMap().dualFaceToCell();
+//     const labelList& dualCellToPoint =
+//         dualMesh.dualMeshMap().dualCellToPoint();
 //     //const scalarField& dualRhoI = dualRho;
 //     // const cellPointLeastSquaresVectors& cellPointLeastSquaresVecs =
 //     //     cellPointLeastSquaresVectors::New(mesh);
@@ -941,11 +943,16 @@ void Foam::vfvm::laplacian
 //                 // Weight for qID
 //                 const scalar wq = 1.0/curCellPoints.size();
 
-//                 // Calculate the coefficient for point pID coming from dualFaceI
-//                 // const tensor ddpCoeff(curDualRho*wp*wq*curDualSf*pointVI[qID]);
+//                 // Calculate the coefficient for point pID coming from
+//                 // dualFaceI
+//                 // const tensor ddpCoeff
+//                 // (
+//                 //     curDualRho*wp*wq*curDualSf*pointVI[qID]
+//                 // );
 //                 const tensor ddpCoeff(wp*wq*curDualSf*pointVI[qID]);
 
-//                 // Calculate the coefficient for point qID coming from dualFaceI
+//                 // Calculate the coefficient for point qID coming from
+//                 // dualFaceI
 //                 const tensor ddqCoeff
 //                 (
 //                     // curDualRho*wp*wq*(curDualSf & pointVI[pID])*I
@@ -960,8 +967,8 @@ void Foam::vfvm::laplacian
 //                 // qID
 //                 matrix(ownPointID, qID) += ddqCoeff;
 
-//                 // Subtract the coeffs from the neighbour point equation as the
-//                 // dual face normal is flipped
+//                 // Subtract the coeffs from the neighbour point equation as
+//                 // the dual face normal is flipped
 //                 matrix(neiPointID, pID) -= ddpCoeff;
 //                 matrix(neiPointID, qID) -= ddqCoeff;
 //             }

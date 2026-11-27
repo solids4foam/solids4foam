@@ -2,7 +2,8 @@
 set -euo pipefail
 
 if ! command -v python3 >/dev/null 2>&1; then
-    echo "ERROR: python3 is required for idealisedVentricle verification." >&2
+    echo "ERROR: python3 is required for LandEtAl2015/problem2" \
+        "verification." >&2
     exit 2
 fi
 

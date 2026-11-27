@@ -56,7 +56,7 @@ void Foam::crackerFvMesh::addZonesAndModifiers()
     // Add zones
     if (faceZones().findZoneID(crackPatchName + "Zone") == -1)
     {
-        Info << "Adding the crack faceZone" << endl;
+        Info<< "Adding the crack faceZone" << endl;
 
         // Copy points zones from the mesh
 
@@ -126,13 +126,13 @@ void Foam::crackerFvMesh::addZonesAndModifiers()
     }
     else
     {
-        Info << "Face zones already present" << endl;
+        Info<< "Face zones already present" << endl;
     }
 
     // Add a topology modifier
     if (topoChanger_.size() == 0)
     {
-        Info << "Adding topology modifiers" << endl;
+        Info<< "Adding topology modifiers" << endl;
         topoChanger_.setSize(1);
         topoChanger_.set
         (

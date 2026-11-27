@@ -4,7 +4,7 @@
 ################################################################################
 
 # Set the base image
-FROM philippic/openfoam-v2512:ubuntu-22.04-petsc-no-openmp-system-blas
+FROM philippic/openfoam-v2512:ubuntu-24.04-petsc-no-openmp-system-blas
 
 # File Author / Maintainer
 LABEL maintainer="Philip Cardiff <philip.cardiff@ucd.ie>"

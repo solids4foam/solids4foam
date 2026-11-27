@@ -52,8 +52,7 @@ dynamics but makes the partitioned solution well posed. The oomph-lib
 reference is computed for the same wall density, with the timescale ratio
 $$\Lambda^2 = \rho_s U^2/E_{eff} = 2\times10^{-9}$$ (`--lambdasq`), so the
 comparison is exact. The regularisation moves the converged reference by
-0.28% of the peak deflection, below the 0.3% precision of the reference.
-The massless reference is kept as
+0.28% of the peak deflection. The massless reference is kept as
 `reference/collapsibleChannel_oomph_massless_reference.csv`.
 
 ### Density sweep
@@ -105,14 +104,14 @@ secant Robin coefficient, proportional to the wall density, vanishes.
   wall density, is too small and the iterations stall or diverge.
 
 ρs/ρf = 1 is the smallest density tested for which the Robin coupling
-completes the whole study, and its reference shift, 0.28%, is below the
-reference precision. It is the verification definition. ρs/ρf = 3 converges
+completes the whole study, and its reference shift, 0.28%, is small. It is
+the verification definition. ρs/ρf = 3 converges
 faster but moves the reference by 0.8%.
 
 Where both couplings complete, Robin and IQN-ILS agree to 0.08-0.23% of the
 peak (0.1% on the tutorial mesh and time step, 0.23% at
 $$\Delta t = 0.00625\,\mathrm{s}$$, 0.21% on the fluid mesh refined three
-times at ρs/ρf = 3), below the reference precision. The difference does not
+times at ρs/ρf = 3). The difference does not
 shrink with mesh or time-step refinement, as it did on Turek-Hron FSI3; at
 this level it is of the order of the coupling tolerances.
 
@@ -134,42 +133,85 @@ oomph-lib (its `oomph_build.py`; on macOS pass
 cd reference/oomph-lib
 cmake -G Ninja -B build -DOOMPH_INSTALL=<oomph-lib>/install
 cmake --build build
-mkdir -p run
-./build/collapsible_channel_ref_CR --out run --refine 1 --dt 0.003125 \
-    --sigma0 0 --h 0.05 --q 4e-11 --pext 4e-7 --clamped 1 --tramp 0.25 \
-    --lambdasq 2e-9 --tmax 3.5
+A="--sigma0 0 --h 0.05 --q 4e-11 --pext 4e-7 --clamped 1 --tramp 0.25"
+for refine in 2 3; do
+    for dt in 0.025 0.0125 0.00625; do
+        ./build/collapsible_channel_ref_CR --out r${refine}_dt$dt \
+            --refine $refine --dt $dt $A --lambdasq 2e-9 --tmax 1.5
+    done
+    for dt in 0.003125 0.0015625; do
+        ./build/collapsible_channel_ref_CR --out r${refine}_dt$dt \
+            --refine $refine --dt $dt $A --lambdasq 2e-9 --tmax 3.5
+        ./build/collapsible_channel_ref_CR --out r${refine}_ml_dt$dt \
+            --refine $refine --dt $dt $A --lambdasq 0 --tmax 3.5
+    done
+    ./build/collapsible_channel_ref_CR --out r${refine}_static \
+        --refine $refine --sigma0 0 --h 0.05 --q 0 --pext 4e-7 --clamped 1 \
+        --steady 20
+done
 ```
 
-`--refine 1` is the resolution of the oomph-lib tutorial: 100 x 16 fluid
-elements and 40 beam elements, 17,356 unknowns. The static beam deflection
-used by the `static` study is computed with `--q 0 --steady 20`: the wall
-alone, without fluid loading, under the external pressure raised in 20 steps.
+Each output directory holds a `trace.dat`. `--refine N` multiplies the
+resolution of the oomph-lib tutorial, 100 x 16 fluid elements and 40 beam
+elements, by N: `--refine 3` is 300 x 48 fluid elements and 120 beam
+elements, 157,676 unknowns. The runs take up to 37 hours on one core (the
+`--refine 3` runs at $$\Delta t = 0.0015625\,\mathrm{s}$$). The static beam
+deflection used by the `static` study is computed with `--q 0 --steady 20`:
+the wall alone, without fluid loading, under the external pressure raised in
+20 steps.
 
-`scripts/oomph_trace_to_csv.py` writes the reference CSV files:
+The oomph-lib solution converges at first order in space: the change in the
+wall-midpoint history from `--refine` 1 to 2, 2 to 3 and 3 to 4 is 0.28%,
+0.08% and 0.04% of the peak at $$\Delta t = 0.00625\,\mathrm{s}$$,
+observed orders 1.2 and 1.1. Each reference is
+therefore the first-order extrapolation in space of the `--refine 3` and
+`--refine 2` runs, $$f = 3 f_3 - 2 f_2$$, which `scripts/oomph_trace_to_csv.py`
+computes from a `FINE:COARSE` pair of traces:
+
+```bash
+P=../../scripts/oomph_trace_to_csv.py
+for dt in 0.025:40 0.0125:80 0.00625:160 0.003125:320; do
+    python3 $P r3_dt${dt%:*}/trace.dat:r2_dt${dt%:*}/trace.dat \
+        ../collapsibleChannel_oomph_dt${dt#*:}.csv
+done
+python3 $P r3_dt0.003125/trace.dat:r2_dt0.003125/trace.dat \
+    r3_dt0.0015625/trace.dat:r2_dt0.0015625/trace.dat \
+    ../collapsibleChannel_oomph_reference.csv
+python3 $P r3_ml_dt0.003125/trace.dat:r2_ml_dt0.003125/trace.dat \
+    r3_ml_dt0.0015625/trace.dat:r2_ml_dt0.0015625/trace.dat \
+    ../collapsibleChannel_oomph_massless_reference.csv
+python3 $P --static r3_static/trace.dat:r2_static/trace.dat
+```
 
 - `collapsibleChannel_oomph_reference.csv`, the converged reference to
-  $$t = 3.5\,\mathrm{s}$$, is the Richardson extrapolation in time of the runs
-  at $$\Delta t = 0.003125$$ and $$0.0015625\,\mathrm{s}$$;
-- `collapsibleChannel_oomph_dt40.csv` to `_dt320.csv` are the runs at
-  $$\Delta t = 0.025$$ to $$0.003125\,\mathrm{s}$$, so that a solids4foam case
-  can be compared with oomph-lib at its own time step.
+  $$t = 3.5\,\mathrm{s}$$, is in addition the Richardson extrapolation in
+  time of the extrapolations at $$\Delta t = 0.003125$$ and
+  $$0.0015625\,\mathrm{s}$$;
+- `collapsibleChannel_oomph_dt40.csv` to `_dt320.csv` are the extrapolations
+  at $$\Delta t = 0.025$$ to $$0.003125\,\mathrm{s}$$, so that a solids4foam
+  case can be compared with oomph-lib at its own time step;
+- `--static` prints the static deflection for
+  `collapsibleChannel_verification_references.json`.
 
 Precision of the references, on the wall midpoint up to
 $$t = 1.5\,\mathrm{s}$$, against a peak displacement of $$0.216\,\mathrm{m}$$:
 
 | Check | Largest difference (m) | Relative to peak |
 | --- | ---: | ---: |
-| Refinement 1 vs 2 (200 x 32 elements), $$\Delta t = 0.025$$ | 5.7e-4 | 0.26% |
-| Crouzeix-Raviart vs Taylor-Hood elements | 1.4e-7 | < 0.001% |
-| Richardson correction of the converged reference | 1.2e-4 | 0.06% |
-| $$\Delta t = 0.0031$$ vs $$0.0016$$ | 2.4e-4 | 0.11% |
-| Static deflection, refinement 1 vs 3 | 1.8e-4 | 0.13% |
+| Spatial correction to `--refine 3`, $$\Delta t = 0.003125$$ | 3.6e-4 | 0.17% |
+| Extrapolation, refine 2, 3 vs 3, 4, $$\Delta t = 0.00625$$ | 8.4e-6 | 0.004% |
+| Crouzeix-Raviart vs Taylor-Hood elements (`--refine 1`) | 1.4e-7 | < 0.001% |
+| Richardson correction of the converged reference | 8.4e-5 | 0.04% |
+| $$\Delta t = 0.0031$$ vs $$0.0016$$ | 2.5e-4 | 0.12% |
+| Static deflection, spatial correction | 8.9e-5 | 0.04% |
 
-The references are good to about 0.3% of the peak displacement, dominated by
-the spatial error at the oomph-lib tutorial resolution. oomph-lib's own
-error against the converged reference is 6.3%, 1.8% and 0.49% at
-$$\Delta t = 0.025$$, $$0.0125$$ and $$0.00625\,\mathrm{s}$$, an observed order
-of 1.8 and 1.9.
+The references are good to better than 0.05% of the peak displacement. The
+earlier FSI references, computed at the oomph-lib tutorial resolution
+(`--refine 1`) without extrapolation in space, were 0.53% of the peak from
+the converged solution, and that error was the 0.5% floor of the first
+fluid-mesh study. oomph-lib's own error against the converged reference is
+6.3%, 1.8%, 0.49% and 0.16% at $$\Delta t = 0.025$$ to
+$$0.003125\,\mathrm{s}$$, observed orders 1.8, 1.9 and 1.7.
 
 ## Studies and acceptance criteria
 
@@ -180,7 +222,7 @@ displacement of the reference, $$0.216\,\mathrm{m}$$.
 
 - `static`: the wall alone under the full external pressure, raised in 20
   steps, against the static oomph-lib beam deflection
-  $$-0.143628\,\mathrm{m}$$. The cubic solid must be within 0.5% on every
+  $$-0.143717\,\mathrm{m}$$. The cubic solid must be within 0.5% on every
   mesh; the linear solid within 1% on its finest mesh, 640 x 8.
 - `solid`: the tutorial fluid mesh, time step and IQN-ILS coupling with solid
   meshes from 80 x 8 to 640 x 8, for both solids. On this fluid mesh the
@@ -192,50 +234,54 @@ displacement of the reference, $$0.216\,\mathrm{m}$$.
 - `mesh`: fluid meshes refined 1 to 4 times, with the 160 x 8 cubic solid,
   Robin coupling and $$\Delta t = 0.00625\,\mathrm{s}$$, against oomph-lib at
   the same time step. The error must decrease and the finest must be within
-  1%, about three times the reference precision.
+  1%.
 - `time`: the tutorial fluid mesh with the 160 x 8 cubic solid and Robin
-  coupling at $$\Delta t = 0.025$$ to $$0.003125\,\mathrm{s}$$. The error against
-  the converged reference carries the spatial error of the mesh (about 4.4%),
-  so the temporal convergence is measured between successive time steps:
-  every step must complete, the observed order must be at least 1.5, and the
-  difference between the two finest steps at most 0.5%.
+  coupling at $$\Delta t = 0.025$$ to $$0.003125\,\mathrm{s}$$. The error
+  against the converged reference carries the spatial error of the mesh
+  (about 4.6%), so the temporal convergence is measured between successive
+  time steps: every step must complete, the observed order must be at least
+  1.5, and the difference between the two finest steps at most 0.5%.
 
 ## Recorded results
 
 Recorded with OpenFOAM v2412 and PETSc 3.24 on Linux, one case per core on a
 Slurm node (the static study also on macOS with PETSc 3.22, with identical
-results); `./Allverify` passes.
+results); `./Allverify` passes. The errors against oomph-lib were recomputed
+against the extrapolated references with OpenFOAM v2512 on macOS, where
+`./Allverify` also passes: the static, mesh and time-step studies reproduce
+the recorded solutions, troughs and iteration counts, and the solid study
+reproduces the troughs to within 5e-5 m.
 
 ### Static wall
 
 | Solid mesh | Linear | Cubic |
 | --- | ---: | ---: |
-| 80 x 8 (tutorial) | -16.7% | +0.21% |
-| 160 x 8 | -6.0% | +0.08% |
-| 320 x 8 | -1.1% | +0.06% |
-| 640 x 8 | -0.22% | +0.05% |
-| 160 x 4 | +1.7% | -0.25% |
+| 80 x 8 (tutorial) | -16.7% | +0.15% |
+| 160 x 8 | -6.0% | +0.01% |
+| 320 x 8 | -1.2% | -0.01% |
+| 640 x 8 | -0.28% | -0.01% |
+| 160 x 4 | +1.7% | -0.32% |
 
-The cubic solid converges to 0.05% of the beam, which is the continuum-beam
-difference at $$h/L = 0.005$$. The linear solid is too stiff on elongated
-cells, converging at about second order in the in-plane spacing.
+The cubic solid converges to within 0.01% of the beam. The linear solid is
+too stiff on elongated cells, converging at about second order in the
+in-plane spacing.
 
 ### Solid discretisation in the coupled problem
 
 IQN-ILS, tutorial fluid mesh, $$\Delta t = 0.025\,\mathrm{s}$$. "Trough" is the
 first trough of the wall midpoint, "It." the mean number of FSI iterations
 per time step and "s" the run time in seconds. oomph-lib at the same time
-step has its first trough at $$-0.21296\,\mathrm{m}$$.
+step has its first trough at $$-0.21339\,\mathrm{m}$$.
 
 | Solid mesh | Solid | vs oomph-lib | vs finest cubic | Trough (m) | It. | s |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
-| 80 x 8 | linear | 15.6% | 17.4% | -0.18511 | 11.8 | 131 |
-| 160 x 8 | linear | 5.8% | 5.6% | -0.20201 | 14.3 | 331 |
-| 320 x 8 | linear | 3.9% | 1.1% | -0.21048 | 16.8 | 795 |
-| 640 x 8 | linear | 4.2% | 0.30% | -0.21219 | 18.4 | 1814 |
-| 80 x 8 | cubic | 4.2% | 0.44% | -0.21308 | 18.2 | 413 |
-| 160 x 8 | cubic | 4.2% | 0.13% | -0.21284 | 17.8 | 722 |
-| 320 x 8 | cubic | 4.3% | 0.04% | -0.21277 | 17.6 | 1385 |
+| 80 x 8 | linear | 15.5% | 17.4% | -0.18511 | 11.8 | 131 |
+| 160 x 8 | linear | 6.1% | 5.6% | -0.20201 | 14.3 | 331 |
+| 320 x 8 | linear | 4.4% | 1.1% | -0.21048 | 16.8 | 795 |
+| 640 x 8 | linear | 4.3% | 0.30% | -0.21219 | 18.4 | 1814 |
+| 80 x 8 | cubic | 4.3% | 0.44% | -0.21308 | 18.2 | 413 |
+| 160 x 8 | cubic | 4.3% | 0.13% | -0.21284 | 17.8 | 722 |
+| 320 x 8 | cubic | 4.4% | 0.04% | -0.21277 | 17.6 | 1385 |
 | 640 x 8 | cubic | 4.3% | - | -0.21278 | 17.6 | 2888 |
 
 On the tutorial mesh the cubic solid is as accurate as the linear solid on a
@@ -251,15 +297,16 @@ against oomph-lib at the same time step:
 
 | Fluid level | Fluid cells | vs oomph-lib | Trough (m) | It. | s |
 | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1 (tutorial) | 3,200 | 4.65% | -0.21566 | 23.8 | 1711 |
-| 2 | 12,800 | 1.43% | -0.21592 | 23.9 | 2022 |
-| 3 | 28,800 | 0.53% | -0.21605 | 23.8 | 2785 |
-| 4 | 51,200 | 0.50% | -0.21610 | 23.9 | 4205 |
+| 1 (tutorial) | 3,200 | 4.81% | -0.21566 | 23.8 | 1711 |
+| 2 | 12,800 | 1.59% | -0.21592 | 23.9 | 2022 |
+| 3 | 28,800 | 0.68% | -0.21605 | 23.8 | 2785 |
+| 4 | 51,200 | 0.34% | -0.21610 | 23.9 | 4205 |
 
-The error falls with an observed order of 1.7 and 2.4, and then levels off
-at 0.5% on the two finest meshes, i.e. at the precision of the reference
-(0.3%, dominated by oomph-lib's own spatial error). The FSI iteration count
-does not grow with the mesh.
+The error falls with an observed order of 1.6, 2.1 and 2.5, to 0.34% on the
+finest mesh, without levelling off. Against the earlier, unextrapolated
+reference it levelled off at 0.5% on the two finest meshes: that floor was
+oomph-lib's own spatial error. The FSI iteration count does not grow with
+the mesh.
 
 ![Mesh study](reference/mesh_study_wallMid.png)
 
@@ -269,26 +316,25 @@ Robin coupling, tutorial fluid mesh, 160 x 8 cubic solid:
 
 | Δt (s) | vs converged oomph-lib | vs next finer Δt | Trough (m) | It. | s |
 | ---: | ---: | ---: | ---: | ---: | ---: |
-| 0.025 | 4.82% | 4.56% | -0.21283 | 23.5 | 526 |
-| 0.0125 | 4.07% | 1.33% | -0.21510 | 24.1 | 968 |
-| 0.00625 | 4.44% | 0.34% | -0.21566 | 23.8 | 1777 |
-| 0.003125 | 4.58% | - | -0.21589 | 20.2 | 2796 |
+| 0.025 | 4.68% | 4.56% | -0.21283 | 23.5 | 526 |
+| 0.0125 | 4.24% | 1.33% | -0.21510 | 24.1 | 968 |
+| 0.00625 | 4.61% | 0.34% | -0.21566 | 23.8 | 1777 |
+| 0.003125 | 4.74% | - | -0.21589 | 20.2 | 2796 |
 
 The solids4foam solutions converge in time with an observed order of 1.8 and
 2.0, as oomph-lib does (6.3%, 1.8% and 0.49% at the first three steps,
 orders 1.8 and 1.9). The error against the converged reference levels off at
-about 4.5%: the spatial error of the tutorial fluid mesh, which the mesh
+about 4.6%: the spatial error of the tutorial fluid mesh, which the mesh
 study removes.
 
 ![Time-step study](reference/time_study_wallMid.png)
 
 The two studies are separate refinements: the mesh study at
 $$\Delta t = 0.00625\,\mathrm{s}$$, and the time-step study on the tutorial
-fluid mesh. Together they show that the spatial error falls to the reference
-precision on the finest mesh (0.5% against oomph-lib at the same time step),
-and that the temporal error at $$\Delta t = 0.00625\,\mathrm{s}$$ is about
-0.3% on the tutorial mesh; the temporal error on the finest mesh was not
-measured separately.
+fluid mesh. Together they show that the spatial error falls to 0.34% on the
+finest mesh (against oomph-lib at the same time step), and that the temporal
+error at $$\Delta t = 0.00625\,\mathrm{s}$$ is about 0.3% on the tutorial
+mesh; the temporal error on the finest mesh was not measured separately.
 
 ## Solid solver
 

@@ -4,6 +4,10 @@ on:
   workflow_dispatch:
   pull_request:
 
+# The GITHUB_TOKEN is only needed to read the repository
+permissions:
+  contents: read
+
 jobs:
   check-tutorial-readmes:
     runs-on: ubuntu-latest

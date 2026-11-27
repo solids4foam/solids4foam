@@ -57,7 +57,10 @@ AitkenCouplingInterface::AitkenCouplingInterface
             "relaxationFactorMax", 1.0
         )
     ),
-    predictSolid_(fsiProperties().lookupOrAddDefault<Switch>("predictSolid", true)),
+    predictSolid_
+    (
+        fsiProperties().lookupOrAddDefault<Switch>("predictSolid", true)
+    ),
     aitkenRelaxationFactors_(nGlobalPatches(), relaxationFactor_)
 {}
 
@@ -228,7 +231,8 @@ void AitkenCouplingInterface::updateDisplacement()
                 aitkenRelaxationFactors_[interfaceI] =
                     -aitkenRelaxationFactors_[interfaceI]
                    *(
-                        sum(residualsPrev()[interfaceI] & resMinusResPrev )/denom
+                        sum(residualsPrev()[interfaceI] & resMinusResPrev)
+                       /denom
                     );
             }
 

@@ -337,7 +337,12 @@ void Foam::eig3::eigen_decomposition(const tensor& A, tensor& V, vector& d)
 }
 
 
-void Foam::eig3::eigen_decomposition(const symmTensor& sA, tensor& V, vector& d)
+void Foam::eig3::eigen_decomposition
+(
+    const symmTensor& sA,
+    tensor& V,
+    vector& d
+)
 {
     vector e = vector::zero;
     V = tensor(sA);

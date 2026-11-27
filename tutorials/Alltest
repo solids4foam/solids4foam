@@ -11,6 +11,11 @@
 #     Quickly test the tutorials and write out the scheme/solver information
 #     Adapted from foam-extend-4.0 and OpenFOAM-v2012 tutorials/Alltest scripts.
 #
+#     Each case is modified to run one time step and run with its Allrun
+#     script. A case that cannot be tested this way, e.g. because one run
+#     needs the converged results of an earlier run, can provide an Alltest
+#     script, which is run in place of Allrun on the modified case.
+#
 #------------------------------------------------------------------------------
 cd "${0%/*}" || exit  # Run from this directory
 
@@ -95,8 +100,15 @@ function runCases()
         thisScript="$PWD/$thisScript"
     fi
 
-    # If an argument is supplied do not execute ./Allrun to avoid recursion
-    if [ $# = 0 -a -f "./Allrun" ]
+    # If an argument is supplied do not execute ./Alltest or ./Allrun to avoid
+    # recursion
+    if [ $# = 0 -a -f "./Alltest" ]
+    then
+        echo; echo "execute Alltest"
+        # Case-specific test script, run in place of Allrun on the case as
+        # modified below
+        ./Alltest
+    elif [ $# = 0 -a -f "./Allrun" ]
     then
         echo; echo "execute Allrun"
         # Specialised script.
@@ -244,8 +256,9 @@ done
 # Source tutorial functions
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 
-# Remove high-level Allrun
-rm Allrun*
+# Remove high-level Allrun and Alltest scripts, so that runCases does not run
+# them in place of the cases
+rm Allrun* Alltest*
 
 # Run cases recursively
 echo "Running cases "; echo "    $PWD"; echo

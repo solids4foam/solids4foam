@@ -467,7 +467,8 @@ tmp<surfaceTensorField> fGrad
             // central-differencing and use the primary mesh cell value for the
             // tangential directions
             resultI[dualFaceI] =
-              //   edgeDir*(pointDI[neiPointID] - pointDI[ownPointID])/edgeLength
+              //   edgeDir*(pointDI[neiPointID] - pointDI[ownPointID])
+              //  /edgeLength
               // + ((I - sqr(edgeDir)) & gradDI[cellID]);
                 zeta*edgeDir
                *(
@@ -493,7 +494,8 @@ tmp<surfaceTensorField> fGrad
                 if (cellID > -1)
                 {
                     // Use the gradient in the adjacent primary cell-centre
-                    // This will result in inconsistent values at processor patches
+                    // This will result in inconsistent values at processor
+                    // patches
                     // Is this an issue?
                     boundaryFieldRef(result)[dualPatchID][localDualFaceID] =
                         gradDI[cellID];
@@ -1050,7 +1052,8 @@ tmp<surfaceScalarField> interpolate
                 {
 
                     // Use the gradient in the adjacent primary cell-centre
-                    // This will result in inconsistent values at processor patches
+                    // This will result in inconsistent values at processor
+                    // patches
                     // Is this an issue?
                     boundaryFieldRef(result)[dualPatchID][localDualFaceID] =
                         volPI[cellID];
@@ -1173,7 +1176,8 @@ tmp<surfaceVectorField> interpolate
                 if (cellID > -1)
                 {
                     // Use the gradient in the adjacent primary cell-centre
-                    // This will result in inconsistent values at processor patches
+                    // This will result in inconsistent values at processor
+                    // patches
                     // Is this an issue?
                     boundaryFieldRef(result)[dualPatchID][localDualFaceID] =
                         volPI[cellID];

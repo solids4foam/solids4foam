@@ -60,9 +60,15 @@ electroMechanicalLawMechanicalConstitutiveLaw
     ),
     rampTime_(dict.lookupOrDefault<scalar>("rampTime", 0.0)),
     TaName_(dict.lookupOrDefault<word>("activeTensionFieldName", "Ta")),
+    TaSeriesGiven_(dict.found("activeTensionSeries")),
+    TaSeries_(),
     TaFromField_
     (
-        dict.lookupOrDefault<Switch>("activeTensionFromField", !TaGiven_)
+        dict.lookupOrDefault<Switch>
+        (
+            "activeTensionFromField",
+            !TaGiven_ && !TaSeriesGiven_
+        )
     ),
     f0Default_
     (
@@ -77,20 +83,40 @@ electroMechanicalLawMechanicalConstitutiveLaw
             << "rampTime must not be negative." << exit(FatalIOError);
     }
 
-    if (!TaFromField_ && !TaGiven_)
+    if (TaSeriesGiven_)
     {
-        FatalIOErrorInFunction(dict)
-            << "activeTensionFromField is off but no constant 'activeTension' "
-            << "is given." << exit(FatalIOError);
+        TaSeries_ =
+            interpolationTable<scalar>(dict.subDict("activeTensionSeries"));
+
+        if (TaGiven_ || dict.found("rampTime"))
+        {
+            FatalIOErrorInFunction(dict)
+                << "Give either 'activeTensionSeries' or 'activeTension' "
+                << "(with 'rampTime'), not both." << exit(FatalIOError);
+        }
     }
 
-    // The constant and its ramp are not used when the tension comes from a
-    // field, so a case that gives them is probably not running as intended
-    if (TaFromField_ && (TaGiven_ || dict.found("rampTime")))
+    if (!TaFromField_ && !TaGiven_ && !TaSeriesGiven_)
+    {
+        FatalIOErrorInFunction(dict)
+            << "activeTensionFromField is off but neither a constant "
+            << "'activeTension' nor an 'activeTensionSeries' is given."
+            << exit(FatalIOError);
+    }
+
+    // The constant, its ramp and the table are not used when the tension
+    // comes from a field, so a case that gives them is probably not running
+    // as intended
+    if
+    (
+        TaFromField_
+     && (TaGiven_ || TaSeriesGiven_ || dict.found("rampTime"))
+    )
     {
         WarningInFunction
             << "The active tension is read from the field '" << TaName_
-            << "', so 'activeTension' and 'rampTime' are not used." << endl;
+            << "', so 'activeTension', 'activeTensionSeries' and 'rampTime' "
+            << "are not used." << endl;
     }
 
     Info<< "    Active tension law over " << subLawPtr_->type();
@@ -98,6 +124,10 @@ electroMechanicalLawMechanicalConstitutiveLaw
     if (TaFromField_)
     {
         Info<< ", from field " << TaName_;
+    }
+    else if (TaSeriesGiven_)
+    {
+        Info<< ", from a table of " << TaSeries_.size() << " points";
     }
     else
     {
@@ -183,7 +213,11 @@ void Foam::electroMechanicalLawMechanicalConstitutiveLaw::evaluate
 
     scalar TaUniform = Ta_.value();
 
-    if (!haveTaField && rampTime_ > 0 && inputs.time() < rampTime_)
+    if (TaSeriesGiven_)
+    {
+        TaUniform = TaSeries_(inputs.time());
+    }
+    else if (!haveTaField && rampTime_ > 0 && inputs.time() < rampTime_)
     {
         TaUniform *= inputs.time()/rampTime_;
     }

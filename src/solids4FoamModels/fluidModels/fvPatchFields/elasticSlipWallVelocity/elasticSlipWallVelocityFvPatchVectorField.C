@@ -218,7 +218,7 @@ void elasticSlipWallVelocityFvPatchVectorField::updateCoeffs()
         return;
     }
 
-    Info << "elasticSlipWallVelocityFvPatchVectorField::updateCoeffs" << endl;
+    Info<< "elasticSlipWallVelocityFvPatchVectorField::updateCoeffs" << endl;
 
 #ifdef OPENFOAM_NOT_EXTEND
     const fvMesh& mesh = internalField().mesh();

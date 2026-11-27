@@ -490,7 +490,7 @@ void blockFixedGradientFvPatchVectorField::insertBlockCoeffs
                 const labelList& sePointBndFaces =
                     pointBndFaces[sePointID];
 
-                for(label i = 0; i < sePointBndFaces.size(); i++)
+                for (label i = 0; i < sePointBndFaces.size(); i++)
                 {
                     scalar wCell = w[neiID]/sumW;
 

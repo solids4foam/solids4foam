@@ -36,9 +36,11 @@ fluidSolidInterface    IQNILS;
     // Maximum number of outer FSI loop correctors within each time step
     nOuterCorr      100;
 
-    // Reuse the IQN-ILS secant modes of the previous 5 time steps, which
-    // reduces the number of coupling iterations per time step (#587)
-    couplingReuse   5;
+    // Do not reuse the IQN-ILS secant modes of earlier time steps: with the
+    // finite-strain solid, modes reused across the large time steps of the
+    // verification study (dt = 0.0625 s) give a first update that inverts
+    // solid cells
+    couplingReuse   0;
 
     // Enable coupling from the start
     coupled         yes;

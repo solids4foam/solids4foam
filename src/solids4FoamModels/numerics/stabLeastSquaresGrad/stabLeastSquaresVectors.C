@@ -108,7 +108,7 @@ void Foam::stabLeastSquaresVectors::makeLeastSquaresVectors() const
     // Set up temporary storage for the dd tensor (before inversion)
     symmTensorField dd(mesh().nCells(), symmTensor::zero);
 
-    forAll (owner, faceI)
+    forAll(owner, faceI)
     {
         const label own = owner[faceI];
         const label nei = neighbour[faceI];
@@ -120,7 +120,7 @@ void Foam::stabLeastSquaresVectors::makeLeastSquaresVectors() const
         dd[nei] += wdd;
     }
 
-    forAll (lsP.boundaryField(), patchI)
+    forAll(lsP.boundaryField(), patchI)
     {
         const fvPatch& p = mesh().boundary()[patchI];
         const unallocLabelList& fc = p.faceCells();
@@ -128,7 +128,7 @@ void Foam::stabLeastSquaresVectors::makeLeastSquaresVectors() const
         // Better version of d-vectors: Zeljko Tukovic, 25/Apr/2010
         const vectorField pd = p.delta();
 
-        forAll (pd, pFaceI)
+        forAll(pd, pFaceI)
         {
             const vector& d = pd[pFaceI];
             dd[fc[pFaceI]] += (1.0/magSqr(d))*sqr(d);
@@ -168,7 +168,7 @@ void Foam::stabLeastSquaresVectors::makeLeastSquaresVectors() const
     vectorField& lsNIn = lsN.internalField();
 
     // Least squares vectors on internal faces
-    forAll (owner, faceI)
+    forAll(owner, faceI)
     {
         const label own = owner[faceI];
         const label nei = neighbour[faceI];
@@ -185,7 +185,7 @@ void Foam::stabLeastSquaresVectors::makeLeastSquaresVectors() const
         volInvDd.boundaryField();
 
     // Least squares vectors on boundary faces
-    forAll (lsP.boundaryField(), patchI)
+    forAll(lsP.boundaryField(), patchI)
     {
         fvsPatchVectorField& patchLsP = lsP.boundaryField()[patchI];
         fvsPatchVectorField& patchLsN = lsN.boundaryField()[patchI];
@@ -201,7 +201,7 @@ void Foam::stabLeastSquaresVectors::makeLeastSquaresVectors() const
         {
             const symmTensorField invDdNei = volInvDdp.patchNeighbourField();
 
-            forAll (pd, pFaceI)
+            forAll(pd, pFaceI)
             {
                 const vector& d = pd[pFaceI];
 
@@ -212,7 +212,7 @@ void Foam::stabLeastSquaresVectors::makeLeastSquaresVectors() const
         }
         else
         {
-            forAll (pd, pFaceI)
+            forAll(pd, pFaceI)
             {
                 const vector& d = pd[pFaceI];
 
@@ -255,7 +255,7 @@ void Foam::stabLeastSquaresVectors::makeLeastSquaresVectors() const
     scalarField& uggIn = useGaussGrad.internalField();
 
     // Check internal faces
-    forAll (owner, faceI)
+    forAll(owner, faceI)
     {
         if
         (
@@ -281,7 +281,7 @@ void Foam::stabLeastSquaresVectors::makeLeastSquaresVectors() const
         }
     }
 
-    forAll (lsP.boundaryField(), patchI)
+    forAll(lsP.boundaryField(), patchI)
     {
         fvsPatchVectorField& patchLsP = lsP.boundaryField()[patchI];
         const vectorField& pSf = Sf.boundaryField()[patchI];
@@ -289,7 +289,7 @@ void Foam::stabLeastSquaresVectors::makeLeastSquaresVectors() const
         const unallocLabelList& fc = p.faceCells();
 
         // Same check for coupled and uncoupled
-        forAll (patchLsP, pFaceI)
+        forAll(patchLsP, pFaceI)
         {
             if
             (
@@ -334,7 +334,7 @@ void Foam::stabLeastSquaresVectors::makeLeastSquaresVectors() const
     const scalarField& cellVIn = cellV.internalField();
 
     // Internal faces
-    forAll (owner, faceI)
+    forAll(owner, faceI)
     {
         const label own = owner[faceI];
         const label nei = neighbour[faceI];
@@ -357,7 +357,7 @@ void Foam::stabLeastSquaresVectors::makeLeastSquaresVectors() const
         cellV.boundaryField();
 
     // Boundary faces
-    forAll (lsP.boundaryField(), patchI)
+    forAll(lsP.boundaryField(), patchI)
     {
         fvsPatchVectorField& patchLsP = lsP.boundaryField()[patchI];
         fvsPatchVectorField& patchLsN = lsN.boundaryField()[patchI];
@@ -379,7 +379,7 @@ void Foam::stabLeastSquaresVectors::makeLeastSquaresVectors() const
             // Get indicator for neighbour side
             const scalarField nUgg = ugg.patchNeighbourField();
 
-            forAll (pUgg, pFaceI)
+            forAll(pUgg, pFaceI)
             {
                 if (pUgg[pFaceI] > SMALL)
                 {
@@ -398,7 +398,7 @@ void Foam::stabLeastSquaresVectors::makeLeastSquaresVectors() const
         }
         else
         {
-            forAll (pUgg, pFaceI)
+            forAll(pUgg, pFaceI)
             {
                 if (pUgg[pFaceI] > SMALL)
                 {

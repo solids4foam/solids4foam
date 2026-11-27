@@ -74,7 +74,7 @@ namespace Foam
     {
         Type result;
 
-        for(label i = 0;i < pTraits<Type>::nComponents; i++)
+        for (label i = 0;i < pTraits<Type>::nComponents; i++)
         {
             if (componentColumns_[i] >= split.size())
             {

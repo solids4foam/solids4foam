@@ -418,7 +418,8 @@ Foam::mechanicalConstitutiveLawCaseInputs::mechanicalConstitutiveLawCaseInputs
 
 // * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * //
 
-Foam::mechanicalConstitutiveLawCaseInputs::~mechanicalConstitutiveLawCaseInputs()
+Foam::mechanicalConstitutiveLawCaseInputs::
+~mechanicalConstitutiveLawCaseInputs()
 {}
 
 

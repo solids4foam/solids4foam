@@ -18,6 +18,7 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "newMovingWallVelocityFvPatchVectorField.H"
+#include "patchCorrectionVectors.H"
 #include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
 #include "surfaceFields.H"
@@ -47,7 +48,8 @@ newMovingWallVelocityFvPatchVectorField::newMovingWallVelocityFvPatchVectorField
     Fc_(p.patch().size(), vector::zero),
     oldFc_(p.patch().size(), vector::zero),
     oldoldFc_(p.patch().size(), vector::zero),
-    acceleration_(p.patch().size(), vector::zero)
+    acceleration_(p.patch().size(), vector::zero),
+    continuityNormalGradient_(true)
 {}
 
 
@@ -64,7 +66,8 @@ newMovingWallVelocityFvPatchVectorField::newMovingWallVelocityFvPatchVectorField
     Fc_(p.patch().size(), vector::zero),
     oldFc_(p.patch().size(), vector::zero),
     oldoldFc_(p.patch().size(), vector::zero),
-    acceleration_(p.patch().size(), vector::zero)
+    acceleration_(p.patch().size(), vector::zero),
+    continuityNormalGradient_(ptf.continuityNormalGradient_)
 {}
 
 
@@ -84,7 +87,11 @@ newMovingWallVelocityFvPatchVectorField::newMovingWallVelocityFvPatchVectorField
     Fc_(p.patch().size(), vector::zero),
     oldFc_(p.patch().size(), vector::zero),
     oldoldFc_(p.patch().size(), vector::zero),
-    acceleration_(p.patch().size(), vector::zero)
+    acceleration_(p.patch().size(), vector::zero),
+    continuityNormalGradient_
+    (
+        dict.lookupOrDefault<Switch>("continuityNormalGradient", true)
+    )
 {
     fvPatchVectorField::operator=(vectorField("value", dict, p.size()));
 
@@ -140,7 +147,8 @@ newMovingWallVelocityFvPatchVectorField::newMovingWallVelocityFvPatchVectorField
     Fc_(pivpvf.Fc_),
     oldFc_(pivpvf.oldFc_),
     oldoldFc_(pivpvf.oldoldFc_),
-    acceleration_(pivpvf.acceleration_)
+    acceleration_(pivpvf.acceleration_),
+    continuityNormalGradient_(pivpvf.continuityNormalGradient_)
 {}
 #endif
 
@@ -156,7 +164,8 @@ newMovingWallVelocityFvPatchVectorField::newMovingWallVelocityFvPatchVectorField
     Fc_(pivpvf.oldFc_),
     oldFc_(pivpvf.oldFc_),
     oldoldFc_(pivpvf.oldoldFc_),
-    acceleration_(pivpvf.acceleration_)
+    acceleration_(pivpvf.acceleration_),
+    continuityNormalGradient_(pivpvf.continuityNormalGradient_)
 {}
 
 
@@ -331,8 +340,7 @@ snGrad() const
             );
 
         const vectorField n(patch().nf());
-        const vectorField delta(patch().delta());
-        const vectorField k((I - sqr(n)) & delta);
+        const vectorField k(patchCorrectionVectors(patch()));
 
         const vectorField dUP(k & gradU.patchInternalField());
 
@@ -355,6 +363,11 @@ snGrad() const
               - nGradUP;
 
             tnGradU.ref() -= n*(n&tnGradU());
+
+            if (continuityNormalGradient_)
+            {
+                tnGradU.ref() += n*continuityNormalGradient(gradU);
+            }
     #else
             tnGradU() =
                 2
@@ -365,6 +378,11 @@ snGrad() const
               - nGradUP;
 
             tnGradU() -= n*(n&tnGradU());
+
+            if (continuityNormalGradient_)
+            {
+                tnGradU() += n*continuityNormalGradient(gradU);
+            }
     #endif
 
             return tnGradU;
@@ -389,6 +407,10 @@ snGrad() const
             )*this->patch().deltaCoeffs();
 
         tnGradU.ref() -= n*(n&tnGradU());
+        if (continuityNormalGradient_)
+        {
+            tnGradU.ref() += n*continuityNormalGradient(gradU);
+        }
     #else
         tnGradU() =
             (
@@ -397,6 +419,10 @@ snGrad() const
             )*this->patch().deltaCoeffs();
 
         tnGradU() -= n*(n&tnGradU());
+        if (continuityNormalGradient_)
+        {
+            tnGradU() += n*continuityNormalGradient(gradU);
+        }
     #endif
 
         return tnGradU;
@@ -418,6 +444,19 @@ snGrad() const
 }
 
 
+tmp<scalarField> newMovingWallVelocityFvPatchVectorField::
+continuityNormalGradient(const fvPatchField<tensor>& gradU) const
+{
+    // Continuity, tr(grad U) = 0, at the wall gives
+    // n.(grad U).n = -tr((I - nn) & grad U), the tangential divergence of the
+    // velocity, which the wall velocity determines
+    const vectorField n(patch().nf());
+    const tensorField gradUP(gradU.patchInternalField());
+
+    return -tr((I - sqr(n)) & gradUP);
+}
+
+
 tmp<Field<vector> > newMovingWallVelocityFvPatchVectorField::
 gradientBoundaryCoeffs() const
 {
@@ -436,8 +475,7 @@ gradientBoundaryCoeffs() const
         );
 
     const vectorField n(patch().nf());
-    const vectorField delta(patch().delta());
-    const vectorField k((I - sqr(n)) & delta);
+    const vectorField k(patchCorrectionVectors(patch()));
 
     const vectorField dUP(k & gradU.patchInternalField());
 
@@ -487,7 +525,12 @@ gradientBoundaryCoeffs() const
         )*this->patch().deltaCoeffs()
     );
 
-    const vectorField nGradUn(sqr(n) & nGradU);
+    vectorField nGradUn(sqr(n) & nGradU);
+
+    if (continuityNormalGradient_)
+    {
+        nGradUn -= n*continuityNormalGradient(gradU);
+    }
 
     return
         this->patch().deltaCoeffs()
@@ -514,6 +557,11 @@ void newMovingWallVelocityFvPatchVectorField::write(Ostream& os) const
     oldFc_.writeEntry("oldFaceCentres", os);
     oldoldFc_.writeEntry("oldOldFaceCentres", os);
 #endif
+    if (!continuityNormalGradient_)
+    {
+        os.writeKeyword("continuityNormalGradient")
+            << continuityNormalGradient_ << token::END_STATEMENT << nl;
+    }
 }
 
 
