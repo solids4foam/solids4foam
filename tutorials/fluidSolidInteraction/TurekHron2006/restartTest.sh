@@ -20,12 +20,16 @@ source "${SCRIPT_DIR}/../../../applications/scripts/solids4FoamScripts.sh"
 #   - decomposed again for all regions in one call with -copyUniform: the
 #     result must agree to REDECOMP_REL_TOL (the decomposition changes the
 #     Krylov iterates, not the converged solution)
+# The re-decompositions use the same number of processes with a different
+# method (simple instead of scotch): a 4-vCPU GitHub runner has two cores, and
+# Open MPI refuses to start more processes than cores without oversubscribe
 # Needs OpenFOAM.com and PETSc; it is skipped otherwise.
 
 RESTART_TIME=0.02
 END_TIME=0.03
 N_PROCS=2
-N_PROCS_REDECOMP=3
+METHOD=scotch
+METHOD_REDECOMP=simple
 SAME_REL_TOL=1e-6
 REDECOMP_REL_TOL=1e-5
 
@@ -49,14 +53,15 @@ echo "============================================================"
 echo
 
 set_subdomains() {
-    local nProcs="$1"
+    local nProcs="$1" method="$2"
     local dict
     for dict in system/decomposeParDict system/fluid/decomposeParDict \
         system/solid/decomposeParDict
     do
         "${SOLIDS4FOAM_SED}" -i \
             -e "s/^\(numberOfSubdomains[[:space:]]*\).*/\1${nProcs};/" \
-            -e "s/^\(method[[:space:]]*\).*/\1scotch;/" \
+            -e "s/^\(method[[:space:]]*\).*/\1${method};/" \
+            -e "s/^\([[:space:]]*n[[:space:]]*\)(.*);/\1(${nProcs} 1 1);/" \
             "${dict}"
     done
 }
@@ -132,7 +137,7 @@ prepare_case() {
             "${SOLIDS4FOAM_SED}" -i \
                 -e '/Coeffs$/{n;s/{/{\n    restart yes;/}' "${props}"
         done
-        set_subdomains "${N_PROCS}"
+        set_subdomains "${N_PROCS}" "${METHOD}"
         blockMesh -region solid > log.blockMesh.solid 2>&1
         blockMesh -region fluid > log.blockMesh.fluid 2>&1
     ) > /dev/null
@@ -197,7 +202,7 @@ reconstruct_restart_time() {
         reconstructPar -region solid -time "${RESTART_TIME}" \
             > log.reconstructPar.solid 2>&1
         rm -rf processor*
-        set_subdomains "${N_PROCS_REDECOMP}"
+        set_subdomains "${N_PROCS}" "${METHOD_REDECOMP}"
         "${SOLIDS4FOAM_SED}" -i \
             "s/^\(startFrom[[:space:]]*\).*/\1latestTime;/" system/controlDict
     )

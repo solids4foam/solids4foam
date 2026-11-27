@@ -749,6 +749,14 @@ nonLinGeomTotalLagVelocitySolid::nonLinGeomTotalLagVelocitySolid
             false
         )
     ),
+    tractionPatchSurfaceGradient_
+    (
+        solidModelDict().lookupOrDefault<Switch>
+        (
+            "tractionPatchSurfaceGradient",
+            false
+        )
+    ),
     blockSize_
     (
         solvePressure()
@@ -798,6 +806,8 @@ nonLinGeomTotalLagVelocitySolid::nonLinGeomTotalLagVelocitySolid
         << "predictor = " << predictor_ << nl
         << "velocityBasedMomentumStabilisation = "
         << velocityBasedMomentumStabilisation_ << nl
+        << "tractionPatchSurfaceGradient = "
+        << tractionPatchSurfaceGradient_ << nl
         << "solvePressure = " << solvePressure() << endl;
 
     // The momentum stabilisation model dimensions depend on which field is
@@ -904,6 +914,10 @@ nonLinGeomTotalLagVelocitySolid::nonLinGeomTotalLagVelocitySolid
     {
         DD() = D() - D().oldTime();
         gradD() = fvc::grad(D());
+        if (tractionPatchSurfaceGradient_ && !linearGeometryFormulation_)
+        {
+            correctTractionPatchGradient(D(), gradD());
+        }
         gradDD() = gradD() - gradD().oldTime();
         F_ = I + gradD().T();
         Finv_ = inv(F_);
@@ -1019,6 +1033,11 @@ void nonLinGeomTotalLagVelocitySolid::updateDisplacement()
     else
     {
         gradD() = fvc::grad(D());
+
+        if (tractionPatchSurfaceGradient_ && !linearGeometryFormulation_)
+        {
+            correctTractionPatchGradient(D(), gradD());
+        }
     }
 
     if (!linearGeometryFormulation_)
@@ -1117,6 +1136,12 @@ label nonLinGeomTotalLagVelocitySolid::formResidual
     {
         // Calculate the gradient of displacement at the new time
         gradD() = fvc::grad(DImplicit_);
+
+        if (tractionPatchSurfaceGradient_ && !linearGeometryFormulation_)
+        {
+            // DImplicit_ has the values of D on the fixed-value patches
+            correctTractionPatchGradient(DImplicit_, gradD());
+        }
     }
 
     if (highOrderResidual())

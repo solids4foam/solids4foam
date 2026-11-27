@@ -15,6 +15,14 @@ rm -rf case.foam residuals deflection.pdf postProcessing
 solids4Foam::restoreCaseFormat .
 solids4Foam::restoreCaseVariant .
 
+# Undo the foam-extend inlet change made by Allrun (restoreCaseFormat restores
+# only files named p)
+solids4Foam::requireGnuSed
+"${SOLIDS4FOAM_SED}" -i \
+    -e 's|^\([[:space:]]*type[[:space:]]*timeVaryingUniformFixedValue;\)|//\1|' \
+    -e 's|^//\([[:space:]]*type[[:space:]]*uniformFixedValue;\)|\1|' \
+    0/fluid/U.dirichletNeumann
+
 ln -vnsf solidProperties.linear constant/solid/solidProperties
 ln -vnsf fvSolution.linear system/solid/fvSolution
 ln -vnsf fsiProperties.iqnils constant/fsiProperties
