@@ -387,6 +387,57 @@ auxiliary momentum equation (the diagonal `A` of the Jacobian's momentum
 block is negative). This couples the pressure stabilisation strength to the
 current momentum diagonal.
 
+### Rhie–Chow Time History (`RhieChowTimeHistory`)
+
+The momentum diagonal includes the transient term, so `rAUf` is proportional
+to the time step for small steps. The pressure stabilisation, and with it the
+discrete problem that the time integration converges to, then depends on the
+time step. With a manufactured FSI solution on a fixed mesh, the differences
+between solutions at successive time steps stop converging below about
+`deltaT = 0.005` (solids4foam#749). Leaving the transient term out of `rAUf`
+removes this, but the coefficient is then unbounded for slow, nearly inviscid
+flows: the ring added-mass case loses about 21% of its amplitude per period.
+
+`RhieChowTimeHistory yes` in `newtonIcoFluidCoeffs` keeps `rAUf` proportional
+to the time step. It adds the time history of the correction to the face flux
+(Choi 1999; Cubero and Fueyo 2007):
+
+```text
+phi = interpolate(U) & Sf - gamma |Sf| B
+    + gamma |Sf| (c0 w^n - c00 w^(n-1))/deltaT
+```
+
+- `B` is the pressure stabilisation (`snGrad(p) - n & interpolate(grad(p))`,
+  scaled).
+- `gamma = 1/(interpolate(a_P) + c/deltaT)`, where `a_P` is the spatial
+  (viscous and upwind convection) diagonal and `c`, `c0`, `c00` are the
+  coefficients of the `backward` (or `Euler`) scheme of `ddt(U)`, with its
+  Euler first step.
+- `w^n` is the face-normal velocity correction accepted in time step `n`.
+
+A converged steady solution then has `w = -B/interpolate(a_P)`, independent of
+the time step.
+
+Implementation notes:
+
+- The history is stored as a velocity, so on a moving mesh it is multiplied by
+  the current face area. It is kept on internal and coupled (processor,
+  cyclic) faces only. On physical boundaries the correction `B` vanishes with
+  gradient schemes that impose `n & grad(p) = snGrad(p)` there (`Gauss`,
+  `leastSquares`). With other schemes (e.g. `leastSquaresS4f`) the boundary
+  correction keeps no history.
+- `w` is evaluated at the accepted solution with the residual's own flux,
+  after each solve. It enters the history at the first residual evaluation of
+  the next time step, so repeated solves within one time step overwrite it.
+- `rhieChowW`, `rhieChowW0` and `rhieChowW00` are written at write times and
+  read on a restart. A restart without them prints a warning, as its history
+  starts from zero.
+- The assembled pressure block uses the same `gamma`. The physics
+  preconditioner keeps its own coefficient.
+
+The option needs OpenFOAM.com, PETSc, and the `RhieChow` (or
+`diffStencilLaplacian`) pressure stabilisation. It is off by default.
+
 ### Jacobian and Preconditioning Matrix
 
 `formJacobian(jac, x, extrapolatedFlux)` assembles the matrix used by PETSc as

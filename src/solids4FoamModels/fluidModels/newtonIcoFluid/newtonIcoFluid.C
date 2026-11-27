@@ -773,6 +773,10 @@ newtonIcoFluid::newtonIcoFluid
     ),
     Uf_(),
     rAUfPtr_(),
+    rhieChowWPtr_(),
+    rhieChowW0Ptr_(),
+    rhieChowW00Ptr_(),
+    rhieChowShiftTimeIndex_(-1),
     pRefCell_(-1),
     pRefValue_(0.0),
     laminarTransport_(U(), phi()),
@@ -956,6 +960,14 @@ newtonIcoFluid::newtonIcoFluid
 #endif
 
     U().oldTime().oldTime();
+
+    // Read (on a restart) or create the Rhie-Chow history at the start time
+    if (rhieChowTimeHistory())
+    {
+        Info<< "Rhie-Chow pressure stabilisation with the time history of "
+            << "its face-flux correction (RhieChowTimeHistory)" << endl;
+        makeRhieChowHistory();
+    }
 
     // Store the old-time pressure from the start, so that a retry of the
     // first time-step restores it (restoreOldTimeState); created lazily, it
@@ -1541,6 +1553,12 @@ bool newtonIcoFluid::evolve()
     // boundary-condition corrections are applied by unpackSolution
     unpackSolution(foamPetscSnesHelper::solution());
 
+    // Store the converged Rhie-Chow correction of this time-step
+    if (rhieChowTimeHistory())
+    {
+        storeRhieChowHistory(false);
+    }
+
     // Correct Uf if the mesh is moving
     //fvc::correctUf(Uf, U, phi);
 
@@ -1580,6 +1598,444 @@ bool newtonIcoFluid::evolve()
 
     return true;
 }
+
+
+bool newtonIcoFluid::rhieChowTimeHistory() const
+{
+    return
+        fluidProperties().lookupOrDefault<Switch>
+        (
+            "RhieChowTimeHistory", false
+        );
+}
+
+
+#ifdef USE_PETSC
+
+tmp<surfaceScalarField> newtonIcoFluid::setResidualFlux
+(
+    const bool extrapolatedFlux
+)
+{
+    const fvMesh& mesh = this->mesh();
+    const volVectorField& U = this->U();
+    surfaceScalarField& phi = this->phi();
+
+    // Lookup the forceImplicitFlux flag
+    const Switch forceImplicitFlux =
+        fluidProperties().lookupOrDefault<Switch>("forceImplicitFlux", false);
+
+    if (forceImplicitFlux || !extrapolatedFlux)
+    {
+        phi = fvc::interpolate(U) & mesh.Sf();
+    }
+    else
+    {
+        if
+        (
+            Switch
+            (
+                fluidProperties().lookup("fluidFluxExtrapolationAlgorithm1")
+            )
+        )
+        {
+            // Equation 6.10
+            phi = fvc::interpolate
+                  (
+                      2.0*U.oldTime() - U.oldTime().oldTime()
+                  ) & mesh.Sf();
+        }
+        else
+        {
+            // Equation 6.30
+            phi = fvc::interpolate
+                  (
+                      2.25*U.oldTime()
+                    - 1.5*U.oldTime().oldTime()
+                    + 0.25*U.oldTime().oldTime().oldTime()
+                  ) & mesh.Sf();
+        }
+    }
+
+    // Absolute flux
+    tmp<surfaceScalarField> tphiAbs(new surfaceScalarField("phiAbs", phi));
+
+    if (mesh.changing())
+    {
+        fvc::makeRelative(phi, U);
+
+        forAll(U.boundaryField(), patchI)
+        {
+            if (mesh.boundaryMesh()[patchI].type() == "wall")
+            {
+                boundaryFieldRef(phi)[patchI] = 0.0;
+            }
+        }
+    }
+
+    return tphiAbs;
+}
+
+
+#endif
+
+
+#if defined(USE_PETSC) && defined(OPENFOAM_COM)
+
+void newtonIcoFluid::makeRhieChowHistory() const
+{
+    if (rhieChowWPtr_.valid())
+    {
+        return;
+    }
+
+    // The history is derived for the Rhie-Chow correction (and its
+    // identical diffStencilLaplacian implementation)
+    if
+    (
+        pressureStabilisation().type() != "RhieChow"
+     && pressureStabilisation().type() != "diffStencilLaplacian"
+    )
+    {
+        FatalErrorInFunction
+            << "RhieChowTimeHistory needs the RhieChow (or "
+            << "diffStencilLaplacian) pressure stabilisation, not "
+            << pressureStabilisation().type() << exit(FatalError);
+    }
+
+    const fvMesh& mesh = this->mesh();
+    const word names[3] = {"rhieChowW", "rhieChowW0", "rhieChowW00"};
+    autoPtr<surfaceScalarField>* ptrs[3] =
+        {&rhieChowWPtr_, &rhieChowW0Ptr_, &rhieChowW00Ptr_};
+
+    label nRead = 0;
+    for (label i = 0; i < 3; ++i)
+    {
+        IOobject io
+        (
+            names[i],
+            mesh.time().timeName(),
+            mesh,
+            IOobject::READ_IF_PRESENT,
+            IOobject::AUTO_WRITE
+        );
+
+        if (io.typeHeaderOk<surfaceScalarField>(true))
+        {
+            ++nRead;
+        }
+
+        ptrs[i]->reset
+        (
+            new surfaceScalarField
+            (
+                io,
+                mesh,
+                dimensionedScalar("zero", dimVelocity, 0.0)
+            )
+        );
+
+        // A face-normal velocity: oriented, as a flux
+        (*ptrs[i])().setOriented(true);
+    }
+
+    // The time-step that continues from this time first shifts the history:
+    // rhieChowW (this time) -> rhieChowW0 -> rhieChowW00
+    rhieChowShiftTimeIndex_ = mesh.time().timeIndex();
+
+    if (nRead > 0 && nRead < 3)
+    {
+        WarningInFunction
+            << "Only " << nRead << " of the 3 Rhie-Chow history fields "
+            << "rhieChowW, rhieChowW0 and rhieChowW00 were read at time "
+            << mesh.time().timeName() << ": the missing ones are zero"
+            << endl;
+    }
+    else if (nRead == 0 && mesh.time().timeIndex() > 0)
+    {
+        WarningInFunction
+            << "No Rhie-Chow history fields at time "
+            << mesh.time().timeName() << ": the history starts from zero, "
+            << "so this run does not continue the earlier one exactly"
+            << endl;
+    }
+}
+
+
+void newtonIcoFluid::rhieChowTimeCoeffs
+(
+    scalar& coefft,
+    scalar& coefft0,
+    scalar& coefft00
+) const
+{
+    const fvMesh& mesh = this->mesh();
+
+    coefft = 1;
+    coefft0 = 1;
+    coefft00 = 0;
+
+    ITstream& is = mesh.ddtScheme("ddt(" + U().name() + ")");
+    is.rewind();
+    token t(is);
+    is.rewind();
+
+    if (!t.isWord())
+    {
+        FatalErrorInFunction
+            << "Cannot read the ddt scheme of " << U().name()
+            << exit(FatalError);
+    }
+
+    const word scheme(t.wordToken());
+
+    // BDF 1 has Euler's weights in every step, so it is accepted as Euler.
+    // Higher BDF orders are not supported: the history would need q levels
+    // of w (also written and read on restart), the order-q weights and the
+    // scheme's own start-up ramp, which are private to bdfDdtScheme. BDF 2
+    // has backward's weights, but its start-up and restart time-step
+    // handling are the scheme's own, so backward is required instead.
+    if (scheme == "BDF")
+    {
+        token schemeToken(is);
+        token orderToken(is);
+        is.rewind();
+
+        if (!orderToken.isLabel() || orderToken.labelToken() != 1)
+        {
+            FatalErrorInFunction
+                << "RhieChowTimeHistory does not support the BDF ";
+
+            if (orderToken.isLabel())
+            {
+                FatalError<< orderToken.labelToken();
+            }
+            else
+            {
+                FatalError<< orderToken.info();
+            }
+
+            FatalError
+                << " ddt scheme of " << U().name() << "." << nl
+                << "    The time-history correction uses the weights of"
+                << " backward (BDF 2) or Euler (BDF 1) with two levels of"
+                << " history; BDF 2 to 6 would need the BDF scheme's own"
+                << " order-q weights, start-up ramp and q history levels,"
+                << " which are not implemented. Use backward or Euler for "
+                << U().name() << ", or switch RhieChowTimeHistory off."
+                << exit(FatalError);
+        }
+
+        return;
+    }
+
+    if (scheme == "backward")
+    {
+        // As backwardDdtScheme::deltaT0_(vf): Euler for the first time-step
+        if (mesh.time().timeIndex() >= 2)
+        {
+            const scalar deltaT = mesh.time().deltaTValue();
+            const scalar deltaT0 = mesh.time().deltaT0Value();
+            coefft = 1 + deltaT/(deltaT + deltaT0);
+            coefft00 = deltaT*deltaT/(deltaT0*(deltaT + deltaT0));
+            coefft0 = coefft + coefft00;
+        }
+    }
+    else if (scheme != "Euler")
+    {
+        FatalErrorInFunction
+            << "RhieChowTimeHistory supports the backward, Euler and BDF 1 "
+            << "ddt schemes of " << U().name() << ", not " << scheme
+            << exit(FatalError);
+    }
+}
+
+
+tmp<surfaceScalarField> newtonIcoFluid::rhieChowGamma
+(
+    const surfaceScalarField& phiStab
+) const
+{
+    const volVectorField& U = this->U();
+
+    scalar coefft, coefft0, coefft00;
+    rhieChowTimeCoeffs(coefft, coefft0, coefft00);
+
+    // Spatial diagonal per unit volume, positive: a_P = -A of the viscous
+    // and upwind convection terms
+    const fvVectorMatrix spatialEqn
+    (
+        fvm::laplacian(turbulence_->nuEff(), U)
+      - fvm::div(phiStab, U, "jacobian-div(phi,U)")
+    );
+    const volScalarField aP("aP", -spatialEqn.A());
+
+    // The spatial diagonal is positive with an upwind jacobian-div(phi,U)
+    // scheme and a positive viscosity
+    if (gMin(Foam::primitiveField(aP)) < 0)
+    {
+        WarningInFunction
+            << "Negative spatial momentum diagonal (min "
+            << gMin(Foam::primitiveField(aP)) << "): check that "
+            << "jacobian-div(phi,U) is an upwind scheme" << endl;
+    }
+
+    // gamma = 1/(a_f + coefft/deltaT): the steady correction w = -B/a_f
+    // does not depend on the time-step (with gamma = interpolate(1/A) it
+    // would, since interpolation and inversion do not commute)
+    return tmp<surfaceScalarField>
+    (
+        new surfaceScalarField
+        (
+            "rhieChowGamma",
+            1.0
+           /(
+                fvc::interpolate(aP)
+              + dimensionedScalar
+                (
+                    "rDeltaT",
+                    dimless/dimTime,
+                    coefft/mesh().time().deltaTValue()
+                )
+            )
+        )
+    );
+}
+
+
+tmp<surfaceScalarField> newtonIcoFluid::rhieChowHistoryFlux
+(
+    const surfaceScalarField& gamma
+) const
+{
+    const fvMesh& mesh = this->mesh();
+
+    makeRhieChowHistory();
+
+    // Shift the history at the first evaluation of a new time-step: the
+    // correction accepted in the previous time-step becomes w^n
+    if (mesh.time().timeIndex() != rhieChowShiftTimeIndex_)
+    {
+        rhieChowW00Ptr_() == rhieChowW0Ptr_();
+        rhieChowW0Ptr_() == rhieChowWPtr_();
+        rhieChowShiftTimeIndex_ = mesh.time().timeIndex();
+    }
+
+    scalar coefft, coefft0, coefft00;
+    rhieChowTimeCoeffs(coefft, coefft0, coefft00);
+
+    const dimensionedScalar rDeltaT
+    (
+        "rDeltaT", dimless/dimTime, 1.0/mesh.time().deltaTValue()
+    );
+
+    // The history as a velocity correction times the current face area, so
+    // that the correction is a velocity history on a moving mesh
+    tmp<surfaceScalarField> thist
+    (
+        new surfaceScalarField
+        (
+            "rhieChowHistoryFlux",
+            gamma*mesh.magSf()*rDeltaT
+           *(coefft0*rhieChowW0Ptr_() - coefft00*rhieChowW00Ptr_())
+        )
+    );
+
+    // The history is kept on internal and coupled (processor, cyclic)
+    // faces only. On physical boundaries the Rhie-Chow correction B vanishes
+    // for gradient schemes that impose n & grad(p) = snGrad(p) on the
+    // boundary (Gauss, leastSquares); with others (e.g. leastSquaresS4f) the
+    // instantaneous correction there is kept, but without its history
+    surfaceScalarField::Boundary& histBf = boundaryFieldRef(tmpRef(thist));
+    forAll(histBf, patchI)
+    {
+        if (!mesh.boundary()[patchI].coupled())
+        {
+            histBf[patchI] = 0.0;
+        }
+    }
+
+    return thist;
+}
+
+
+void newtonIcoFluid::storeRhieChowHistory(const bool extrapolatedFlux)
+{
+    const fvMesh& mesh = this->mesh();
+    const volScalarField& p = this->p();
+
+    // The state of the residual at the accepted solution: its flux, the
+    // wall pressure gradients and the pressure gradient
+    setResidualFlux(extrapolatedFlux);
+    updatePressureGradientBoundaries();
+    gradp() = fvc::grad(p);
+
+    const surfaceScalarField gamma(rhieChowGamma(this->phi()));
+    pressureStabilisation().updateScalar(p, &gradp());
+    const surfaceScalarField& B = pressureStabilisation().faceScalar();
+
+    // w = (-gamma*|Sf|*B + history)/|Sf|
+    rhieChowWPtr_() ==
+        rhieChowHistoryFlux(gamma)/mesh.magSf() - gamma*B;
+
+    surfaceScalarField::Boundary& wBf = boundaryFieldRef(rhieChowWPtr_());
+    forAll(wBf, patchI)
+    {
+        if (!mesh.boundary()[patchI].coupled())
+        {
+            wBf[patchI] = 0.0;
+        }
+    }
+}
+
+
+#else
+
+void newtonIcoFluid::makeRhieChowHistory() const
+{
+    FatalErrorInFunction
+        << "RhieChowTimeHistory needs OpenFOAM.com and PETSc"
+        << exit(FatalError);
+}
+
+
+void newtonIcoFluid::rhieChowTimeCoeffs
+(
+    scalar& coefft,
+    scalar& coefft0,
+    scalar& coefft00
+) const
+{
+    makeRhieChowHistory();
+}
+
+
+tmp<surfaceScalarField> newtonIcoFluid::rhieChowGamma
+(
+    const surfaceScalarField& phiStab
+) const
+{
+    makeRhieChowHistory();
+    return tmp<surfaceScalarField>(nullptr);
+}
+
+
+tmp<surfaceScalarField> newtonIcoFluid::rhieChowHistoryFlux
+(
+    const surfaceScalarField& gamma
+) const
+{
+    makeRhieChowHistory();
+    return tmp<surfaceScalarField>(nullptr);
+}
+
+
+void newtonIcoFluid::storeRhieChowHistory(const bool extrapolatedFlux)
+{
+    makeRhieChowHistory();
+}
+
+#endif
 
 
 void newtonIcoFluid::clearRAUf()
@@ -1891,57 +2347,9 @@ label newtonIcoFluid::formResidual
     // velocity gradient gradU()
     updateViscousCache();
 
-    // Lookup the forceImplicitFlux flag
-    const Switch forceImplicitFlux =
-        fluidProperties().lookupOrDefault<Switch>("forceImplicitFlux", false);
-
-    if (forceImplicitFlux || !extrapolatedFlux)
-    {
-        phi = fvc::interpolate(U) & mesh.Sf();
-    }
-    else
-    {
-        if
-        (
-            Switch
-            (
-                fluidProperties().lookup("fluidFluxExtrapolationAlgorithm1")
-            )
-        )
-        {
-            // Equation 6.10
-            phi = fvc::interpolate
-                  (
-                      2.0*U.oldTime() - U.oldTime().oldTime()
-                  ) & mesh.Sf();
-        }
-        else
-        {
-            // Equation 6.30
-            phi = fvc::interpolate
-                  (
-                      2.25*U.oldTime()
-                    - 1.5*U.oldTime().oldTime()
-                    + 0.25*U.oldTime().oldTime().oldTime()
-                  ) & mesh.Sf();
-        }
-    }
-
-    // Absolute flux
-    const surfaceScalarField phiAbs("phiAbs", phi);
-
-    if (mesh.changing())
-    {
-        fvc::makeRelative(phi, U);
-
-        forAll(U.boundaryField(), patchI)
-        {
-            if (mesh.boundaryMesh()[patchI].type() == "wall")
-            {
-                boundaryFieldRef(phi)[patchI] = 0.0;
-            }
-        }
-    }
+    // The flux of the residual (also used by storeRhieChowHistory), and the
+    // absolute flux
+    const surfaceScalarField phiAbs(setResidualFlux(extrapolatedFlux));
 
     // Pressure has already been unpacked from x (and BCs corrected)
     // by unpackSolution() above
@@ -2023,18 +2431,39 @@ label newtonIcoFluid::formResidual
     // Newton/MFFD perturbations and tripping the RhieChow check.
     // The actual momentum residual (above) still uses the user-chosen
     // div scheme, so physical accuracy is unchanged
-    fvVectorMatrix pressureStabUEqn
-    (
-        fvm::laplacian(turbulence_->nuEff(), U)
-      - fvm::ddt(U)
-      - fvm::div(phi, U, "jacobian-div(phi,U)")
-    );
+    if (rhieChowTimeHistory())
+    {
+        // gamma = 1/(a_f + coefft/deltaT), with the spatial diagonal
+        // interpolated, as the time history needs
+        rAUf() = rhieChowGamma(phi);
+    }
+    else
+    {
+        fvVectorMatrix pressureStabUEqn
+        (
+            fvm::laplacian(turbulence_->nuEff(), U)
+          - fvm::ddt(U)
+          - fvm::div(phi, U, "jacobian-div(phi,U)")
+        );
 
-    rAUf() = -fvc::interpolate(1.0/pressureStabUEqn.A());
+        rAUf() = -fvc::interpolate(1.0/pressureStabUEqn.A());
+    }
     const surfaceScalarField& pStabGamma = rAUf();
 
     pressureStabilisation().updateScalar(p, &gradp());
     pressureResidual += pressureStabilisation().cellScalar(&pStabGamma, true);
+
+    // Time history of the Rhie-Chow correction (opt-in): the face flux is
+    // interpolate(U) & Sf - gamma*|Sf|*B + gamma*|Sf|*(c0*w^n -
+    // c00*w^(n-1))/deltaT, so that a converged steady solution does not
+    // depend on the time-step. The assembled Jacobian omits the history term
+    // (it depends on the unknowns only through gamma); the matrix-free
+    // Jacobian action includes it
+    if (rhieChowTimeHistory())
+    {
+        pressureResidual -=
+            Foam::primitiveField(fvc::div(rhieChowHistoryFlux(pStabGamma))());
+    }
 
     pressureResidual *= mesh.V();
 
@@ -2149,7 +2578,15 @@ label newtonIcoFluid::formJacobian
     // Record the reciprocal of the central coefficient before adding
     // diagonal damping terms that are not part of the upwind pressure
     // stabilisation operator and may not preserve the sign of UEqn.A().
-    rAUf() = -fvc::interpolate(1.0/UEqn.A());
+    if (rhieChowTimeHistory())
+    {
+        // As in the residual
+        rAUf() = rhieChowGamma(phi);
+    }
+    else
+    {
+        rAUf() = -fvc::interpolate(1.0/UEqn.A());
+    }
     const surfaceScalarField& pStabGamma = rAUf();
 
     if (Switch(fluidProperties().lookupOrDefault<Switch>("addDivPhiUDamping", false)))

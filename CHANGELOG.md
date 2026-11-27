@@ -8,6 +8,13 @@ release. For complete commit-level details and contributor information, see the
 
 ### Added
 
+- `newtonIcoFluid` has an opt-in time history of the Rhie–Chow pressure
+  stabilisation (`RhieChowTimeHistory yes`, OpenFOAM.com with PETSc), for
+  which a converged steady solution does not depend on the time step
+  (#749). It removes the stall of the temporal convergence of the pressure and
+  the interface traction at small time steps in a manufactured FSI solution,
+  and changes the ring added-mass and blobInTreacle results by less than
+  0.02% and 3.4e-5. The history is written and read for restarts.
 - The quasi-monolithic Newton fluid-solid coupling
   (`fluidSolidInterface NewtonQuasiMonolithic`, OpenFOAM.com with PETSc),
   which solves the fluid velocity and pressure (`newtonIcoFluid`) and the

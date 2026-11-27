@@ -75,6 +75,19 @@ class newtonIcoFluid
         //  Smoothing coefficient in the pressure equation
         mutable autoPtr<surfaceScalarField> rAUfPtr_;
 
+        //- Time history of the Rhie-Chow correction (opt-in
+        //  RhieChowTimeHistory), as face-normal velocity corrections w,
+        //  where the face-flux correction is w*|Sf|: the accepted correction
+        //  of the current time-step (rhieChowW), and of the previous two
+        //  time-steps (rhieChowW0, rhieChowW00). Choi (1999); Cubero and
+        //  Fueyo (2007)
+        mutable autoPtr<surfaceScalarField> rhieChowWPtr_;
+        mutable autoPtr<surfaceScalarField> rhieChowW0Ptr_;
+        mutable autoPtr<surfaceScalarField> rhieChowW00Ptr_;
+
+        //- Time index at which the history was last shifted
+        mutable label rhieChowShiftTimeIndex_;
+
         //- Reference pressure cell
         label pRefCell_;
 
@@ -412,6 +425,55 @@ public:
 
             //- Return a const reference to the rAU field
             void clearRAUf();
+
+            //- Is the time history of the Rhie-Chow correction enabled
+            //  (RhieChowTimeHistory)?
+            bool rhieChowTimeHistory() const;
+
+            //- Read (on a restart) or create the Rhie-Chow history fields
+            void makeRhieChowHistory() const;
+
+            //- Coefficients of the time scheme of ddt(U), as the installed
+            //  backwardDdtScheme uses them (Euler for the first time-step).
+            //  Euler and BDF 1 give Euler's; other schemes, including BDF 2
+            //  to 6, are fatal
+            void rhieChowTimeCoeffs
+            (
+                scalar& coefft,
+                scalar& coefft0,
+                scalar& coefft00
+            ) const;
+
+            //- Rhie-Chow coefficient with a time-step independent spatial
+            //  part: gamma = 1/(a_f + coefft/deltaT), where a_f is the
+            //  interpolated spatial diagonal of the momentum equation
+            tmp<surfaceScalarField> rhieChowGamma
+            (
+                const surfaceScalarField& phiStab
+            ) const;
+
+            //- The time-history part of the Rhie-Chow face flux,
+            //  gamma*|Sf|*(coefft0*w^n - coefft00*w^(n-1))/deltaT, on the
+            //  internal and coupled faces; the history is shifted first if
+            //  this is a new time-step
+            tmp<surfaceScalarField> rhieChowHistoryFlux
+            (
+                const surfaceScalarField& gamma
+            ) const;
+
+            //- Set the accepted Rhie-Chow correction of this time-step from
+            //  the current solution: w = (-gamma*|Sf|*B + history)/|Sf|. Call
+            //  after an accepted solve; repeated calls in one time-step (e.g.
+            //  partitioned coupling iterations) overwrite it, and it enters
+            //  the history at the start of the next time-step
+            void storeRhieChowHistory(const bool extrapolatedFlux);
+
+            //- Set phi to the (relative) flux the residual uses, and return
+            //  the absolute flux (formResidual)
+            tmp<surfaceScalarField> setResidualFlux
+            (
+                const bool extrapolatedFlux
+            );
 
             //- Mark the cached viscous fields as out of date. The cache also
             //  checks the velocity, the mesh points, the time index and the
