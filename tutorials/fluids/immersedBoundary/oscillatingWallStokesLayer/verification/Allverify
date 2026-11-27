@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Opt-in verification driver for the oscillatingWallStokesLayer tutorial: the
+# velocity and the wall shear stress against the exact solutions of the Stokes
+# second problem, for the cutLink, penalty, legacy incremental and ghostCell
+# methods on the tutorial mesh levels. See README.md.
+#
+#     ./Allverify unit                   # exact tests, no OpenFOAM needed
+#     ./Allverify dry-run --runs matrix  # cases, ranks and observed cost
+#     ./Allverify                        # smoke: cutLink, Level 1
+#     ./Allverify --runs L1 L2           # the variants of Levels 1-2
+#     ./Allverify check                  # PASS / FAIL / SKIPPED
+#     ./Allverify tables                 # the master table
+#     ./Allverify --help
+set -euo pipefail
+
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "ERROR: python3 is required for oscillatingWallStokesLayer verification." >&2
+    exit 2
+fi
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec python3 -u "${SCRIPT_DIR}/scripts/oscillating_wall_stokes_layer_verification.py" "$@"

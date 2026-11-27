@@ -1,0 +1,64 @@
+method,estimator,level,quantity,points,dt_first,dt_last,value_first,value_last,last_difference,ratio,verdict,limit,bound
+cutLink,FO,1,u_L2_all_ivp,4,0.001,0.000125,0.00835318,0.008835,6.918e-05,1.99243,first-order,0.00890471,6.97075e-05
+cutLink,FO,1,shear_amp_err_ivp,4,0.001,0.000125,0.00460036,0.00446434,-1.404e-05,2.51109,ratio outside the thresholds,,
+cutLink,FO,1,shear_rms_err_ivp,4,0.001,0.000125,0.0656679,0.0686741,0.0004402,1.97341,first-order,0.0691263,0.000452222
+cutLink,ME,1,u_L2_all_ivp,4,0.001,0.000125,0.00835318,0.008835,6.918e-05,1.99243,first-order,0.00890471,6.97075e-05
+cutLink,ME,1,shear_amp_err_ivp,4,0.001,0.000125,-0.036816,-0.0368584,-3.9e-06,2.70327,ratio outside the thresholds,,
+cutLink,ME,1,shear_rms_err_ivp,4,0.001,0.000125,0.093414,0.0962373,0.0004157,1.96481,first-order,0.0966682,0.000430862
+cutLink,ME,2,u_L2_all_ivp,4,0.001,0.000125,0.00156973,0.00210336,7.866e-05,1.95191,first-order,0.00218599,8.26341e-05
+cutLink,ME,2,shear_amp_err_ivp,4,0.001,0.000125,-0.0321329,-0.0321671,-2.5e-06,3.1241,ratio outside the thresholds,,
+cutLink,ME,2,shear_rms_err_ivp,4,0.001,0.000125,0.0524746,0.0552268,0.0004071,1.95704,first-order,0.0556522,0.000425373
+cutLink,ME,3,u_L2_all_ivp,4,0.001,0.000125,0.000506948,0.000342307,7.4826e-05,1.97748,non-monotone,,
+cutLink,ME,3,shear_amp_err_ivp,4,0.001,0.000125,-0.0315773,-0.0316137,-2.3e-06,3.40077,second-order,-0.0316147,9.58027e-07
+cutLink,ME,3,shear_rms_err_ivp,4,0.001,0.000125,0.0432506,0.0461754,0.0004365,1.94218,first-order,0.0466387,0.000463289
+cutLink,ME,4,u_L2_all_ivp,5,0.001,6.25e-05,6.16267e-05,5.56664e-05,-3.656e-07,2.04577,first-order,5.53168e-05,3.49599e-07
+cutLink,ME,4,shear_amp_err_ivp,5,0.001,6.25e-05,0.0310125,0.0309945,-1e-07,nan,saturated,0.0309945,1e-07
+cutLink,ME,4,shear_rms_err_ivp,5,0.001,6.25e-05,0.0438358,0.0437827,1.35e-05,nan,saturated,0.0437827,1.35e-05
+cutLink,ST,1,u_L2_all_ivp,4,0.001,0.000125,0.00835318,0.008835,6.918e-05,1.99243,first-order,0.00890471,6.97075e-05
+cutLink,ST,1,shear_amp_err_ivp,4,0.001,0.000125,-0.10865,-0.108973,-9.8e-05,2.04041,non-monotone,,
+cutLink,ST,1,shear_rms_err_ivp,4,0.001,0.000125,0.38339,0.385956,0.000366,1.9481,first-order,0.386342,0.000386036
+cutLink,ST,2,u_L2_all_ivp,4,0.001,0.000125,0.00156973,0.00210336,7.866e-05,1.95191,first-order,0.00218599,8.26341e-05
+cutLink,ST,2,shear_amp_err_ivp,4,0.001,0.000125,0.0334212,0.0472821,0.001947,2.02996,first-order,0.0491725,0.00189036
+cutLink,ST,2,shear_rms_err_ivp,4,0.001,0.000125,0.0531614,0.0625755,0.00145,1.90198,first-order,0.0641831,0.00160758
+cutLink,ST,3,u_L2_all_ivp,4,0.001,0.000125,0.000506948,0.000342307,7.4826e-05,1.97748,non-monotone,,
+cutLink,ST,3,shear_amp_err_ivp,4,0.001,0.000125,-0.0107622,0.019794,0.0043982,1.99571,first-order,0.0242112,0.00441716
+cutLink,ST,3,shear_rms_err_ivp,4,0.001,0.000125,0.0381488,0.039546,0.0027951,1.26279,non-monotone,,
+cutLink,ST,4,u_L2_all_ivp,5,0.001,6.25e-05,6.16267e-05,5.56664e-05,-3.656e-07,2.04577,first-order,5.53168e-05,3.49599e-07
+cutLink,ST,4,shear_amp_err_ivp,5,0.001,6.25e-05,-0.00103747,-0.000134347,6.325e-05,2.12537,ratio outside the thresholds,,
+cutLink,ST,4,shear_rms_err_ivp,5,0.001,6.25e-05,0.0124509,0.0124263,-7e-07,11.2059,non-monotone,,
+ghostCell,,1,u_L2_all_ivp,4,0.001,0.000125,0.0216257,0.0217007,1.08e-05,1.98839,first-order,0.0217116,1.09268e-05
+ghostCell,,1,shear_amp_err_ivp,4,0.001,0.000125,-0.0428688,-0.0354235,0.0010709,1.98975,first-order,-0.0343415,0.00108199
+ghostCell,,1,shear_rms_err_ivp,4,0.001,0.000125,0.113135,0.117223,0.000633,1.88701,first-order,0.117937,0.00071363
+ghostCell,,2,u_L2_all_ivp,4,0.001,0.000125,0.00521033,0.00533345,1.768e-05,1.99221,first-order,0.00535127,1.78189e-05
+ghostCell,,2,shear_amp_err_ivp,4,0.001,0.000125,-0.0118329,-0.00515214,0.000963,1.98653,first-order,-0.00417599,0.000976153
+ghostCell,,2,shear_rms_err_ivp,4,0.001,0.000125,0.0202542,0.0244804,0.0008207,1.55117,ratio outside the thresholds,,
+ghostCell,,3,u_L2_all_ivp,5,0.001,6.25e-05,0.000809132,0.000920042,7.472e-06,1.99078,first-order,0.000927584,7.54155e-06
+ghostCell,,3,shear_amp_err_ivp,5,0.001,6.25e-05,-0.00799775,-0.000892499,0.000478721,1.99171,first-order,-0.000409778,0.000482721
+ghostCell,,3,shear_rms_err_ivp,5,0.001,6.25e-05,0.00987265,0.00236708,0.00019221,3.28994,non-monotone,,
+ghostCell,,4,u_L2_all_ivp,5,0.001,6.25e-05,0.00069865,0.00108661,2.514e-05,2.00976,first-order,0.00111151,2.4897e-05
+ghostCell,,4,shear_amp_err_ivp,5,0.001,6.25e-05,-0.00770331,-0.000583982,0.000474698,1.99072,first-order,-0.000104837,0.000479145
+ghostCell,,4,shear_rms_err_ivp,5,0.001,6.25e-05,0.00908051,0.00451373,0.00047156,1.11893,non-monotone,,
+incremental,,1,u_L2_all_ivp,4,0.001,0.000125,0.0475532,0.0475118,-5.7e-06,2.05196,first-order,0.0475064,5.41847e-06
+incremental,,1,shear_amp_err_ivp,4,0.001,0.000125,-0.122632,-0.115605,0.00101,1.99057,first-order,-0.114585,0.00101961
+incremental,,1,shear_rms_err_ivp,4,0.001,0.000125,0.135189,0.132091,-0.000406,2.12596,first-order,0.13173,0.000360581
+incremental,,2,u_L2_all_ivp,4,0.001,0.000125,0.0221558,0.022064,-1.22e-05,2.10581,first-order,0.022053,1.10327e-05
+incremental,,2,shear_amp_err_ivp,4,0.001,0.000125,-0.0630454,-0.0564627,0.0009428,1.99631,first-order,-0.0555164,0.000946291
+incremental,,2,shear_rms_err_ivp,4,0.001,0.000125,0.0744434,0.0731725,-0.0001061,2.8576,ratio outside the thresholds,,
+incremental,,3,u_L2_all_ivp,6,0.001,3.125e-05,0.00774745,0.0075055,-6.18e-06,nan,saturated,0.0075055,6.18e-06
+incremental,,3,shear_amp_err_ivp,6,0.001,3.125e-05,-0.0306418,-0.0255932,0.0001481,2.00993,first-order,-0.0254466,0.000146643
+incremental,,3,shear_rms_err_ivp,6,0.001,3.125e-05,0.0364055,0.0372902,8e-05,nan,saturated,0.0372902,8e-05
+incremental,,4,u_L2_all_ivp,6,0.001,3.125e-05,0.00169215,0.000169488,3.9866e-05,1.86608,non-monotone,,
+incremental,,4,shear_amp_err_ivp,6,0.001,3.125e-05,0.0450093,0.0329472,-0.0011762,1.78082,first-order,0.0314408,0.00150637
+incremental,,4,shear_rms_err_ivp,6,0.001,3.125e-05,0.0485675,0.0370554,-0.0011055,1.7845,first-order,0.0356462,0.00140918
+penalty,,1,u_L2_all_ivp,4,0.001,0.000125,0.0498132,0.0498129,1e-07,inf,non-monotone,,
+penalty,,1,shear_amp_err_ivp,4,0.001,0.000125,-0.216618,-0.208651,0.001144,1.99234,first-order,-0.207498,0.00115283
+penalty,,1,shear_rms_err_ivp,4,0.001,0.000125,0.281568,0.280046,-0.000197,2.1386,first-order,0.279873,0.00017302
+penalty,,2,u_L2_all_ivp,4,0.001,0.000125,0.02475,0.0247493,0,inf,non-monotone,,
+penalty,,2,shear_amp_err_ivp,4,0.001,0.000125,-0.107266,-0.0999338,0.0010542,1.99006,first-order,-0.098869,0.00106478
+penalty,,2,shear_rms_err_ivp,4,0.001,0.000125,0.13744,0.136393,-0.000107,2.50607,ratio outside the thresholds,,
+penalty,,3,u_L2_all_ivp,5,0.001,6.25e-05,0.0106326,0.0106304,-1e-07,nan,saturated,0.0106304,1e-07
+penalty,,3,shear_amp_err_ivp,5,0.001,6.25e-05,-0.0497887,-0.0423158,0.0005026,1.99297,first-order,-0.0418096,0.000506156
+penalty,,3,shear_rms_err_ivp,5,0.001,6.25e-05,0.0595277,0.0582142,-5.16e-05,nan,saturated,0.0582142,5.16e-05
+penalty,,4,u_L2_all_ivp,5,0.001,6.25e-05,0.0074167,0.00408259,-3.54e-06,nan,saturated,0.00408259,3.54e-06
+penalty,,4,shear_amp_err_ivp,5,0.001,6.25e-05,-0.0354253,-0.0154278,0.0004886,3.08745,ratio outside the thresholds,,
+penalty,,4,shear_rms_err_ivp,5,0.001,6.25e-05,0.0405556,0.0211133,-6.79e-05,nan,saturated,0.0211133,6.79e-05
