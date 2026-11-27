@@ -8,6 +8,17 @@ release. For complete commit-level details and contributor information, see the
 
 ### Added
 
+- Optional spectral normalisation of the Laplacian-family pressure
+  stabilisation models (`spectralNormalisation`, `referenceNyquistDirections`),
+  by Aaron Mullen-Hales (#627). Off by default. The order is
+  m = `laplacianPower`, counted from zero; with normalisation the m = 0
+  branch uses the ideal `scaleFactor/(4*rStar)*snGrad(p)` form.
+  `referenceNyquistDirections` is limited by the geometric mesh directions,
+  so a one-cell empty or wedge direction is excluded.
+- `stabilisationFourierCheck`, which verifies the stabilisation operators
+  against their analytical Fourier symbols, by Aaron Mullen-Hales (#627), and
+  the `pressureStabilisationFourier` tutorial and regression test that run it
+  with the parameter-validation checks and an example of its field output.
 - Cardiac elastodynamics benchmark tutorials of Aróstica et al. (2025),
   `tutorials/solids/hyperelasticity/ArosticaEtAl2025`: `benchmark1`, an
   idealised left ventricle (steps 0A, 0B, 1 and the blinded 2A to 2C) on an

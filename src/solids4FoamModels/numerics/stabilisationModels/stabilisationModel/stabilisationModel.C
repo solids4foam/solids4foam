@@ -24,6 +24,64 @@ InClass
 #include "fvc.H"
 #include "compatibilityFunctions.H"
 
+// * * * * * * * * * * * * * * * Local Functions * * * * * * * * * * * * * * //
+
+namespace Foam
+{
+
+//- Read and validate referenceNyquistDirections; zero without normalisation
+static label readReferenceNyquistDirections
+(
+    const fvMesh& mesh,
+    const dictionary& dict,
+    const bool normalise
+)
+{
+    if (!normalise)
+    {
+        return 0;
+    }
+
+    if (!dict.found("referenceNyquistDirections"))
+    {
+        FatalIOErrorInFunction(dict)
+            << "referenceNyquistDirections is required when "
+            << "spectralNormalisation is true"
+            << exit(FatalIOError);
+    }
+
+    const label referenceNyquistDirections = readLabel
+    (
+        dict.lookup("referenceNyquistDirections")
+    );
+
+    if (referenceNyquistDirections <= 0)
+    {
+        FatalIOErrorInFunction(dict)
+            << "referenceNyquistDirections must be greater than zero, found "
+            << referenceNyquistDirections << exit(FatalIOError);
+    }
+
+    // A Nyquist mode exists only in the geometric directions: a one-cell
+    // empty or wedge direction is excluded
+    const label maxReferenceNyquistDirections =
+        min(label(3), mesh.nGeometricD());
+
+    if (referenceNyquistDirections > maxReferenceNyquistDirections)
+    {
+        FatalIOErrorInFunction(dict)
+            << "referenceNyquistDirections must be in the valid range 1 .. "
+            << maxReferenceNyquistDirections
+            << " = min(3, mesh.nGeometricD()), found "
+            << referenceNyquistDirections << exit(FatalIOError);
+    }
+
+    return referenceNyquistDirections;
+}
+
+} // End namespace Foam
+
+
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
 namespace Foam
@@ -49,6 +107,14 @@ Foam::stabilisationModel::stabilisationModel
     (
         dict.lookupOrDefault<scalar>("scaleFactorJacobian", 1.0)
     ),
+    spectralNormalisation_
+    (
+        dict.lookupOrDefault<Switch>("spectralNormalisation", false)
+    ),
+    referenceNyquistDirections_
+    (
+        readReferenceNyquistDirections(mesh, dict, spectralNormalisation_)
+    ),
     faceScalarPtr_(),
     faceVectorPtr_(),
     scalarJacobianPtr_(),
@@ -56,11 +122,18 @@ Foam::stabilisationModel::stabilisationModel
     cellScalarPtr_(),
     cellVectorPtr_(),
     h2Ptr_()
-{}
+{
+    if (!spectralNormalisation_ && dict.found("referenceNyquistDirections"))
+    {
+        WarningInFunction
+            << "Ignoring referenceNyquistDirections because "
+            << "spectralNormalisation is false"
+            << endl;
+    }
+}
 
 
 // * * * * * * * * * * * * * * * Member functions * * * * * * * * * * * * * * //
-
 
 Foam::autoPtr<Foam::stabilisationModel> Foam::stabilisationModel::New
 (
@@ -103,7 +176,86 @@ Foam::autoPtr<Foam::stabilisationModel> Foam::stabilisationModel::New
     auto* ctorPtr = cstrIter();
 #endif
 
-    return autoPtr<stabilisationModel>(ctorPtr(mesh, dict, dims));
+    autoPtr<stabilisationModel> modelPtr(ctorPtr(mesh, dict, dims));
+
+    if
+    (
+        modelPtr->spectralNormalisation()
+     && !modelPtr->supportsSpectralNormalisation()
+    )
+    {
+        FatalIOErrorInFunction(dict)
+            << "Spectral normalisation is not supported by stabilisation "
+            << "model " << modelType << exit(FatalIOError);
+    }
+
+    return modelPtr;
+}
+
+
+Foam::scalar Foam::stabilisationModel::nyquistNormalisation
+(
+    const label nLaplacianFactors
+) const
+{
+    if (!spectralNormalisation_)
+    {
+        return 1.0;
+    }
+
+    scalar referenceResponse = 1.0;
+    const scalar directionalResponse = 4.0*referenceNyquistDirections_;
+
+    for (label i = 0; i < nLaplacianFactors; ++i)
+    {
+        referenceResponse *= directionalResponse;
+    }
+
+    return 1.0/referenceResponse;
+}
+
+
+void Foam::stabilisationModel::writeSpectralNormalisationInfo
+(
+    const string& responseDescription,
+    const scalar factor
+) const
+{
+    if (spectralNormalisation_)
+    {
+        Info<< "Spectral normalisation: model " << word(dict_.lookup("type"))
+            << ", referenceNyquistDirections "
+            << referenceNyquistDirections_
+            << ", " << responseDescription.c_str()
+            << ", factor " << factor << endl;
+    }
+}
+
+
+void Foam::stabilisationModel::writeSpectralNormalisationInfo
+(
+    const label nLaplacianFactors,
+    const bool usesIdealLaplacianStencil
+) const
+{
+    // m = laplacianPower, zero-based: m + 1 repeated Laplacian factors
+    string responseDescription("m = ");
+    responseDescription += Foam::name(nLaplacianFactors - 1);
+    responseDescription += " (";
+    responseDescription += Foam::name(nLaplacianFactors);
+    responseDescription +=
+        nLaplacianFactors == 1 ? " Laplacian factor)" : " Laplacian factors)";
+
+    if (usesIdealLaplacianStencil)
+    {
+        responseDescription += ", using the ideal snGrad stencil";
+    }
+
+    writeSpectralNormalisationInfo
+    (
+        responseDescription,
+        nyquistNormalisation(nLaplacianFactors)
+    );
 }
 
 

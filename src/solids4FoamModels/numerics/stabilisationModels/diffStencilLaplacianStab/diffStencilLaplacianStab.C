@@ -34,6 +34,16 @@ namespace Foam
 }
 
 
+// * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
+
+Foam::scalar Foam::diffStencilLaplacianStab::diffStencilNormalisation() const
+{
+    return spectralNormalisation()
+         ? 1.0/(4.0*referenceNyquistDirections())
+         : 1.0;
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 // Construct from dictionary
@@ -50,7 +60,14 @@ Foam::diffStencilLaplacianStab::diffStencilLaplacianStab
     (
         dict.lookupOrDefault<scalar>("scaleFactorJacobian", 1.0)
     )
-{}
+{
+    writeSpectralNormalisationInfo
+    (
+        "directionally split m = 1 spectral shape, raw reference response "
+        "4*rStar",
+        diffStencilNormalisation()
+    );
+}
 
 
 // * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * //
@@ -100,7 +117,16 @@ void Foam::diffStencilLaplacianStab::updateScalar
     }
 
     // Update the stabilisation
-    computeDiffStencil(p, gradP, autoPtrRef(faceScalarPtr()), scaleFactor_);
+    const scalar effectiveScaleFactor =
+        scaleFactor_*diffStencilNormalisation();
+
+    computeDiffStencil
+    (
+        p,
+        gradP,
+        autoPtrRef(faceScalarPtr()),
+        effectiveScaleFactor
+    );
 }
 
 
@@ -143,7 +169,16 @@ void Foam::diffStencilLaplacianStab::updateVector
     }
 
     // Update the stabilisation
-    computeDiffStencil(p, gradP, autoPtrRef(faceVectorPtr()), scaleFactor_);
+    const scalar effectiveScaleFactor =
+        scaleFactor_*diffStencilNormalisation();
+
+    computeDiffStencil
+    (
+        p,
+        gradP,
+        autoPtrRef(faceVectorPtr()),
+        effectiveScaleFactor
+    );
 }
 
 const Foam::fvScalarMatrix& Foam::diffStencilLaplacianStab::scalarJacobian

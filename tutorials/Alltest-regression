@@ -145,6 +145,7 @@ REGRESSION_TESTS=(
     "solids/linearElasticity/ellipticPlate"
     "solids/linearElasticity/manufacturedSolution"
     "solids/linearElasticity/plateHole"
+    "solids/linearElasticity/pressureStabilisationFourier"
     "solids/linearElasticity/contactPatchTest"
     "solids/linearElasticity/narrowTmember"
     "solids/linearElasticity/flatEndedRigidIndenter"

@@ -378,6 +378,55 @@ The mesh is overwritten!
 
 ---
 
+## `stabilisationFourierCheck`
+
+- **Utility purpose** Verifies the runtime-selected pressure-stabilisation
+  models against independent analytical Fourier symbols, with and without
+  spectral normalisation (`spectralNormalisation`, `referenceNyquistDirections`).
+
+- **Utility description** On a uniform, axis-aligned periodic Cartesian mesh
+  (cyclic and empty patches only), each model in
+  `system/stabilisationFourierCheckDict` is applied, through the calls a solid
+  model makes, to discrete Fourier modes of the pressure. The measured
+  eigenvalues are compared with the analytical symbols of `fourierSymbols.H`;
+  equivalent model pairs, constant-gamma linearity and the rejection of
+  invalid configurations are also checked. Supported models: `laplacian`,
+  `JamesonSchmidtTurkel`, `generalisedEvenOrderLaplacian` with
+  m = `laplacianPower` = 0, 1 and 2 (counted from zero),
+  `diffStencilLaplacian` and `RhieChow`. Results are written as CSV files to
+  `postProcessing/stabilisationFourierCheck`, and the utility exits nonzero if
+  a check fails.
+
+- **Options** `-dict <name>` (default `stabilisationFourierCheckDict`),
+  `-symbolSweep` (write analytical cuts and 2-D maps), `-writeFields` (also
+  write the pressure mode and the stabilisation response of every checked
+  mode and model), `-constructOnly` (construct the models and exit, for
+  rejection tests) and `-gammaLinearityCheck <scalar>`.
+
+- **Field output** With `-writeFields` and a `fieldOutput` entry, the utility
+  writes only the named modes instead of running the checks: each pressure
+  mode, `fourierP_<mode>`, and the response S(p) of each model to it,
+  `fourierS_<model>_<mode>`, to inspect the spatial action of a model. It
+  exits nonzero if a mode is not an eigenmode of a model to `tolerance`:
+
+  ```text
+  fieldOutput
+  {
+      modes
+      {
+          nyquist         (1 1 0);    // theta/pi
+      }
+      pressurePrefix      fourierP;   // optional
+      stabilisationPrefix fourierS;   // optional
+  }
+  ```
+
+- **Tutorial** `tutorials/solids/linearElasticity/pressureStabilisationFourier`
+  runs the checks, an example of the field output and the parameter
+  validation, and is part of `Alltest-regression`.
+
+---
+
 ## `updatePrestress`
 
 - **Utility purpose** Performs one pass of the modified updated Lagrangian

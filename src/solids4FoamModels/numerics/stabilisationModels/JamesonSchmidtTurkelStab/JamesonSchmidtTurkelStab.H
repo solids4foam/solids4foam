@@ -103,6 +103,12 @@ public:
 
         // Access
 
+            //- Return true: spectral normalisation is supported
+            virtual bool supportsSpectralNormalisation() const
+            {
+                return true;
+            }
+
             //- Re-calculate the scalar stabilisation
             //  Provide the primary variable field and optionally its gradient
             virtual void updateScalar
