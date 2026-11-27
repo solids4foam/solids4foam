@@ -819,7 +819,7 @@ release. For complete commit-level details and contributor information, see the
   cell-based or face-based, and a rank with no cells has no faces either, so
   that rank registered a `compactCell` topology while the others registered
   `compactFace`. The caller of the `CompactListList` stress updates now states
-  which kind of layout it passes (#707).  
+  which kind of layout it passes (#707).
 - On OpenFOAM.com and OpenFOAM.org, the non-orthogonal correction of
   `newMovingWallVelocity`, `elasticWallVelocity`, `normalInletVelocity`,
   `paraboloidInletVelocity`, `fixedTemperature`, `normalDisplacement`,
