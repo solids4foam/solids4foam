@@ -58,6 +58,11 @@ NewtonQuasiMonolithicCoeffs
     // over the solid)
     //solidSystemScaleFactor 1;
 
+    // Optional: userDefined (default; the two factors above) or
+    // forceBalanced (fluid rows times the fluid density, solid rows
+    // unscaled; see Residual Scaling)
+    //systemScaling forceBalanced;
+
     // Optional: solid block of the preconditioning matrix, compact
     // (default), colouredFiniteDifference or automatic (see Solid Block)
     //solidJacobian colouredFiniteDifference;
@@ -288,6 +293,33 @@ kept, but only if it is faster by more than `solidJacobianSwitchMargin`
 does not change. A change of block rebuilds the solver state, so the
 preconditioner is rebuilt at the next Newton iteration; the residual and the
 convergence tests are not affected.
+
+## Residual Scaling
+
+The fluid rows of the residual are kinematic (per unit density) and the solid
+rows are forces, scaled by `fluidSystemScaleFactor` and
+`solidSystemScaleFactor`. The Newton test acts on the norm of the scaled
+residual, so these factors decide how much each region counts in it. With left
+preconditioning they do not change the Krylov iterations (the preconditioner
+is built from the scaled rows, and row scaling cancels in it); they change only
+the stopping tests, and the unpreconditioned norm used with right
+preconditioning.
+
+`systemScaling forceBalanced` multiplies the fluid rows by the fluid density
+and leaves the solid rows unscaled, so that the momentum residuals of both
+regions count as forces. With the factors of the tutorials on
+`collapsibleChannel` (1e8 and 1/(mu*deltaT)), the solid rows are about 1e-12 of
+the fluid rows in the norm, although in force units the solid residual is the
+larger at the start of a step: the Newton test is then met by the fluid rows
+alone and the solid residual is reduced by only about 1e3-1e4. With
+`forceBalanced` it is reduced by the requested factor, at the cost of about one
+more Newton iteration per step; the wall displacement of the coarse tutorial
+then agrees with a tightly converged solution to 1e-11 instead of 4e-6
+(relative to its peak). Do not combine it with `fluidSystemScaleFactor` or
+`solidSystemScaleFactor`. Right preconditioning
+(`ksp_pc_side right`, `ksp_norm_type unpreconditioned`) appears faster with
+the default factors only because its Krylov test then ignores the solid rows;
+with `forceBalanced` it is slower than left preconditioning.
 
 ## Time-step Adjustment
 

@@ -2343,7 +2343,10 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
     fluidSolidInterface(typeName, runTime, region),
     fluidSystemScaleFactor_
     (
-        fsiProperties().lookupOrDefault<scalar>
+        fsiProperties().lookupOrDefault<word>("systemScaling", "userDefined")
+     == "forceBalanced"
+      ? refCast<const fluidModels::newtonIcoFluid>(fluid()).rho().value()
+      : fsiProperties().lookupOrDefault<scalar>
         (
             "fluidSystemScaleFactor",
             1.0 //gAverage(1.0/fluid().nf().primitiveField())
@@ -2351,7 +2354,10 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
     ),
     solidSystemScaleFactor_
     (
-        fsiProperties().lookupOrDefault<scalar>
+        fsiProperties().lookupOrDefault<word>("systemScaling", "userDefined")
+     == "forceBalanced"
+      ? 1.0
+      : fsiProperties().lookupOrDefault<scalar>
         (
             "solidSystemScaleFactor",
             gAverage
@@ -2467,6 +2473,48 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
             << "Unknown solidJacobianRebuild " << solidJacobianRebuild_
             << ": valid options are deltaTChange and always"
             << exit(FatalIOError);
+    }
+
+    {
+        // Row scaling of the coupled residual. "forceBalanced" multiplies the
+        // fluid rows (kinematic, per unit density) by the fluid density and
+        // leaves the solid rows (forces) unscaled, so that the momentum
+        // residuals of both regions enter the residual norm, and hence the
+        // nonlinear convergence test, as forces. With left preconditioning
+        // the row scaling does not change the Krylov iterates (the
+        // preconditioner is built from the scaled rows); it changes the
+        // stopping tests only
+        const word systemScaling
+        (
+            fsiProperties().lookupOrDefault<word>
+            (
+                "systemScaling",
+                "userDefined"
+            )
+        );
+
+        if (systemScaling != "userDefined" && systemScaling != "forceBalanced")
+        {
+            FatalIOErrorInFunction(fsiProperties())
+                << "Unknown systemScaling " << systemScaling
+                << ": valid options are userDefined and forceBalanced"
+                << exit(FatalIOError);
+        }
+
+        if
+        (
+            systemScaling == "forceBalanced"
+         && (
+                fsiProperties().found("fluidSystemScaleFactor")
+             || fsiProperties().found("solidSystemScaleFactor")
+            )
+        )
+        {
+            FatalIOErrorInFunction(fsiProperties())
+                << "systemScaling forceBalanced sets the fluid and solid "
+                << "scale factors: remove fluidSystemScaleFactor and "
+                << "solidSystemScaleFactor" << exit(FatalIOError);
+        }
     }
 
     if (solidJacobian_ == "colouredFiniteDifference")
