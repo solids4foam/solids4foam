@@ -18,6 +18,7 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "solidSymmetryFvPatchVectorField.H"
+#include "patchCorrectionVectors.H"
 #include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
 #include "compatibilityFunctions.H"
@@ -169,11 +170,8 @@ tmp<Field<vector> > solidSymmetryFvPatchVectorField::snGrad() const
 
     if (applyCorrection)
     {
-        // Delta vectors
-        const vectorField delta(patch().delta());
-
         // Non-orthogonal correction vectors
-        const vectorField k((I - sqr(n)) & delta);
+        const vectorField k(patchCorrectionVectors(patch()));
 
         // Lookup the gradient of displacement field
         const fvPatchField<tensor>& gradD =
@@ -252,11 +250,8 @@ void solidSymmetryFvPatchVectorField::evaluate(const Pstream::commsTypes)
 
     if (applyCorrection)
     {
-        // Delta vectors
-        const vectorField delta(patch().delta());
-
         // Non-orthogonal correction vectors
-        const vectorField k((I - sqr(n)) & delta);
+        const vectorField k(patchCorrectionVectors(patch()));
 
         // Lookup the gradient of displacement field
         const fvPatchField<tensor>& gradD =

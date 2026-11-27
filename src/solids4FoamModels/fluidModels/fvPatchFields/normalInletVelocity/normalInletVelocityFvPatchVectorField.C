@@ -18,6 +18,7 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "normalInletVelocityFvPatchVectorField.H"
+#include "patchCorrectionVectors.H"
 #include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
 #include "surfaceFields.H"
@@ -240,8 +241,7 @@ snGrad() const
         );
 
     const vectorField n(patch().nf());
-    const vectorField delta(patch().delta());
-    const vectorField k((I - sqr(n)) & delta);
+    const vectorField k(patchCorrectionVectors(patch()));
 
     if (secondOrder_)
     {
@@ -336,8 +336,7 @@ gradientBoundaryCoeffs() const
         );
 
     const vectorField n(patch().nf());
-    const vectorField delta(patch().delta());
-    const vectorField k((I - sqr(n)) & delta);
+    const vectorField k(patchCorrectionVectors(patch()));
 
     if (secondOrder_)
     {

@@ -570,6 +570,7 @@ void Foam::solidModels::linGeomTotalDispSolid::correctStressQuad()
     // read
     mechanicalManager().updateStressSmallStrain
     (
+        mechanicalConstitutiveLawManager::compactLayout::faces,
         gradDQuad(),
         gradDQuad0(),
         mesh().time().deltaTValue(),

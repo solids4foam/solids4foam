@@ -11,9 +11,17 @@ const pr = {number: 7, state: 'open', draft: false, head: {sha: 'c'.repeat(40)},
   base: {ref: 'development', sha: 'd'.repeat(40)}, title: 'T', body: 'B'};
 const files = [{filename: 'src/solids4FoamModels/numerics/x.C', status: 'modified',
   patch: '@@ -1 +1 @@\n-a\n+b'}];
-function fakeApi(prData = pr) {
-  const raws = [];
-  return {raws,
+function fakeApi(prData = pr, contents = {}) {
+  const raws = [], fetched = [];
+  return {raws, fetched,
+    file: endpoint => {
+      fetched.push(endpoint);
+      const name = decodeURIComponent(endpoint.replace(/^repos\/[^/]+\/[^/]+\/contents\//, '')
+        .replace(/\?.*$/, ''));
+      if (!(name in contents)) throw new Error('gh: Not Found (HTTP 404)');
+      const bytes = Buffer.from(contents[name]);
+      return {type: 'file', encoding: 'base64', size: bytes.length, content: bytes.toString('base64')};
+    },
     json: () => prData,
     list: () => files,
     raw: endpoint => {
@@ -24,9 +32,9 @@ function fakeApi(prData = pr) {
     }};
 }
 
-test('second review builds the CI prompt from the base branch on GitHub, not the local tree', () => {
+test('second review builds the CI prompt from the base branch on GitHub, not the local tree', async () => {
   const api = fakeApi();
-  const c = collect(7, api);
+  const c = await collect(7, api);
   assert.ok(api.raws.length === 3 && api.raws.every(e => e.endsWith('?ref=development')));
   assert.match(c.prompt, /^BASE INSTRUCTIONS\n\n## Repository guide/);
   assert.match(c.prompt, /Latest released version in CHANGELOG.md: v9\.9/);
@@ -36,14 +44,33 @@ test('second review builds the CI prompt from the base branch on GitHub, not the
   assert.ok(!c.prompt.includes('Claude advisory review'));
 });
 
-test('second review refuses PRs that are closed, drafts or not into development', () => {
-  assert.throws(() => collect(7, fakeApi({...pr, state: 'closed'})), /not open/);
-  assert.throws(() => collect(7, fakeApi({...pr, draft: true})), /not open/);
-  assert.throws(() => collect(7, fakeApi({...pr, base: {ref: 'master', sha: pr.base.sha}})), /not open/);
-  assert.throws(() => collect(7, fakeApi({...pr, base: {ref: 'feature-x'}})), /not open/);
+test('second review adds full files from the PR head SHA, with encoded paths', async () => {
+  const api = fakeApi(pr, {'src/solids4FoamModels/numerics/x.C': 'int whole() { return 1; }\n'});
+  const c = await collect(7, api);
+  assert.deepEqual(api.fetched, [`repos/solids4foam/solids4foam/contents/src/solids4FoamModels/numerics/x.C?ref=${pr.head.sha}`]);
+  assert.ok(api.raws.length === 3);
+  assert.deepEqual(c.coverage.full_files, ['src/solids4FoamModels/numerics/x.C']);
+  assert.ok(JSON.parse(c.data.split('UNTRUSTED PR DATA (JSON):\n')[1]).full_files[0].content
+    .includes('int whole()'));
+  // An untrusted path cannot add query parameters or leave the contents endpoint.
+  const odd = fakeApi();
+  files.push({filename: 'src/a b/x?ref=main#y.C', status: 'modified', patch: '@@ -1 +1 @@\n-a\n+b'});
+  try {
+    await collect(7, odd);
+  } finally {
+    files.pop();
+  }
+  assert.ok(odd.fetched.some(e => e.includes('src/a%20b/x%3Fref%3Dmain%23y.C?ref=')));
 });
 
-test('second review is not posted if the PR changed in any way CI also checks', () => {
+test('second review refuses PRs that are closed, drafts or not into development', async () => {
+  await assert.rejects(collect(7, fakeApi({...pr, state: 'closed'})), /not open/);
+  await assert.rejects(collect(7, fakeApi({...pr, draft: true})), /not open/);
+  await assert.rejects(collect(7, fakeApi({...pr, base: {ref: 'master', sha: pr.base.sha}})), /not open/);
+  await assert.rejects(collect(7, fakeApi({...pr, base: {ref: 'feature-x'}})), /not open/);
+});
+
+test('second review is not posted if the PR changed in any way CI also checks', async () => {
   assert.equal(changed(pr, structuredClone(pr)), false);
   for (const now of [{...pr, state: 'closed'}, {...pr, draft: true},
     {...pr, head: {sha: 'e'.repeat(40)}}, {...pr, base: {...pr.base, ref: 'master'}},
@@ -53,7 +80,7 @@ test('second review is not posted if the PR changed in any way CI also checks', 
   // During collection too: a retarget between the two reads aborts.
   let reads = 0;
   const api = {...fakeApi(), json: () => (reads++ ? {...pr, base: {...pr.base, ref: 'master'}} : pr)};
-  assert.throws(() => collect(7, api), /changed during collection/);
+  await assert.rejects(collect(7, api), /changed during collection/);
 });
 
 test('second review report is validated, escaped and applies the path floor', () => {
@@ -81,7 +108,7 @@ test('Fable second review runs the CI analysis with separate system and untruste
     core.setOutput('conclusion', 'success');
     core.setOutput('telemetry', JSON.stringify({served_model: 'claude-fable-5-2'}));
   };
-  const c = collect(7, fakeApi());
+  const c = await collect(7, fakeApi());
   const result = await runFable(c, dir, {ANTHROPIC_API_KEY: 'k', OTHER: 'x'}, analyse);
   assert.equal(result, report);
   assert.equal(seen.env.CLAUDE_REVIEW_MODEL, 'claude-fable-5-2');
@@ -92,7 +119,7 @@ test('Fable second review runs the CI analysis with separate system and untruste
 
 test('Fable second review needs a key; analysis failure and any fallback model fail', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 's4f-fable-'));
-  const c = collect(7, fakeApi());
+  const c = await collect(7, fakeApi());
   await assert.rejects(runFable(c, dir, {}, async () => {}), /ANTHROPIC_API_KEY/);
   await assert.rejects(runFable(c, dir, {ANTHROPIC_API_KEY: 'k'}, async ({core}) => {
     core.setOutput('conclusion', 'failure');

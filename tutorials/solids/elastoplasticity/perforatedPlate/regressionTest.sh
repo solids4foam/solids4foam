@@ -41,15 +41,18 @@ YIELD_MAX=44
 # tutorial log, per fork. The log gives six figures, so a round-off
 # difference on another machine can move the last one; the tolerance, 1e-5
 # relative, is a few units in that digit. A plastic history error would show
-# here as a difference the unit checks cannot see
+# here as a difference the unit checks cannot see. OpenFOAM.com and
+# OpenFOAM.org gave 0.00547495 and 1.87848e+08 until solidSymmetry took its
+# non-orthogonal correction from Cf - Cn (#748): before, the correction was
+# zero on these forks, and with it they now agree with foam-extend
 case "$(solids4Foam::foamFlavour)" in
     com)
-        REF_EPS=0.00547495
-        REF_SIG=1.87848e+08
+        REF_EPS=0.00547921
+        REF_SIG=1.87903e+08
         ;;
     org)
-        REF_EPS=0.00547495
-        REF_SIG=1.87848e+08
+        REF_EPS=0.00547921
+        REF_SIG=1.87903e+08
         ;;
     foamextend)
         REF_EPS=0.00547921

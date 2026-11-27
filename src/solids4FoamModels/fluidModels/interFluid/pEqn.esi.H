@@ -63,6 +63,10 @@
 
             U = HbyA + rAU()*fvc::reconstruct((phig - p_rghEqn.flux())/rAUf);
             U.correctBoundaryConditions();
+
+            // The registered velocity gradient, which boundary conditions with
+            // a non-orthogonal correction look up (as in pimpleFluid)
+            gradU() = fvc::grad(U);
             // fvOptions.correct(U);
         }
     }
