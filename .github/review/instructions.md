@@ -18,14 +18,41 @@ results independently.
 
 ## Risk
 
-Classify by potential consequences, not diff size. Use the highest applicable
-risk. Explain the reason. If uncertain, raise the risk and explain the uncertainty.
+Classify by consequences, not by diff size or by which directory is touched.
+Explain the reason in terms of which existing cases or users are affected.
 
-- LOW: Documentation or changes unlikely to affect results or existing behaviour.
-- MEDIUM: Isolated functionality, such as a new boundary condition or utility.
-- HIGH: Core numerical operators, constitutive models, nonlinear solvers, FSI
-  coupling, central abstractions, existing solver behaviour, security, or CI
-  permissions. A one-line default change can be HIGH.
+- LOW: no change to results or behaviour: documentation, comments, READMEs,
+  new tests, or a change confined to one tutorial's own set-up, plots or
+  scripts.
+- MEDIUM: an opt-in addition (a new boundary condition, law, utility or option
+  that is off by default), a fix confined to one class or one tutorial, or a
+  change whose effect on existing results is small and limited to the cases
+  that select it.
+- HIGH: the results of many existing cases change by default: shared operators,
+  discretisation or interpolation used across models, default values, widely
+  used constitutive laws or boundary conditions, the FSI coupling algorithm,
+  restart data, or the build of the whole library. Also security, CI and agent
+  configuration. A one-line default change can be HIGH.
+
+Calibration from past PRs:
+
+- #760, HIGH: non-orthogonal corrections in widely used boundary conditions
+  were zero on OpenFOAM.com and .org; the fix moves results of many existing
+  cases on non-orthogonal meshes.
+- #763, MEDIUM: the stress in five hyperelastic laws rewritten so that zero
+  deformation gives exactly zero stress; equivalent in exact arithmetic,
+  differing only at round-off.
+- #735, MEDIUM: a new outlet boundary condition, used only by cases that
+  select it.
+- #743, LOW: one scheme changed in one tutorial's `fvSchemes`, affecting only
+  that case and its own reference values.
+
+When unsure between two levels, choose the lower and add a checklist item
+naming the question whose answer would raise it. Choose the higher only when
+the doubt concerns security or a change to default behaviour. Automatic floors
+apply after you: CI and agent configuration are HIGH by path, and changed
+regression references in several tutorials make a PR HIGH. Do not raise the
+risk just because a floor exists.
 
 Risk is advisory. It does not authorise merging or change approval requirements.
 
@@ -51,19 +78,38 @@ tolerances, and suitable convergence or regression evidence. Identify missing
 evidence explicitly. Documentation alone does not need numerical tests.
 Treat author statements as reported evidence, not independently verified facts.
 
-Provide a short human-review checklist (at most five items). Include numerical
-and architectural decisions that need experienced judgement. Welcome technical
-assessments from contributing reviewers. Final approval and merging remain with
-core maintainers. Review the changed lines in the supplied patches. CI results,
-linked evidence, and any source not supplied have not been independently
-inspected. State these limits in the verification assessment.
+Review the changed lines in the supplied patches. CI results, linked evidence,
+and any source not supplied have not been independently inspected. State these
+limits in the verification assessment. Report only findings supported by the
+supplied evidence. The fixed publisher displays all findings; it does not use
+a synthesis model to dismiss unresolved concerns. You are one independent
+reviewer; never claim the two-reviewer policy has been satisfied.
 
-This is a standard AI assessment. Invite independent human judgement and
-verification rather than another full pasted AI review. Report only findings
-supported by the supplied evidence. The fixed publisher displays all findings;
-it does not use a synthesis model to dismiss unresolved concerns. You are one
-independent reviewer. MEDIUM and HIGH risk also need a second, independent AI
-review; never claim the two-reviewer policy has been satisfied.
+## Human review checklist
+
+The checklist tells a maintainer what to check or decide that you could not.
+Give one to five items, most important first; fewer good items are better than
+five weak ones. Each item:
+
+- starts with a verb and names where to look (file, function, case, log or
+  plot) and what result settles it, e.g. "Run `hotSphere` on OpenFOAM.org and
+  confirm `max(D)` moves by less than 1e-4 relative";
+- is a check or decision a person can make, such as a numerical judgement,
+  an architectural choice, evidence to inspect, or a missing case to run;
+- does not restate a finding; refer to it ("Decide on the sign question in
+  the second finding") only when it needs a human decision.
+
+Do not include:
+
+- process or policy text (second reviews, who approves or merges, welcoming
+  reviewers): a fixed section of the report already states it;
+- generic advice ("use independent judgement", "check carefully");
+- builds or the regression suite in general. CI builds every PR on OpenFOAM
+  v2312, v2412, v2512, OpenFOAM-9 and foam-extend-4.1, with and without
+  PETSc, runs `tutorials/Alltest-regression` on v2512, OpenFOAM-9 and
+  foam-extend-4.1 with PETSc, and checks whitespace, Markdown, links and
+  tutorial READMEs. You may ask for a specific case, variant or parallel run
+  that CI does not cover.
 
 ## Repository guide and coverage
 

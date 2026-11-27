@@ -288,21 +288,43 @@ function classifyRisk(proposed, floor) {
   if (!risks.includes(proposed) || !risks.includes(floor)) return 'HIGH';
   return risks[Math.max(risks.indexOf(proposed), risks.indexOf(floor))];
 }
+// Automatic floors. Only the trust boundary (CI, agent configuration, the
+// published images and the merge rules) is HIGH by path, because a PR there
+// could steer the model. For other code the model judges HIGH from the
+// consequences, with referenceRisk as a backstop.
 function pathRisk(path) {
-  if (/^(\.github\/|\.claude\/|\.agents\/|\.docker\/|tests\/|applications\/scripts\/)/.test(path) ||
-      /(^|\/)(CLAUDE(\.local)?\.md|AGENTS\.md|SECURITY\.md|CODEOWNERS|\.gitmodules|\.mcp\.json|\.claude\.json|Allwmake|Allwclean)$/.test(path)) {
+  if (/^(\.github\/|\.claude\/|\.agents\/|\.docker\/)/.test(path) || path === 'CONTRIBUTING.md' ||
+      /(^|\/)(CLAUDE(\.local)?\.md|AGENTS\.md|SECURITY\.md|CODEOWNERS|\.gitmodules|\.mcp\.json|\.claude\.json)$/.test(path)) {
     return 'HIGH';
   }
-  if (/^src\/(blockCoupledSolids4FoamTools\/|immersedBoundary\/|RBFMeshMotionSolver\/|solids4FoamModels\/(numerics|mechanicalConstitutiveLaw|materialModels|physicsModel|fluidSolidInterfaces|interfaceToInterfaceMapping|Make)[^/]*\/)/.test(path) ||
-      (/^src\/solids4FoamModels\/(solidModels|fluidModels)\//.test(path) &&
-       !/\/(fvPatchFields|pointPatchFields)\//.test(path)) ||
-      /^applications\/solvers\//.test(path)) return 'HIGH';
-  if (path.startsWith('src/')) return 'MEDIUM';
   return /\.(md|rst|txt|png|jpg|jpeg|svg|pdf)$/i.test(path) ? 'LOW' : 'MEDIUM';
+}
+// A PR that changes existing regression references in at least this many
+// tutorials changes existing results broadly: HIGH whatever the model says.
+const referenceTutorials = 2;
+// An existing tutorial regressionTest.sh that loses a non-comment line holding
+// a number (a reference value or tolerance), or whose patch is not available.
+function changesReference(file) {
+  if (!/^tutorials\/.+\/regressionTest\.sh$/.test(file.filename) ||
+      !['modified', 'renamed', 'changed'].includes(file.status)) return false;
+  if (typeof file.patch !== 'string') return true;
+  return file.patch.split('\n').some(line =>
+    /^-(?!--)/.test(line) && !/^-\s*#/.test(line) && /\d/.test(line));
+}
+function referenceRisk(files) {
+  return files.filter(changesReference).length >= referenceTutorials ? 'HIGH' : 'LOW';
 }
 function riskFloor(files) {
   return files.reduce((floor, file) => [file.filename, file.previous_filename].filter(Boolean)
-    .reduce((risk, path) => classifyRisk(pathRisk(path), risk), floor), 'LOW');
+    .reduce((risk, path) => classifyRisk(pathRisk(path), risk), floor), referenceRisk(files));
+}
+// Process and policy text belongs in the fixed "Review process" section, not
+// in the checklist; such items are left out of the rendered report.
+const processItem = /second (independent )?AI review|two-reviewer|contributing reviewers?\b[^.]*welcome|approval and merging|merging remain|core maintainers? (must|decide|approve)/i;
+function checklist(items, text) {
+  const kept = items.filter(item => !processItem.test(item));
+  return kept.length ? kept.map(item => `- [ ] ${text(item)}`).join('\n') :
+    '_No item beyond the findings above._';
 }
 function formatAssessment(data, risk, floor, max = Infinity) {
   const text = value => plain(value, max);
@@ -315,11 +337,11 @@ function formatAssessment(data, risk, floor, max = Infinity) {
   return `**Status: analysis completed. Advisory only; no approval.**\n\n` +
     (max === Infinity ? '' : '_Some report text was shortened to fit the GitHub comment ' +
       'size limit; no finding was removed._\n\n') +
-    `**Risk: ${risk}** (path floor: ${risks.includes(floor) ? floor : 'HIGH, unavailable'})\n\n` +
+    `**Risk: ${risk}** (automatic floor: ${risks.includes(floor) ? floor : 'HIGH, unavailable'})\n\n` +
     `${text(data.reason)}\n\n### Summary\n\n${text(data.summary)}\n\n### Findings\n\n` +
     (findings || 'No actionable issue identified in the supplied evidence.') +
     `\n\n### Verification evidence and limits\n\n${text(data.verification)}\n\n` +
-    `### Human review checklist\n\n` + data.human_review.map(item => `- [ ] ${text(item)}`).join('\n') +
+    `### Human review checklist\n\n` + checklist(data.human_review, text) +
     '\n\nContributing reviewer: what did you independently check? ' +
     'Use this standard AI report; core maintainers decide approval and merging.';
 }
@@ -668,5 +690,5 @@ async function publish({github, context, core}, env = process.env) {
 }
 module.exports = {promptBudget, maxFullFiles, maxFullFileBytes, fullFileCandidates, fileText,
   fetchFullFiles, buildReviewPrompt, riskLabels, incompleteLabel, setRiskLabels, secondMarker,
-  secondReviewRisk, risks, schema, apiSchema, analyse, inputFile, replayContent, addUsage, retryDelay, clientOptions, maxRequests, analysisReasons, httpStatus, limits, maxReportChars, maxReportBytes, commentLimit, fitComment, validate, classifyRisk, pathRisk, riskFloor, buildPrompt,
+  secondReviewRisk, risks, schema, apiSchema, analyse, inputFile, replayContent, addUsage, retryDelay, clientOptions, maxRequests, analysisReasons, httpStatus, limits, maxReportChars, maxReportBytes, commentLimit, fitComment, validate, classifyRisk, pathRisk, referenceRisk, riskFloor, buildPrompt,
   formatAssessment, formatCoverage, secondReviewNotice, plain, prepare, publish};

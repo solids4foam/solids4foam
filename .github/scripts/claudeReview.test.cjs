@@ -1,7 +1,8 @@
 const {test} = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
-const {prepare, publish, validate, classifyRisk, formatAssessment, pathRisk, riskFloor, buildPrompt, schema,
+const {prepare, publish, validate, classifyRisk, formatAssessment, pathRisk, referenceRisk, riskFloor,
+  buildPrompt, schema,
   limits, maxReportBytes, commentLimit, promptBudget, setRiskLabels, secondReviewRisk,
   secondMarker, fullFileCandidates, fileText, fetchFullFiles, buildReviewPrompt, formatCoverage,
   maxFullFiles, maxFullFileBytes, fitComment} = require('./claudeReview.cjs');
@@ -405,21 +406,59 @@ test('manifest space survives the guide: a 120-file PR is still reviewable', () 
   assert.equal(result.coverage.status, 'complete');
 });
 
-test('path floors cover core numerics, agents, build scripts, renamed and omitted files', () => {
-  for (const path of ['src/solids4FoamModels/mechanicalConstitutiveLaw/law.C',
-    'src/solids4FoamModels/fluidSolidInterfaces/interface.C',
-    'src/solids4FoamModels/solidModels/nonlinear/solver.C',
-    'src/solids4FoamModels/numerics/operator.C', 'src/blockCoupledSolids4FoamTools/solver.H',
+test('path floors: trust boundary HIGH, code MEDIUM, documents LOW, renamed files count', () => {
+  for (const path of ['.github/workflows/ci.yml', '.github/review/instructions.md',
     '.claude/settings.json', '.agents/skills/test.md', '.gitmodules', '.mcp.json',
-    'src/solids4FoamModels/Make/options',
-    '.docker/build', 'Allwmake', 'applications/scripts/check.sh', 'tests/check.sh']) {
+    '.claude.json', '.docker/build', 'CLAUDE.md', 'AGENTS.md', 'CODEOWNERS', 'SECURITY.md',
+    'CONTRIBUTING.md']) {
     assert.equal(pathRisk(path), 'HIGH', path);
   }
-  assert.equal(pathRisk('src/solids4FoamModels/solidModels/fvPatchFields/newBC.C'), 'MEDIUM');
-  assert.equal(pathRisk('README.md'), 'LOW');
-  assert.equal(pathRisk('tutorials/case/0/D'), 'MEDIUM');
+  for (const path of ['src/solids4FoamModels/mechanicalConstitutiveLaw/law.C',
+    'src/solids4FoamModels/fluidSolidInterfaces/interface.C',
+    'src/solids4FoamModels/numerics/operator.C', 'src/solids4FoamModels/Make/options',
+    'applications/solvers/solids4Foam/solids4Foam.C', 'Allwmake',
+    'applications/scripts/check.sh', 'tests/check.sh', 'tutorials/case/0/D']) {
+    assert.equal(pathRisk(path), 'MEDIUM', path);
+  }
+  for (const path of ['README.md', 'src/solids4FoamModels/materialModels/README.md',
+    'tutorials/case/README.md', 'docs/figure.png']) {
+    assert.equal(pathRisk(path), 'LOW', path);
+  }
   assert.equal(riskFloor([{filename: 'README.md', previous_filename: 'CLAUDE.md'}]), 'HIGH');
-  assert.equal(riskFloor([{filename: '.github/workflows/ci.yml'}]), 'HIGH');
+  assert.equal(riskFloor([{filename: 'docs/CONTRIBUTING.md'}]), 'LOW');
+});
+
+test('changed regression references in two or more tutorials force HIGH', () => {
+  const reference = (dir, patch, status = 'modified') =>
+    ({filename: `tutorials/${dir}/regressionTest.sh`, status, patch});
+  const value = '@@ -45,2 +45,2 @@\n-        REF_EPS=0.00547495\n+        REF_EPS=0.00547921';
+  const comment = '@@ -41,2 +41,2 @@\n-# tolerance 1e-5 relative\n+# tolerance, 1e-5 relative';
+  assert.equal(referenceRisk([reference('solids/a', value)]), 'LOW');
+  assert.equal(referenceRisk([reference('solids/a', value), reference('solids/b', value)]), 'HIGH');
+  assert.equal(riskFloor([reference('solids/a', value), reference('solids/b', value)]), 'HIGH');
+  // Comments, new tutorials and files that are not regression tests do not count.
+  assert.equal(referenceRisk([reference('solids/a', value), reference('solids/b', comment)]), 'LOW');
+  assert.equal(referenceRisk([reference('solids/a', value), reference('solids/b', value, 'added')]),
+    'LOW');
+  assert.equal(referenceRisk([reference('solids/a', value),
+    {filename: 'tutorials/solids/b/Allrun', status: 'modified', patch: value}]), 'LOW');
+  // A patch GitHub leaves out (too large) counts.
+  assert.equal(referenceRisk([reference('solids/a', value), reference('solids/b', undefined)]),
+    'HIGH');
+  assert.equal(riskFloor([reference('solids/a', value)]), 'MEDIUM');
+});
+
+test('process and policy items are left out of the rendered checklist', () => {
+  const data = JSON.parse(response('MEDIUM'));
+  data.human_review = ['Run hotSphere on OpenFOAM.org and confirm max(D) moves by < 1e-4.',
+    'Contributing reviewers are welcome to assess the sign.',
+    'A second independent AI review is still required.',
+    'Final approval and merging remain with core maintainers.'];
+  const rendered = formatAssessment(data, 'MEDIUM', 'MEDIUM').split('### Human review checklist')[1];
+  assert.match(rendered, /Run hotSphere/);
+  assert.doesNotMatch(rendered, /welcome to|second independent|remain with/);
+  data.human_review = ['A second AI review is still required.'];
+  assert.match(formatAssessment(data, 'MEDIUM', 'MEDIUM'), /No item beyond the findings above/);
 });
 
 test('structured findings validate and render evidence separately', () => {
