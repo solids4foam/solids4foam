@@ -1,0 +1,48 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    location    "0";
+    object      p;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 2 -2 0 0 0 0];
+
+internalField   uniform 0;
+
+boundaryField
+{
+    WALL
+    {
+        type            zeroGradient;
+    }
+
+    // Mitral valve plane: the circuit takes the inflow Qmv through this patch
+    // and returns the pressure on the ventricular side of the mitral valve,
+    // Pmv = P_LA - dP(Qmv), as p/rho
+    INLET
+    {
+        type            circulationPressure;
+        value           uniform 0;
+    }
+
+    // Aortic valve plane: outflow Qav; Pav = P_SAS + dP(Qav)
+    OUTLET
+    {
+        type            circulationPressure;
+        value           uniform 0;
+    }
+}
+
+// ************************************************************************* //

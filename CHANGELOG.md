@@ -8,6 +8,21 @@ release. For complete commit-level details and contributor information, see the
 
 ### Added
 
+- The `leftVentricle` tutorial, `tutorials/fluids/circulationModels`: a 3D
+  left ventricle with a prescribed moving wall whose mitral and aortic valve
+  planes are coupled to the closed-loop healthy-human circulation (a
+  `coupledDomain`), with implicit coupling of order 2 and the `BDF 2` ddt
+  scheme on a moving mesh; it plots the interface waveforms and the volume
+  exchanged between the 3D and 0D models (gnuplot). It comes with:
+  - the `circulationMeshMotion` library and its `movingVentricle` mesh motion
+    solver, which moves a wall so that the cavity volume follows the integral
+    of a prescribed wall flux (optionally a cubic spline, `smoothFlow`);
+  - the `pressureInletOutletDdtCorrVelocity` velocity condition
+    (`libcirculationCoupling`), a `pressureInletOutletVelocity` that keeps
+    the `ddtCorr` flux correction on a coupled valve plane;
+  - an optional `reverseDPmax` in the `valve` dictionary of a `coupledDomain`
+    port, which bounds the adverse pressure of a shut, leaking valve. Without
+    it the valve law is unchanged.
 - Cardiac elastodynamics benchmark tutorials of Aróstica et al. (2025),
   `tutorials/solids/hyperelasticity/ArosticaEtAl2025`: `benchmark1`, an
   idealised left ventricle (steps 0A, 0B, 1 and the blinded 2A to 2C) on an

@@ -1,0 +1,64 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      controlDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// libcirculationCoupling: the circulationPressure and
+// pressureInletOutletDdtCorrVelocity conditions; libsolids4FoamModels: the
+// BDF ddt scheme
+libs            ("libcirculationCoupling.so" "libsolids4FoamModels.so");
+
+application     pimpleFoam;
+
+startFrom       startTime;
+
+startTime       0;
+
+stopAt          endTime;
+
+// Three cardiac cycles from rest; the analysis uses the third, 2-3 s
+endTime         3;
+
+deltaT          1e-4;
+
+adjustTimeStep  no;
+
+// One write per cardiac cycle. A run can restart from a write, with the
+// circuit state from its checkpoint, but on this moving mesh the BDF order
+// ramps up again from first order over the first steps after the restart.
+// The circuit state, the patch flows and the patch pressures of every step
+// are written at full precision to
+// postProcessing/circulationCoupling/0/coupling.dat
+writeControl    runTime;
+
+writeInterval   1;
+
+purgeWrite      0;
+
+writeFormat     binary;
+
+writePrecision  17;
+
+writeCompression off;
+
+timeFormat      general;
+
+timePrecision   12;
+
+runTimeModifiable false;
+
+// ************************************************************************* //

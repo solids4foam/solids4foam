@@ -79,7 +79,9 @@ probes ( Qin.out );             // optional: also report the pressure at a termi
 * `valvedChamber`: inlet valve + chamber + outlet valve. Parameters:
   `chamber {} inletValve {} outletValve {}`.
 * `coupledDomain`: external (3D) replacement for `valvedChamber`. Parameters:
-  `provider`, `inlet {} outlet {}`.
+  `provider`, `inlet {} outlet {}`, each with `patch` and an optional
+  `valve { CQ; reverseFraction; reverseDPmax; }`, the inverse valve law at the
+  patch (`reverseDPmax` bounds the adverse pressure of a shut valve).
 
 Waveforms: `constant`, `sine`, `halfSine`, `table` (whitespace file,
 `column`, optional `periodic`).
@@ -270,8 +272,11 @@ and `libs ("libcirculationCoupling.so");` in `controlDict`. See
 * `pipeWindkessel`: a CFD pipe (`solids4Foam`, `pimpleFluid`) coupled to a
   Windkessel; `scheme explicit/implicit` and `order 1..4` chosen in the
   dictionary, compared with the exact solution.
+* `leftVentricle`: a CFD left ventricle (`pimpleFoam`) with a prescribed
+  moving wall (`movingVentricle`), whose mitral and aortic planes are coupled
+  to the closed-loop healthy-human circulation (a `coupledDomain`).
 
-Both CFD cases also run with stock `pimpleFoam` (`./Allrun pimpleFoam`).
+The two pipe cases also run with stock `pimpleFoam` (`./Allrun pimpleFoam`).
 
 ## Verification
 

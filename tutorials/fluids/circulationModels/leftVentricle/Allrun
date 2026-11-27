@@ -1,0 +1,111 @@
+#!/bin/bash
+# A left ventricle with a prescribed moving wall, its mitral and aortic valve
+# planes coupled to a closed-loop circulation (implicit coupling of order 2,
+# deltaT 1e-4, three cardiac cycles). Runs on the numberOfSubdomains ranks of
+# system/decomposeParDict (8); about 30,000 steps, so expect hours.
+#
+#   ./Allrun              the ventricle solved by stock pimpleFoam
+cd "$(dirname "$0")" || exit 1
+: "${WM_PROJECT_DIR:?OpenFOAM environment not sourced}"
+
+solver=pimpleFoam
+
+print_usage()
+{
+    cat <<'USAGE'
+Usage:
+  ./Allrun              # the ventricle solved by stock pimpleFoam
+USAGE
+}
+
+for arg in "$@"
+do
+    case "$arg" in
+        pimpleFoam)
+            solver=$arg
+            ;;
+        help|-h|--help)
+            print_usage
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $arg"
+            print_usage
+            exit 1
+            ;;
+    esac
+done
+
+# Source solids4Foam scripts (on macOS, this keeps the OpenFOAM libraries findable)
+source solids4FoamScripts.sh
+
+# The circulation models are currently only built for OpenFOAM.com
+solids4Foam::caseDoesNotRunWithFoamExtend
+solids4Foam::caseDoesNotRunWithOpenFOAMOrg
+
+if ! command -v cartesianMesh &> /dev/null
+then
+    echo
+    echo "cartesianMesh command not found, which is required for this case"
+    echo
+    exit 0
+fi
+
+np=$(solids4Foam::getNumberOfProcessors system/decomposeParDict)
+
+solids4Foam::runApplication cartesianMesh || exit 1
+solids4Foam::runApplication checkMesh || exit 1
+grep -E "^\s+cells:|Total volume" log.checkMesh
+
+echo "--- ${solver} on $np rank(s) (progress: tail -f log.${solver}) ---"
+if [ "$np" -gt 1 ]; then
+    solids4Foam::runApplication decomposePar || exit 1
+    solids4Foam::runParallel "${solver}" || exit 1
+else
+    solids4Foam::runApplication "${solver}" || exit 1
+fi
+echo "done: postProcessing/circulationCoupling/0/coupling.dat"
+
+# Volume conservation: the change in the ventricle volume (the mesh volume
+# the movingVentricle motion solver reaches at each step, from the log)
+# against the change in the volume stored in the circulation, the sum of its
+# compliance and chamber volumes (from the coupling record), both from the
+# first step, in mL. The circuit exchanges volume only with the ventricle, so
+# dV_LV = -dV_0D.
+awk '
+    FNR == NR {
+        if ($1 == "Time" && $2 == "=") t = sprintf("%.10g", $3)
+        if ($1 == "Converged:" && $2 == "volume") V[t] = $4
+        next
+    }
+    $1 == "#" && $2 == "time" {
+        n = split("SAS.C.V SAT.C.V SVN.C.V PAS.C.V PAT.C.V PVN.C.V RA.V RV.V LA.V", s, " ")
+        for (i = 3; i <= NF; i++) for (k = 1; k <= n; k++) if ($i == s[k]) c[k] = i - 1
+        for (k = 1; k <= n; k++) if (!(k in c)) { print "no column " s[k] > "/dev/stderr"; exit 1 }
+        print "# time dV_LV(mL) -dV_0D(mL) dV_LV+dV_0D(mL)"
+        next
+    }
+    /^#/ || NF == 0 { next }
+    {
+        t = sprintf("%.10g", $1)
+        if (!(t in V)) next
+        V0D = 0
+        for (k = 1; k <= n; k++) V0D += $c[k]
+        if (!started) { VLV1 = V[t]; V0D1 = V0D; started = 1 }
+        dLV = 1e6*(V[t] - VLV1)
+        d0D = 1e6*(V0D - V0D1)
+        printf "%s %.10e %.10e %.6e\n", $1, dLV, -d0D, dLV + d0D
+    }
+' "log.${solver}" postProcessing/circulationCoupling/0/coupling.dat \
+    > volumeConservation.dat || exit 1
+awk '!/^#/ { s = $4 < 0 ? -$4 : $4; if (s > m) m = s }
+     END { printf "max |dV_LV + dV_0D| = %.3g mL\n", m }' volumeConservation.dat
+
+# Plot the results
+if command -v gnuplot &> /dev/null
+then
+    echo "Generating interface.png and volumeConservation.png using gnuplot"
+    gnuplot plot.gnuplot 2> /dev/null
+else
+    echo "Please install gnuplot if you would like to generate the plots"
+fi

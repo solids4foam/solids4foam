@@ -1,0 +1,109 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      fvSolution;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+solvers
+{
+    p
+    {
+        solver          GAMG;
+        tolerance       1e-10;
+        relTol          0.01;
+        smoother        GaussSeidel;
+        nPreSweeps      0;
+        nPostSweeps     2;
+        cacheAgglomeration yes;
+        updateInterval  2;
+    }
+
+    pFinal
+    {
+        $p;
+        relTol          0;
+    }
+
+    "pcorr.*"
+    {
+        $p;
+        relTol          0;
+    }
+
+    U
+    {
+        solver          smoothSolver;
+        smoother        symGaussSeidel;
+        tolerance       1e-12;
+        relTol          0.1;
+    }
+
+    UFinal
+    {
+        $U;
+        relTol          0;
+    }
+
+    cellDisplacement
+    {
+        solver          PCG;
+        preconditioner  DIC;
+        tolerance       1e-12;
+        relTol          0;
+        minIter         3;
+    }
+
+    cellDisplacementFinal
+    {
+        $cellDisplacement;
+    }
+}
+
+PIMPLE
+{
+    correctPhi          yes;
+    momentumPredictor   yes;
+    nOuterCorrectors    200;
+    nCorrectors         2;
+    nNonOrthogonalCorrectors 2;
+    pRefCell            0;
+    pRefValue           0;
+
+    // Outer iterations to convergence of U; the normalised p residual
+    // floors on round-off and is not used
+    residualControl
+    {
+        U
+        {
+            tolerance   1e-8;
+            relTol      0;
+        }
+    }
+}
+
+relaxationFactors
+{
+    equations
+    {
+        U               1;
+    }
+    fields
+    {
+        p               1;
+    }
+}
+
+// ************************************************************************* //

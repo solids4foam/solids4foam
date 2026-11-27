@@ -1,0 +1,68 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version   2.0;
+    format    ascii;
+    class     dictionary;
+    location  "system";
+    object    meshDict;
+}
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// The cavity surface, with the patches WALL, INLET (mitral valve plane) and
+// OUTLET (aortic valve plane)
+surfaceFile "constant/geometry/leftVentricle.fms";
+
+// Mesh M3 of the mesh study (86,048 cells). The five meshes of the study
+// scale maxCellSize and maxFirstLayerThickness together, keeping the number
+// of layers and their growth ratio:
+//
+//   mesh   maxCellSize   maxFirstLayerThickness   cells
+//   M1     1.96e-3       2.94e-4                   39,433
+//   M2     1.656502e-3   2.484753e-4               57,872
+//   M3     1.4e-3        2.1e-4                    86,048
+//   M4     1.183216e-3   1.774824e-4              128,585
+//   M5     1.0e-3        1.5e-4                   192,223
+maxCellSize 1.4e-3;
+
+checkForGluedMesh 1;
+
+// Seven boundary layers growing by 1.08, on the wall and the valve planes
+boundaryLayers
+{
+    enableBoundaryLayers true;
+
+    nLayers 7;
+    thicknessRatio 1.08;
+    maxFirstLayerThickness 2.1e-4;
+
+    patchBoundaryLayers
+    {
+        INLET
+        {
+            nLayers 7;
+            thicknessRatio 1.08;
+            maxFirstLayerThickness 2.1e-4;
+            allowDiscontinuity true;
+        }
+
+        OUTLET
+        {
+            nLayers 7;
+            thicknessRatio 1.08;
+            maxFirstLayerThickness 2.1e-4;
+            allowDiscontinuity true;
+        }
+    }
+}
+
+// ************************************************************************* //
