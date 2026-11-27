@@ -1,0 +1,28 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      caseParameters;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Mesh and time step of the case: nCells cells along the interface, square
+// cells, and a time step proportional to the cell size, deltaT = 0.32/nCells.
+// verification/Allverify writes this file for each level of the study.
+nCells          16;
+nCellsFluidY    8;
+nCellsSolidY    4;
+deltaT          0.02;
+
+// ************************************************************************* //

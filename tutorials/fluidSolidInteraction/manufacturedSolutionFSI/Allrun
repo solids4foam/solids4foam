@@ -1,0 +1,63 @@
+#!/bin/bash
+set -Eeuo pipefail
+IFS=$'\n\t'
+
+usage()
+{
+    cat <<'EOF'
+Usage: ./Allrun [coupling]
+
+coupling: aitken (default), Dirichlet-Neumann with Aitken relaxation
+          robin,            Robin-Neumann with fixed relaxation
+
+The mesh and time step are set in system/caseParameters.
+EOF
+}
+
+if [[ "${1:-}" =~ ^(-h|--help)$ ]]; then
+    usage
+    exit 0
+fi
+
+COUPLING="${1:-aitken}"
+
+case "$COUPLING" in
+    aitken)
+        INTERFACE=dirichletNeumann
+        ;;
+    robin)
+        INTERFACE=robinNeumann
+        ;;
+    *)
+        echo "Error: unknown coupling '$COUPLING'"
+        usage
+        exit 1
+        ;;
+esac
+
+: "${WM_PROJECT_DIR:?OpenFOAM environment not sourced}"
+export DYLD_LIBRARY_PATH="${DYLD_LIBRARY_PATH:-}"
+: "${FOAM_LD_LIBRARY_PATH:=}"
+. "$WM_PROJECT_DIR/bin/tools/RunFunctions"
+source solids4FoamScripts.sh
+
+# The tutorial library uses the OpenFOAM.com fvOptions, and the solid model
+# uses the PETSc SNES solution algorithm
+solids4Foam::caseDoesNotRunWithFoamExtend
+solids4Foam::caseDoesNotRunWithOpenFOAMOrg
+solids4Foam::requirePetscOrExitSilently
+
+ln -vnsf "fsiProperties.$COUPLING" constant/fsiProperties
+for field in U p
+do
+    ln -vnsf "$field.$INTERFACE" "0/fluid/$field"
+done
+
+echo
+echo "Compiling tutorial library..."
+(cd src && ./Allwmake -s)
+
+solids4Foam::runApplication -s fluid blockMesh -region fluid
+solids4Foam::runApplication -s solid blockMesh -region solid
+
+solids4Foam::runApplication solids4Foam

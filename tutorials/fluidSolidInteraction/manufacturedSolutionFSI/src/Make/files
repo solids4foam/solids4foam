@@ -1,0 +1,7 @@
+mmsFsiSource.C
+mmsFsiVelocityFvPatchVectorField.C
+mmsFsiVelocityGradientFvPatchVectorField.C
+mmsFsiPressureFvPatchScalarField.C
+mmsFsiErrorsFunctionObject.C
+
+LIB = $(FOAM_MODULE_LIBBIN)/libmmsFsi

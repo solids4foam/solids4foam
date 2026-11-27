@@ -1,0 +1,42 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      solidProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+solidModel      nonLinearGeometryTotalLagrangianTotalDisplacement;
+
+nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs
+{
+    solutionAlgorithm   PETScSNES;
+    predictor           yes;
+
+    // Second-order deformed area and normal on the interface (solidTraction)
+    // faces. This entry is used from solids4foam PR #756 and is ignored
+    // before it; without it, the solid displacement falls below second order
+    // on meshes finer than n = 64 (see verification/README.md)
+    tractionPatchSurfaceGradient yes;
+
+    stabilisation
+    {
+        momentum
+        {
+            type            diffStencilLaplacian;
+            scaleFactor     0.1;
+        }
+    }
+}
+
+// ************************************************************************* //

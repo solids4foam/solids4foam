@@ -1,0 +1,70 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system/fluid";
+    object      fvSolution;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+solvers
+{
+    "p|pFinal|pcorr|pcorrFinal"
+    {
+        solver          PCG;
+        preconditioner  DIC;
+        tolerance       1e-12;
+        relTol          0;
+    }
+
+    "cellMotionU|cellDisplacement"
+    {
+        solver          PCG;
+        preconditioner  DIC;
+        tolerance       1e-12;
+        relTol          0;
+    }
+
+    "U|UFinal"
+    {
+        solver          PBiCGStab;
+        preconditioner  DILU;
+        tolerance       1e-12;
+        relTol          0;
+    }
+}
+
+PIMPLE
+{
+    momentumPredictor   on;
+
+    // Two outer correctors update the convecting flux within the time step;
+    // with one, the fluid alone is first order in time. In this coupled case
+    // the FSI correctors already do this, and one outer corrector gives the
+    // same errors to four digits
+    nOuterCorrectors    2;
+    nCorrectors         4;
+    nNonOrthogonalCorrectors 1;
+
+    // The ddtCorr flux correction adds an error that grows as the time step
+    // falls on a fixed mesh
+    ddtCorr             no;
+
+    // Make the outlet flux consistent with the boundary velocity, which
+    // removes a first-order pressure error layer in the outlet cells. Uncomment
+    // with solids4foam PR #776: without it, pimpleFluid stops with a fatal
+    // error, as the outlet velocity condition does not fix the value
+    // fluxConsistentPatches (outlet);
+}
+
+// ************************************************************************* //
