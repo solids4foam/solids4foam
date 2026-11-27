@@ -2428,6 +2428,24 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
     solidFdJacobianPtr_(),
     solidFdJacobianDeltaT_(-1),
     solidFdJacobianDeltaT0_(-1),
+    solidFdJacobianTimeIndex_(-1),
+    solidJacobianRebuildTolerance_
+    (
+        fsiProperties().lookupOrDefault<scalar>
+        (
+            "solidJacobianRebuildTolerance",
+            0.05
+        )
+    ),
+    solidJacobianCheckTolerance_
+    (
+        fsiProperties().lookupOrDefault<scalar>
+        (
+            "solidJacobianCheckTolerance",
+            1e-4
+        )
+    ),
+    solidFdBuildTimeStepStart_(0),
     useFdSolidJacobian_(solidJacobian_ == "colouredFiniteDifference"),
     solidJacobianSelection_(false),
     solidJacobianTrialInterval_
@@ -3718,6 +3736,9 @@ void newtonQuasiMonolithicCouplingInterface::selectSolidJacobian()
         return;
     }
 
+    solidFdBuildTimeStepStart_ =
+        solidFdJacobianPtr_.valid() ? solidFdJacobianPtr_->buildTime() : 0;
+
     // Paired trial: the compact block at step solidJacobianNextTrial_, the
     // finite-difference block at the next step; otherwise keep the current
     // selection. The first step uses the compact block (start-up)
@@ -3753,7 +3774,15 @@ void newtonQuasiMonolithicCouplingInterface::recordSolidJacobianSolveTime
         return;
     }
 
-    const scalar t = returnReduce(solveTime, maxOp<scalar>());
+    // The one-off build of the finite-difference block is not charged to the
+    // trial: with deltaTChange it is not repeated
+    const scalar buildTime =
+        solidFdJacobianPtr_.valid()
+      ? solidFdJacobianPtr_->buildTime() - solidFdBuildTimeStepStart_
+      : 0;
+
+    const scalar t =
+        returnReduce(max(solveTime - buildTime, scalar(0)), maxOp<scalar>());
 
     if (solidJacobianStep_ == solidJacobianNextTrial_)
     {
@@ -3903,13 +3932,26 @@ label newtonQuasiMonolithicCouplingInterface::formJacobian
                 );
             }
 
-            const scalar deltaT = physicsModel::runTime().deltaTValue();
-            const scalar deltaT0 = physicsModel::runTime().deltaT0Value();
+            const Time& runTime = physicsModel::runTime();
+            const scalar deltaT = runTime.deltaTValue();
+            const scalar deltaT0 = runTime.deltaT0Value();
+            const label timeIndex = runTime.timeIndex();
+            const scalar tol = solidJacobianRebuildTolerance_*deltaT;
+
+            // Rebuild: always; on the first use; at the second step of a run
+            // if built in the first (whose time scheme may differ); when the
+            // time step or the previous time step has changed
             const bool rebuild =
                 solidJacobianRebuild_ == "always"
              || !solidFdJacobianPtr_->built()
-             || mag(deltaT - solidFdJacobianDeltaT_) > SMALL*deltaT
-             || mag(deltaT0 - solidFdJacobianDeltaT0_) > SMALL*deltaT;
+             || (
+                    solidFdJacobianTimeIndex_ == runTime.startTimeIndex() + 1
+                 && timeIndex > solidFdJacobianTimeIndex_
+                )
+             || mag(deltaT - solidFdJacobianDeltaT_) > tol
+             || mag(deltaT0 - solidFdJacobianDeltaT0_) > tol;
+
+            const bool firstBuild = !solidFdJacobianPtr_->built();
 
             solidFdJacobianPtr_->apply(subMats[1][1], xSolid, rebuild);
 
@@ -3917,10 +3959,30 @@ label newtonQuasiMonolithicCouplingInterface::formJacobian
             {
                 solidFdJacobianDeltaT_ = deltaT;
                 solidFdJacobianDeltaT0_ = deltaT0;
+                solidFdJacobianTimeIndex_ = timeIndex;
 
-                if (solidJacobianCheck_)
+                // The pattern assumes that the solid residual of a cell
+                // depends on the cells within two layers only; a wider
+                // dependence (or a residual that is not differentiable)
+                // would give a wrong block without any error, so the block is
+                // checked against a directional derivative of the residual
+                // after its first build
+                if (firstBuild || solidJacobianCheck_)
                 {
-                    solidFdJacobianPtr_->check(xSolid);
+                    const scalar relErr = solidFdJacobianPtr_->check(xSolid);
+
+                    if (firstBuild && relErr > solidJacobianCheckTolerance_)
+                    {
+                        FatalErrorInFunction
+                            << "The coloured finite-difference solid block "
+                            << "differs from a directional derivative of the "
+                            << "solid residual by " << relErr << " (> "
+                            << "solidJacobianCheckTolerance "
+                            << solidJacobianCheckTolerance_ << "): the solid "
+                            << "residual depends on cells beyond two layers, "
+                            << "or is not differentiable. Use "
+                            << "solidJacobian compact" << exit(FatalError);
+                    }
                 }
             }
         }

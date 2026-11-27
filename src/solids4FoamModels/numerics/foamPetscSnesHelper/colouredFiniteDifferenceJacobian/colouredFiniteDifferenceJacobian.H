@@ -29,7 +29,9 @@ Description
     two columns of a colour share a row) and differences the residual once per
     colour (MatFDColoring). The PETSc objects and the colouring are created on
     the first build and reused; the values can be rebuilt or reused at each
-    request. Works in serial and in parallel.
+    request. Works in serial and in parallel. PETSc options of the colouring
+    and of the differencing take the prefix "solid_fd_" (e.g.
+    -solid_fd_mat_fd_coloring_err).
 
     The residual must be a function of the unknowns only (as required by
     -snes_mf_operator); the residual is re-evaluated at the unperturbed state
@@ -144,10 +146,16 @@ public:
             return nBuilds_;
         }
 
-        //- Number of colours (residual evaluations per build per colour)
+        //- Number of colours (residual evaluations per build)
         label nColours() const
         {
             return nColours_;
+        }
+
+        //- CPU time spent building, summed over the builds
+        scalar buildTime() const
+        {
+            return buildTime_;
         }
 
         //- Destroy the PETSc objects so that the next apply sets them up again

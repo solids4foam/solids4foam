@@ -60,6 +60,10 @@ void Foam::colouredFiniteDifferenceJacobian::setUp(Mat compact)
     MatColoring mc;
     ISColoring isColouring;
     AssertPETSc(MatColoringCreate(J_, &mc));
+    AssertPETSc
+    (
+        PetscObjectSetOptionsPrefix(PetscObject(mc), "solid_fd_")
+    );
     AssertPETSc(MatColoringSetDistance(mc, 2));
     AssertPETSc(MatColoringSetType(mc, MATCOLORINGGREEDY));
     AssertPETSc(MatColoringSetFromOptions(mc));
@@ -68,6 +72,10 @@ void Foam::colouredFiniteDifferenceJacobian::setUp(Mat compact)
 
     AssertPETSc(MatFDColoringCreate(J_, isColouring, &fdc_));
     AssertPETSc(MatFDColoringSetFunction(fdc_, residual, &system_));
+    AssertPETSc
+    (
+        PetscObjectSetOptionsPrefix(PetscObject(fdc_), "solid_fd_")
+    );
     AssertPETSc(MatFDColoringSetFromOptions(fdc_));
     AssertPETSc(MatFDColoringSetUp(J_, isColouring, fdc_));
 
@@ -159,7 +167,11 @@ void Foam::colouredFiniteDifferenceJacobian::apply
         // Leave the fields of the system at the unperturbed state
         Vec f;
         AssertPETSc(VecDuplicate(x, &f));
-        system_.formResidual(f, x);
+        if (system_.formResidual(f, x) != 0)
+        {
+            FatalErrorInFunction
+                << name_ << ": residual evaluation failed" << abort(FatalError);
+        }
         AssertPETSc(VecDestroy(&f));
 
         ++nBuilds_;
@@ -198,7 +210,7 @@ Foam::scalar Foam::colouredFiniteDifferenceJacobian::check
 
     // Random direction of unit norm, reproducible
     PetscRandom rnd;
-    AssertPETSc(PetscRandomCreate(PETSC_COMM_WORLD, &rnd));
+    AssertPETSc(PetscRandomCreate(PetscObjectComm(PetscObject(x)), &rnd));
     AssertPETSc(PetscRandomSetSeed(rnd, 1234));
     AssertPETSc(PetscRandomSeed(rnd));
     AssertPETSc(VecSetRandom(v, rnd));
@@ -211,9 +223,17 @@ Foam::scalar Foam::colouredFiniteDifferenceJacobian::check
 
     // Forward difference of the residual along v
     const PetscReal h = relStep*(1.0 + nx);
-    system_.formResidual(f0, x);
+    if (system_.formResidual(f0, x) != 0)
+    {
+        FatalErrorInFunction
+            << name_ << ": residual evaluation failed" << abort(FatalError);
+    }
     AssertPETSc(VecWAXPY(xp, h, v, x));
-    system_.formResidual(f1, xp);
+    if (system_.formResidual(f1, xp) != 0)
+    {
+        FatalErrorInFunction
+            << name_ << ": residual evaluation failed" << abort(FatalError);
+    }
     AssertPETSc(VecAXPY(f1, -1.0, f0));
     AssertPETSc(VecScale(f1, 1.0/h));
 
@@ -225,7 +245,11 @@ Foam::scalar Foam::colouredFiniteDifferenceJacobian::check
     AssertPETSc(VecNorm(Jv, NORM_2, &nErr));
 
     // Restore the state
-    system_.formResidual(f0, x);
+    if (system_.formResidual(f0, x) != 0)
+    {
+        FatalErrorInFunction
+            << name_ << ": residual evaluation failed" << abort(FatalError);
+    }
 
     AssertPETSc(VecDestroy(&v));
     AssertPETSc(VecDestroy(&Jv));

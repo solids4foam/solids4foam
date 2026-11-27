@@ -192,6 +192,21 @@ class newtonQuasiMonolithicCouplingInterface
         scalar solidFdJacobianDeltaT_;
         scalar solidFdJacobianDeltaT0_;
 
+        //- Time index at the last build of the finite-difference solid block
+        label solidFdJacobianTimeIndex_;
+
+        //- Relative change of the time step or the previous time step that
+        //  triggers a rebuild with solidJacobianRebuild deltaTChange
+        const scalar solidJacobianRebuildTolerance_;
+
+        //- Largest accepted relative difference of the directional check
+        //  made after the first build (a larger one stops the run)
+        const scalar solidJacobianCheckTolerance_;
+
+        //- Build time of the finite-difference solid block at the start of
+        //  the current time step (automatic: excluded from the trial time)
+        scalar solidFdBuildTimeStepStart_;
+
         //- Is the finite-difference solid block used in the current time
         //  step (fixed for compact/colouredFiniteDifference; chosen per step
         //  for automatic)
