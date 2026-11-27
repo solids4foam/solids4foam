@@ -969,6 +969,14 @@ void Foam::circulationCoupler::sampleAndAdvance(const fvMesh& mesh)
             << " dimensions " << phi.dimensions() << exit(FatalError);
     }
 
+    // The explicit scheme takes its flows from the previous step's converged
+    // flux, phi.oldTime(): on a moving mesh, phi already carries this step's
+    // wall motion (correctPhi) when the boundary is first evaluated. On a
+    // static mesh the two are equal at that point. The implicit scheme
+    // couples the current iterate, phi.
+    const surfaceScalarField& phiQ =
+        scheme_ == scheme::explicitScheme ? phi.oldTime() : phi;
+
     // All ranks take part in the reductions, including those without faces.
     // The change from the previous iterate measures the interface convergence
     // of implicit coupling; the first iterate of a step is compared with the
@@ -977,7 +985,7 @@ void Foam::circulationCoupler::sampleAndAdvance(const fvMesh& mesh)
     scalar sumSqrQ = 0;
     for (portData& p : ports_)
     {
-        const scalar Q = portFlow(phi, p);
+        const scalar Q = portFlow(phiQ, p);
         sumSqrChange += sqr(Q - p.Q);
         sumSqrQ += sqr(Q);
         p.Q = Q;

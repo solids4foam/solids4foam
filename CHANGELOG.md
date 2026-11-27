@@ -439,6 +439,11 @@ release. For complete commit-level details and contributor information, see the
 
 ### Changed
 
+- The explicit circulation coupling takes the port flows from the previous
+  step's converged flux, `phi.oldTime()`, instead of `phi`. On a moving mesh
+  `phi` already holds the current step's mesh motion when the boundary is
+  first evaluated; on a static mesh the two are equal there, so static cases
+  are unchanged.
 - The OpenFOAM-v2512 Docker images, the solids4foam release image and the CI
   images, are now based on Ubuntu 24.04 (was 22.04, whose standard support
   ends in April 2027). The Dockerfiles of these base images, with OpenFOAM,
