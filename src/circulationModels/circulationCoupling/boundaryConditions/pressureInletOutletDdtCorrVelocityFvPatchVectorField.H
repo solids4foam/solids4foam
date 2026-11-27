@@ -124,19 +124,29 @@ public:
             pressureInletOutletVelocityFvPatchVectorField(ptf, iF)
         {}
 
-        //- Return a clone
-        virtual tmp<fvPatchField<vector>> clone() const
+        //- Construct and return a clone
+        virtual tmp<fvPatchVectorField> clone() const
         {
-            return fvPatchField<vector>::Clone(*this);
+            return tmp<fvPatchVectorField>
+            (
+                new pressureInletOutletDdtCorrVelocityFvPatchVectorField(*this)
+            );
         }
 
-        //- Clone with an internal field reference
-        virtual tmp<fvPatchField<vector>> clone
+        //- Construct and return a clone setting internal field reference
+        virtual tmp<fvPatchVectorField> clone
         (
             const DimensionedField<vector, volMesh>& iF
         ) const
         {
-            return fvPatchField<vector>::Clone(*this, iF);
+            return tmp<fvPatchVectorField>
+            (
+                new pressureInletOutletDdtCorrVelocityFvPatchVectorField
+                (
+                    *this,
+                    iF
+                )
+            );
         }
 
 
