@@ -1,0 +1,3 @@
+movingVentricleFvMotionSolver/movingVentricleFvMotionSolver.C
+
+LIB = $(FOAM_MODULE_LIBBIN)/libcirculationMeshMotion

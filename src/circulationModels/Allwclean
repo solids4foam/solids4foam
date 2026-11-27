@@ -3,5 +3,6 @@ cd "${0%/*}" || exit  # Run from this directory
 
 wclean lib circulation0D
 wclean lib circulationCoupling
+wclean lib circulationMeshMotion
 
 #------------------------------------------------------------------------------
