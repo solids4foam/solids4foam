@@ -37,7 +37,14 @@ Description
     with nuEff from the fluid's turbulence (momentum transport) model. The
     transpose part is the Gauss linear divergence of linearly interpolated
     face values, so that it needs no scheme of its own. The fvModels of
-    OpenFOAM.org are not included.
+    OpenFOAM.org are not included, nor are momentum sources that the solver
+    adds itself, e.g. the Boussinesq buoyancy of pimpleFluid with the energy
+    equation. nuEff gives the stress of laminar flow and of linear
+    eddy-viscosity models; for other models, e.g. Reynolds-stress or
+    nonlinear eddy-viscosity models, the term is an approximation. The
+    transpose part uses dev2, as the OpenFOAM.com and OpenFOAM.org models;
+    the dev of the foam-extend laminar model differs from it by a multiple
+    of div(U), which vanishes for incompressible flow.
 
     With a registered rho field (variable density, e.g. interFluid) the
     viscous term is that of rho*nuEff, divided by rho, and the fvOptions,
