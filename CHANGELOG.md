@@ -870,6 +870,10 @@ release. For complete commit-level details and contributor information, see the
 
 ### Fixed
 
+- `newtonIcoFluid` with `RhieChowTimeHistory yes` stores the Rhie–Chow history
+  using the same pressure gradient as the residual. With `leastSquaresS4f` for
+  `grad(p)` this includes the boundary normal correction; before, the stored
+  history used the uncorrected gradient.
 - `fixedValueCorrected` keeps its `nonOrthogonalCorrections` setting when it
   is copied or mapped; the copies used to fall back to no correction, and a
   mapped patch to the correction.
