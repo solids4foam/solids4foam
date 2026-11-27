@@ -1,0 +1,85 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      blockMeshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Bi-material plate with no mid-layer, in mm. Materials 1 and 2 are graded
+// towards the interface and the free edge with a ratio of 10000 between the
+// largest and the smallest cell
+
+scale 0.001;
+
+vertices
+(
+    (0 0 0)     // 0
+    (45 0 0)    // 1
+    (90 0 0)    // 2
+    (0 30 0)    // 3
+    (45 30 0)   // 4
+    (90 30 0)   // 5
+    (0 0 1)     // 6
+    (45 0 1)    // 7
+    (90 0 1)    // 8
+    (0 30 1)    // 9
+    (45 30 1)   // 10
+    (90 30 1)   // 11
+);
+
+blocks
+(
+    hex (0 1 4 3 6 7 10 9) material1 (120 240 1) simpleGrading (0.0001 10000 1)
+    hex (1 2 5 4 7 8 11 10) material2 (120 240 1) simpleGrading (10000 10000 1)
+);
+
+edges
+(
+);
+
+patches
+(
+    patch left
+    (
+        (0 6 9 3)
+    )
+    symmetry right
+    (
+        (2 5 11 8)
+    )
+    patch bottom
+    (
+        (0 1 7 6)
+        (1 2 8 7)
+    )
+    symmetry top
+    (
+        (3 9 10 4)
+        (4 10 11 5)
+    )
+    empty frontAndBack
+    (
+        (0 3 4 1)
+        (1 4 5 2)
+        (6 7 10 9)
+        (7 8 11 10)
+    )
+);
+
+mergePatchPairs
+(
+);
+
+// ************************************************************************* //

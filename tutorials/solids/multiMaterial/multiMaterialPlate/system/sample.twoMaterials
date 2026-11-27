@@ -1,0 +1,72 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      sample;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// The line runs along the interface from the free edge to the symmetry
+// plane, 0.05 micrometres inside material 1 rather than on the
+// interface faces themselves: this is within the first cell next to the
+// interface, which is 0.33 micrometres wide
+
+// The mid-line runs across the plate at half its height. The part of it
+// around the interface is sampled again on its own, as the sample utility of
+// foam-extend skips cells that are smaller than 1e-5 of the length of a line
+
+type            sets;
+libs            ("libsampling.so");
+
+interpolationScheme cellPointFace;
+
+setFormat       raw;
+
+surfaceFormat   vtk;
+
+fields
+(
+    sigma
+);
+
+sets
+(
+    interface12
+    {
+        type            face;
+        axis            y;
+        start           (0.04499995 0 0.0005);
+        end             (0.04499995 0.03 0.0005);
+    }
+    midLine
+    {
+        type            face;
+        axis            x;
+        start           (0 0.015 0.0005);
+        end             (0.09 0.015 0.0005);
+    }
+    midLineZoom
+    {
+        type            face;
+        axis            x;
+        start           (0.0447 0.015 0.0005);
+        end             (0.0453 0.015 0.0005);
+    }
+);
+
+surfaces
+(
+);
+
+// ************************************************************************* //

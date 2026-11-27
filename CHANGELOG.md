@@ -412,6 +412,16 @@ release. For complete commit-level details and contributor information, see the
   velocity flux by a term proportional to the time-step, which limits a
   fixed-mesh time-step study to first order; with the entry the flux is
   consistent to O(Δt h). It is empty by default, so no other case changes.
+- Added the `multiMaterialPlate` tutorial (under `solids/multiMaterial`): the
+  free-edge stress singularity in a plate of two materials bonded through a
+  thin mid-layer of a third, after Tuković, Ivanković and Karač (2013).
+  `./Allrun <h/W>` selects the mid-layer thickness, including the bi-material
+  plate with no mid-layer, `./Allrun petscSnes` the PETSc SNES solution
+  algorithm in place of the segregated one, and the normal stress along the
+  interfaces is plotted against the analytical order of the singularity. It
+  has a `regressionTest.sh` and an opt-in `verification/` study: the four
+  thicknesses against the digitised boundary element results of Ioka et al.
+  (2007), and a mesh study of the stress along the interfaces.
 
 ### Changed
 
