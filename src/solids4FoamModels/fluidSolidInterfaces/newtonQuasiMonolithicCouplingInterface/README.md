@@ -342,6 +342,20 @@ In parallel, the fluid and solid regions can be decomposed independently with
 `decomposePar`, or together with `decomposeParMonolithic`, which can give some
 ranks no cells of one region.
 
+## Boundary Conditions and the Matrix-free Jacobian
+
+With `snes_mf_operator`, the Jacobian action is a finite difference of the
+residual, so the residual must be a function of the unknowns only: evaluated
+twice at the same unknowns, it must give the same result. A boundary condition
+that reads a field stored by a previous residual evaluation breaks this. For
+example, `inletOutlet` on the fluid velocity switches between a fixed value and
+a zero gradient according to the sign of the stored face flux `phi`; on an
+outlet with locally reversed flow, the residual then depends on the order of
+the evaluations and jumps when a flux changes sign, the Jacobian action is
+wrong, and Newton stalls in the first time step. Use conditions that depend on
+the unknowns only, e.g. `zeroGradient` velocity with a fixed pressure on an
+outlet that is long enough for backflow not to matter.
+
 ## Files
 
 - `newtonQuasiMonolithicCouplingInterface.C` - Main implementation
