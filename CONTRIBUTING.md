@@ -132,10 +132,11 @@ second review posted with `--post` raises the label automatically, and later
 Claude reports keep that higher risk. Labels are never lowered by a second
 review.
 
-The reviews see the changed lines with three lines of context each, as in the
-GitHub diff, not whole files. Unchanged code next to a change, such as the
-other half of an edited function, is not reviewed. Human reviewers and private
-agents with a full checkout cover that.
+The reviews see every patch and, as far as the prompt budget allows, the full
+post-change text of modified files, with C/C++ sources first. The report lists
+which files were seen in full. Unchanged code is used only as context for the
+changed lines; other files, such as callers elsewhere, are not seen. Human
+reviewers and private agents with a full checkout cover that.
 
 ### 2. Merge rules
 
