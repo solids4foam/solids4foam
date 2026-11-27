@@ -1,0 +1,14 @@
+method,estimator,cap,levels,error_L1,error_L2,error_L3,error_L4,rates,temporal_change_small_on_all,all_steady,monotone,statement
+cutLink,ME,0.01,4,0.00914239,0.00424906,0.00220748,0.000983982,1.11 0.94 1.17,yes,yes,yes,observed rate 1.07
+cutLink,ME,0.005,4,0.0097172,0.00442699,0.00224139,0.000985408,1.13 0.98 1.19,yes,yes,yes,observed rate 1.10
+cutLink,ST,0.01,3,-0.022554,-0.0241234,-0.0283525,,-0.10 -0.23,yes,yes,no,trend only
+cutLink,ST,0.005,3,-0.0238012,-0.0243857,-0.0283873,,-0.04 -0.22,yes,yes,no,trend only
+ghostCell,,0.01,4,0.0174909,0.00386185,-0.00225112,-0.000371684,2.18 0.78 2.60,no,no,yes,trend only
+ghostCell,,0.005,4,0.0209027,0.00501381,-0.00204793,3.25889e-05,2.06 1.29 5.97,no,no,yes,trend only
+ghostCell,,0.0025,3,0.0244332,0.00658996,-0.00188978,,1.89 1.80,no,yes,yes,trend only
+incremental,,0.01,4,0.0173384,0.0714901,0.0304406,0.000214516,-2.04 1.23 7.15,no,no,no,trend only
+incremental,,0.005,4,0.0191844,0.0773985,0.0461871,0.0193588,-2.01 0.74 1.25,no,no,no,trend only
+incremental,,0.0025,4,0.0335261,0.0788121,0.0520879,0.034315,-1.23 0.60 0.60,no,no,no,trend only
+penalty,,0.01,4,-0.134565,-0.0881278,-0.0793096,-0.0556477,0.61 0.15 0.51,no,no,yes,trend only
+penalty,,0.005,4,-0.134327,-0.0703914,-0.0617872,-0.0490378,0.93 0.19 0.33,no,no,yes,trend only
+penalty,,0.0025,4,-0.134044,-0.0702859,-0.0434004,-0.0407789,0.93 0.70 0.09,no,no,yes,trend only

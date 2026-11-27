@@ -1,0 +1,5 @@
+level,thinned_points,recipe_exact_field_circle_wall_pct,recipe_exact_field_polygon_wall_pct,recipe_numerical_field_pct,solver_surface_traction_pct,first_fluid_layer_replaced_by_exact_pct
+1,42,-0.972,-0.931,-2.038,-2.063,-0.57
+2,85,-0.280,-0.284,-2.416,-2.388,-0.07
+3,128,-0.076,-0.197,-2.813,-2.833,-0.04
+4,256,-0.023,-0.380,-3.122,-3.087,-0.19
