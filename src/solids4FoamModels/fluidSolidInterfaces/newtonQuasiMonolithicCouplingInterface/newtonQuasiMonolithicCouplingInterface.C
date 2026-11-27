@@ -3780,6 +3780,14 @@ void newtonQuasiMonolithicCouplingInterface::selectSolidJacobian()
         // used before
         solidFdKrylovRef_ = -1;
 
+        // A finite-difference block kept from an earlier selection may be
+        // stale: rebuild it, so that the trial and the adaptive reference
+        // reflect the current state
+        if (useFd)
+        {
+            solidFdRebuildRequest_ = true;
+        }
+
         // The preconditioning matrix changes its sparsity: rebuild the
         // solver state, so that the Jacobian and the preconditioner are
         // rebuilt at the first Newton iteration of this step

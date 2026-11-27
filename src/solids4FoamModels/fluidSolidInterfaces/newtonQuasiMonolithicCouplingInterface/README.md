@@ -289,15 +289,15 @@ exceed `solidJacobianRebuildKrylovRatio` (default 1.5) times those of the first
 step after the last build; `always` rebuilds it at
 every Jacobian evaluation. Only the preconditioner changes, so the converged
 solution does not. Use it for thin, bending structures; on compact solids it does not reduce the
-Krylov iterations and can cost more (`blobInTreacle`: +7 %; `3dTube` with
-BoomerAMG on the solid block: about +50 %), for which `automatic` is intended. `solidJacobianCheck yes`
+Krylov iterations and can cost more (`blobInTreacle`, 4 ranks: +2 %; `3dTube` with
+BoomerAMG on the solid block: about +30 %), for which `automatic` is intended. `solidJacobianCheck yes`
 prints the relative difference between J v and a forward difference of the
 residual along a random direction after each build (about 1e-8 expected).
 Serial and parallel; tested with OpenFOAM v2512 and PETSc 3.24.
 
 On compact solids the denser two-layer block can make the solid
 preconditioner more expensive without reducing the Krylov iterations (with
-BoomerAMG on the 3-D tube, about 40 % more time per step). `solidJacobian
+BoomerAMG on the 3-D tube, about 30 % more time). `solidJacobian
 automatic` chooses between the two blocks by timing: the first step uses the
 compact block; then, in a paired trial, one step is solved with the compact
 block and the next with the finite-difference block, and the faster one is
