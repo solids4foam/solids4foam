@@ -127,7 +127,15 @@ Foam::leastSquaresStencil::remoteCandidatesValues
         }
     }
 
+    // A processor that needs no cells from this one sends nothing, and
+    // reading from an empty buffer fails, so only the processors that sent
+    // a request are read
+#ifdef OPENFOAM_COM
     reqBufs.finishedSends();
+#else
+    labelList reqSizes;
+    reqBufs.finishedSends(reqSizes);
+#endif
 
     // Phase 2: respond with cell centre coordinates
     PstreamBuffers repBufs(Pstream::commsTypes::nonBlocking);
@@ -143,10 +151,12 @@ Foam::leastSquaresStencil::remoteCandidatesValues
 
 #ifdef OPENFOAM_COM
         if (!reqBufs.recvDataCount(fromProc))
+#else
+        if (!reqSizes[fromProc])
+#endif
         {
             continue;
         }
-#endif
 
         UIPstream is(fromProc, reqBufs);
 
@@ -364,7 +374,15 @@ Foam::leastSquaresStencil::remoteFieldPerProc
         }
     }
 
+    // A processor that needs no cells from this one sends nothing, and
+    // reading from an empty buffer fails, so only the processors that sent
+    // a request are read
+#ifdef OPENFOAM_COM
     reqBufs.finishedSends();
+#else
+    labelList reqSizes;
+    reqBufs.finishedSends(reqSizes);
+#endif
 
     // Phase 2: reply with field values for requested cells
     PstreamBuffers repBufs(Pstream::commsTypes::nonBlocking);
@@ -378,10 +396,12 @@ Foam::leastSquaresStencil::remoteFieldPerProc
 
 #ifdef OPENFOAM_COM
         if (!reqBufs.recvDataCount(procI))
+#else
+        if (!reqSizes[procI])
+#endif
         {
             continue;
         }
-#endif
 
         UIPstream is(procI, reqBufs);
 
