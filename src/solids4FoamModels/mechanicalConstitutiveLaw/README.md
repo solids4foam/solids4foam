@@ -305,7 +305,8 @@ input's name and written. In parallel the directory is looked for inside each
 ## Implicit-gradient fields
 
 A law that is regularised by a non-local variable, such as the non-local
-damage of `linearElasticMisesPlasticLemaitreDamage`, needs the solution of
+damage of `linearElasticMisesPlasticLemaitreDamage` or the non-local void
+fraction of `linearElasticGTNPlastic`, needs the solution of
 
 ```text
 phi - div(l^2 grad(phi)) = source

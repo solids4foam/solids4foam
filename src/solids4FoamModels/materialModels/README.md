@@ -81,6 +81,7 @@ use it:
 | [`linearElastic`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/linearElasticMechanicalConstitutiveLaw/README.md) | small | Hookean elasticity, with an optional residual stress |
 | [`linearElasticMisesPlastic`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/linearElasticMisesPlasticMechanicalConstitutiveLaw/README.md) | small | Hookean elasticity with von Mises plasticity and hardening |
 | [`linearElasticMisesPlasticLemaitreDamage`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/linearElasticMisesPlasticLemaitreDamageMechanicalConstitutiveLaw/README.md) | small | Von Mises plasticity coupled to Lemaitre ductile damage, local or non-local |
+| [`linearElasticGTNPlastic`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/linearElasticGTNPlasticMechanicalConstitutiveLaw/README.md) | small | Gurson-Tvergaard-Needleman porous plasticity, local or non-local |
 | [`linearElasticMohrCoulombPlastic`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/linearElasticMohrCoulombPlasticMechanicalConstitutiveLaw/README.md) | small | Hookean elasticity with Mohr-Coulomb plasticity |
 | [`diffusionElastic`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/diffusionElasticMechanicalConstitutiveLaw/README.md) | small | Hookean elasticity scaled by a mesh motion diffusivity, for mesh motion |
 | [`viscousHookeanElastic`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/viscousHookeanElasticMechanicalConstitutiveLaw/README.md) | small | Linear viscoelasticity (Prony series) |
