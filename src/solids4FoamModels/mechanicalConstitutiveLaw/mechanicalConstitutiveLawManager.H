@@ -1254,10 +1254,12 @@ public:
         //  they wrap, read, sorted, each once
         wordList implicitGradientFieldNames() const;
 
-        //- The source and the squared length scale of one implicit-gradient
-        //  field at the cells: in the cells of each law that reads it, the
-        //  current value of the state variable it names as the source and
-        //  the square of its length; zero in the cells of every other law.
+        //- The source, the squared length scale and the coefficient of one
+        //  implicit-gradient field at the cells: in the cells of each law
+        //  that reads it, the current values of the state variables it
+        //  names as the source and the coefficient, or 1 if it names none,
+        //  and the square of its length; in the cells of every other law,
+        //  zero source and length and a coefficient of 1.
         //
         //  The source is the law's current state, so this is called after
         //  the stress update it is to follow. Read from the cell-centred
@@ -1267,7 +1269,8 @@ public:
         (
             const word& name,
             scalarField& source,
-            scalarField& lengthSqr
+            scalarField& lengthSqr,
+            scalarField& coefficient
         ) const;
 };
 

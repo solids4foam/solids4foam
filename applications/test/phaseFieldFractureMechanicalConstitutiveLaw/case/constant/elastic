@@ -1,0 +1,6 @@
+// Yield stress against equivalent plastic strain: out of reach, for the
+// brittle checks
+(
+    ( 0     1e15 )
+    ( 1     1e15 )
+)
