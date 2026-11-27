@@ -139,6 +139,11 @@ void nonLinGeomTotalLagTotalDispSolid::predict()
     // Update gradient of displacement
     gradD() = fvc::grad(D());
 
+    if (tractionPatchSurfaceGradient_)
+    {
+        correctTractionPatchGradient(D(), gradD());
+    }
+
     // Total deformation gradient
     F_ = I + gradD().T();
 
@@ -533,6 +538,11 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveImplicitSegregated()
 
         // Update gradient of displacement
         gradD() = fvc::grad(D());
+
+        if (tractionPatchSurfaceGradient_)
+        {
+            correctTractionPatchGradient(D(), gradD());
+        }
 
         // Update gradient of displacement increment
         gradDD() = gradD() - gradD().oldTime();
@@ -1037,6 +1047,14 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
     rKappaPtr_(),
     dpdtPtr_(),
     predictor_(solidModelDict().lookupOrDefault<Switch>("predictor", false)),
+    tractionPatchSurfaceGradient_
+    (
+        solidModelDict().lookupOrDefault<Switch>
+        (
+            "tractionPatchSurfaceGradient",
+            false
+        )
+    ),
     blockSize_
     (
         solvePressure()
@@ -1153,6 +1171,10 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
     {
         DD() = D() - D().oldTime();
         gradD() = fvc::grad(D());
+        if (tractionPatchSurfaceGradient_)
+        {
+            correctTractionPatchGradient(D(), gradD());
+        }
         gradDD() = gradD() - gradD().oldTime();
         F_ = I + gradD().T();
         Finv_ = inv(F_);
@@ -1393,6 +1415,11 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
     {
         // Update gradient of displacement
         gradD() = fvc::grad(D);
+
+        if (tractionPatchSurfaceGradient_)
+        {
+            correctTractionPatchGradient(D, gradD());
+        }
     }
 
     // Increment of displacement

@@ -33,6 +33,7 @@ boundaryField
     }
     inlet
     {
+        // OpenFOAM
         type            uniformFixedValue;
         uniformValue    table
         (
@@ -41,6 +42,11 @@ boundaryField
             (0.100001 (0.315 0 0))
             (10       (0.315 0 0))
         );
+
+        // foam extend, selected by Allrun
+//        type            timeVaryingUniformFixedValue;
+        "file|fileName" "$FOAM_CASE/constant/fluid/inletVelocity.fe41";
+        outOfBounds     clamp;
     }
     rigidBlock
     {

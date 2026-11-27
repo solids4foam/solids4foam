@@ -76,6 +76,19 @@ fi
 # Check case version is correct
 solids4Foam::convertCaseFormat .
 
+# foam-extend reads only a constant uniformFixedValue, so the partitioned inlet
+# uses timeVaryingUniformFixedValue with the same table. convertCaseFormat
+# converts only files named p. --follow-symlinks edits U.dirichletNeumann,
+# keeping the 0/fluid/U link
+if [[ $WM_PROJECT == "foam" ]]
+then
+    echo "0/fluid/U: change uniformFixedValue to timeVaryingUniformFixedValue"
+    "${SOLIDS4FOAM_SED}" --follow-symlinks -i \
+        -e 's|^\([[:space:]]*type[[:space:]]*uniformFixedValue;\)|//\1|' \
+        -e 's|^//\([[:space:]]*type[[:space:]]*timeVaryingUniformFixedValue;\)|\1|' \
+        0/fluid/U
+fi
+
 # Create meshes
 solids4Foam::runApplication -s solid blockMesh -region solid
 solids4Foam::runApplication -s fluid blockMesh -region fluid

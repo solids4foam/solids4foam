@@ -383,14 +383,14 @@ REF_HO_MAX_DISP=9.64144e-5
 REF_HO_FINAL_DISP=5.22025e-5
 REF_HO_FINAL_FORCE=1.41024
 
-# Reference values for the quasi-monolithic Newton coupling.
-# TODO: regenerate. These values are from the tutorial definition before #544
-# (inlet peak 0.3 m/s, E = 10 kPa, earlier plate position), so the
-# monolithic arm fails against them until it is rerun with the Richter
-# definition on the GitHub CI OpenFOAM-v2512-PETSc image
-MONO_REF_MAX_DISP=0.0278474
-MONO_REF_FINAL_DISP=0.0267971
-MONO_REF_FINAL_FORCE=5.11391
+# Reference values for the quasi-monolithic Newton coupling, for the Richter
+# definition, from the GitHub CI OpenFOAM-v2512-PETSc image (it runs only on
+# OpenFOAM.com with PETSc). Its velocity-based solid has a different time
+# integration, so it has its own references: at t = 1 s the tip displacement
+# is about 5-7% above the IQN-ILS value
+MONO_REF_MAX_DISP=8.68803e-5
+MONO_REF_FINAL_DISP=4.73022e-5
+MONO_REF_FINAL_FORCE=1.50003
 # diffusionElastic fluid mesh motion, to t = 0.5, from the same CI image (it
 # runs only on OpenFOAM.com): the tip displacement is still increasing, so its
 # maximum is its final value

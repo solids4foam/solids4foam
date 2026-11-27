@@ -80,6 +80,7 @@ The following `solidModel` options are particularly relevant here:
 | `stabilisation` | auto-created if absent | Has `momentum` and `pressure` |
 | `cellDisplacements` | optional | Internal-cell displacement constraints |
 | `solvePressure` | `false` | Pressure unknown, only with `PETScSNES` |
+| `tractionPatchSurfaceGradient` | `false` | Traction-face area, see below |
 
 For `stabilisation`, the code creates a default dictionary if none is
 provided. The default sub-model is `diffStencilLaplacian` with
@@ -303,6 +304,17 @@ conditions into face forces on the deformed surface. It:
 - uses the current deformed normals and area magnitudes;
 - honours `solidTraction` pressure and traction components;
 - projects tangential force away for zero-shear, symmetry, and slip patches.
+
+The deformed area and normal of a traction face follow from Nanson's relation
+with the boundary value of `gradD`. By default this is the value of the
+adjacent cell, half a cell from the face, so the applied force is only
+first-order accurate; with large deformations this limits the displacement to
+first order. With `tractionPatchSurfaceGradient yes;` the tangential rows of
+the boundary gradient, which alone determine the deformed area and normal, are
+taken from the surface gradient of the displacement over the face
+(`solidModel::correctTractionPatchGradient()`), which restores second order.
+The high-order residual does not use this option: it evaluates the gradient at
+the face quadrature points instead.
 
 This is one of the key places where the total-Lagrangian formulation differs
 from the linear-geometry model.

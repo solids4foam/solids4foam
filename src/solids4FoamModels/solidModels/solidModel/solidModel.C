@@ -44,6 +44,8 @@ License
 #include "fvc.H"
 #include "fvMatrices.H"
 #include "zeroGradientFvPatchFields.H"
+#include "fixedValueFvPatchFields.H"
+#include "syncTools.H"
 #ifdef OPENFOAM_NOT_EXTEND
     #include "enhancedVolPointInterpolation.H"
     #include "pointConstraints.H"
@@ -2731,6 +2733,191 @@ void Foam::solidModel::quadInverseAndJacobian
     {
         Finv[i] = inv(Fv[i]);
         J[i] = det(Fv[i]);
+    }
+}
+
+
+void Foam::solidModel::correctTractionPatchGradient
+(
+    const volVectorField& D,
+    volTensorField& gradD
+) const
+{
+    const fvMesh& mesh = this->mesh();
+
+    bool foundTractionPatch = false;
+    forAll(D_.boundaryField(), patchI)
+    {
+        if (isA<solidTractionFvPatchVectorField>(D_.boundaryField()[patchI]))
+        {
+            foundTractionPatch = true;
+        }
+    }
+
+    // The point values are synchronised, so all processors must take part
+    if (!returnReduce(foundTractionPatch, orOp<bool>()))
+    {
+        return;
+    }
+
+    const pointField& points = mesh.points();
+    const faceList& faces = mesh.faces();
+    const vectorField& C = mesh.C();
+
+    // Weighted sums of the displacement at the points: from the adjacent
+    // fixed-value faces, whose values are the prescribed displacements, and
+    // from the cells next to the adjacent traction faces, each extrapolated to
+    // the point with the gradient of the cell next to the face, so that an
+    // affine displacement is reproduced exactly. Only fixedValue patches count
+    // as prescribed: the free components of partially fixed patches, e.g.
+    // fixedDisplacementZeroShear, depend on the previous stress evaluation,
+    // and the residual must be a function of the current unknowns alone
+    vectorField fixedSum(mesh.nPoints(), vector::zero);
+    scalarField fixedWeight(mesh.nPoints(), 0.0);
+    vectorField tractionSum(mesh.nPoints(), vector::zero);
+    scalarField tractionWeight(mesh.nPoints(), 0.0);
+
+    forAll(D_.boundaryField(), patchI)
+    {
+        const fvPatch& fp = mesh.boundary()[patchI];
+
+        if (fp.coupled())
+        {
+            continue;
+        }
+
+        const bool tractionPatch =
+            isA<solidTractionFvPatchVectorField>(D_.boundaryField()[patchI]);
+
+        if
+        (
+            !tractionPatch
+         && !isA<fixedValueFvPatchVectorField>(D_.boundaryField()[patchI])
+        )
+        {
+            continue;
+        }
+
+        const label start = fp.patch().start();
+        const vectorField& Cf = fp.Cf();
+        const labelUList& faceCells = fp.faceCells();
+        const vectorField& DPatch = D.boundaryField()[patchI];
+
+        forAll(fp, faceI)
+        {
+            const face& curFace = faces[start + faceI];
+            const label cellI = faceCells[faceI];
+
+            forAll(curFace, fpI)
+            {
+                const label pointI = curFace[fpI];
+                const scalar w =
+                    1.0/max(mag(points[pointI] - Cf[faceI]), SMALL);
+
+                if (tractionPatch)
+                {
+                    tractionSum[pointI] +=
+                        w
+                       *(
+                            D[cellI]
+                          + ((points[pointI] - C[cellI]) & gradD[cellI])
+                        );
+                    tractionWeight[pointI] += w;
+                }
+                else
+                {
+                    fixedSum[pointI] +=
+                        w
+                       *(
+                            DPatch[faceI]
+                          + ((points[pointI] - Cf[faceI]) & gradD[cellI])
+                        );
+                    fixedWeight[pointI] += w;
+                }
+            }
+        }
+    }
+
+#ifdef OPENFOAM_NOT_EXTEND
+    syncTools::syncPointList
+    (
+        mesh, fixedSum, plusEqOp<vector>(), vector::zero
+    );
+    syncTools::syncPointList
+    (
+        mesh, fixedWeight, plusEqOp<scalar>(), scalar(0)
+    );
+    syncTools::syncPointList
+    (
+        mesh, tractionSum, plusEqOp<vector>(), vector::zero
+    );
+    syncTools::syncPointList
+    (
+        mesh, tractionWeight, plusEqOp<scalar>(), scalar(0)
+    );
+#else
+    // The point sums are not synchronised across processor or cyclic patches
+    forAll(mesh.boundary(), patchI)
+    {
+        if (mesh.boundary()[patchI].coupled())
+        {
+            FatalErrorInFunction
+                << "correctTractionPatchGradient is not implemented on "
+                << "foam-extend for meshes with coupled (processor or cyclic) "
+                << "patches" << exit(FatalError);
+        }
+    }
+#endif
+
+    // Surface gradient over each traction face from the point values, by the
+    // Gauss theorem over the face edges (exact for a linear field on a planar
+    // face), and the normal row of the adjacent cell
+    forAll(D_.boundaryField(), patchI)
+    {
+        if (!isA<solidTractionFvPatchVectorField>(D_.boundaryField()[patchI]))
+        {
+            continue;
+        }
+
+        const fvPatch& fp = mesh.boundary()[patchI];
+        const label start = fp.patch().start();
+        const vectorField nf(fp.nf());
+        const scalarField& magSf = fp.magSf();
+        const labelUList& faceCells = fp.faceCells();
+        tensorField& gradDPatch = boundaryFieldRef(gradD)[patchI];
+
+        forAll(fp, faceI)
+        {
+            const face& curFace = faces[start + faceI];
+            const vector& n = nf[faceI];
+
+            tensor surfaceGradD(tensor::zero);
+
+            forAll(curFace, fpI)
+            {
+                const label p0 = curFace[fpI];
+                const label p1 = curFace.nextLabel(fpI);
+
+                const vector D0
+                (
+                    fixedWeight[p0] > 0
+                  ? fixedSum[p0]/fixedWeight[p0]
+                  : tractionSum[p0]/tractionWeight[p0]
+                );
+                const vector D1
+                (
+                    fixedWeight[p1] > 0
+                  ? fixedSum[p1]/fixedWeight[p1]
+                  : tractionSum[p1]/tractionWeight[p1]
+                );
+
+                // Outward in-plane edge normal times the edge length
+                surfaceGradD += ((points[p1] - points[p0]) ^ n)*0.5*(D0 + D1);
+            }
+
+            gradDPatch[faceI] =
+                n*(n & gradD[faceCells[faceI]]) + surfaceGradD/magSf[faceI];
+        }
     }
 }
 

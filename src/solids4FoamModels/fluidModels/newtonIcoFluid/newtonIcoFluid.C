@@ -2169,7 +2169,7 @@ void newtonIcoFluid::updatePressureGradientBoundary(const label patchI)
 
     // Body force (fvOptions) in the cells next to the boundary: it is part
     // of the normal momentum balance at the wall
-    vectorField bodyForce(n.size(), Zero);
+    vectorField bodyForce(n.size(), vector::zero);
 #ifdef OPENFOAM_COM
     if (options().optionList::size())
     {
