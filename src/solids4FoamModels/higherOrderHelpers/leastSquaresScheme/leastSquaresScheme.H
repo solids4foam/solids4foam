@@ -285,6 +285,18 @@ public:
             CompactListList<tensor>& result
         ) const = 0;
 
+        //- Gradient of a vector field at the face quadrature points of the
+        //  neighbour side of the material interfaces: reconstructed from the
+        //  neighbour's material, where fGrad() reconstructs a face between
+        //  two materials from its owner's. result has a row per face, sized
+        //  as the face's quadrature points for a face between two materials
+        //  and empty otherwise; only those rows are written
+        virtual void fGradInterfaceNeighbour
+        (
+            const volVectorField& vf,
+            CompactListList<tensor>& result
+        ) const = 0;
+
         //- Scalar field values at patch face quadrature points
         virtual autoPtr<CompactListList<scalar>> patchFaceQuadValues
         (

@@ -83,8 +83,10 @@ class nonLinGeomTotalLagTotalDispSolid
         //  In the case of Hookean elasticity, (2*mu + lambda) is the optimum
         const volScalarField impK_;
 
-        //- Implicit stiffness surface field
-        const surfaceScalarField impKf_;
+        //- Implicit stiffness surface field. Not const: on the faces between
+        //  two materials it is the series stiffness of the two, with the
+        //  high-order face quadrature
+        surfaceScalarField impKf_;
 
         //- Reciprocal of impK
         //  We divide by impK every time tractionBoundarySnGrad is called so we
@@ -121,6 +123,13 @@ class nonLinGeomTotalLagTotalDispSolid
         //- Update the cell-centred stress
         void correctStress();
 
+        //- This model evaluates both sides of the material interfaces with
+        //  the high-order face quadrature
+        virtual bool supportsMaterialInterfaceQuad() const
+        {
+            return true;
+        }
+
         //- This model smooths the hydrostatic stress on request, in
         //  correctStress(), in its implicit segregated algorithm
         virtual bool supportsHydrostaticSmoothing() const
@@ -141,6 +150,15 @@ class nonLinGeomTotalLagTotalDispSolid
         mutable autoPtr<CompactListList<tensor>> FinvQuad0Ptr_;
         mutable autoPtr<CompactListList<scalar>> JQuadPtr_;
         mutable autoPtr<CompactListList<scalar>> JQuad0Ptr_;
+
+        //- The same kinematics on the neighbour side of the material
+        //  interfaces, with more than one material (see solidModel)
+        mutable autoPtr<CompactListList<tensor>> FQuadNeiPtr_;
+        mutable autoPtr<CompactListList<tensor>> FQuadNei0Ptr_;
+        mutable autoPtr<CompactListList<tensor>> FinvQuadNeiPtr_;
+        mutable autoPtr<CompactListList<tensor>> FinvQuadNei0Ptr_;
+        mutable autoPtr<CompactListList<scalar>> JQuadNeiPtr_;
+        mutable autoPtr<CompactListList<scalar>> JQuadNei0Ptr_;
 
         //- Construct impK from the framework
         tmp<volScalarField> makeImpK() const;

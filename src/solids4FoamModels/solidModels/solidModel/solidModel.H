@@ -88,6 +88,7 @@ namespace Foam
 
 // Forward declaration
 class mechanicalConstitutiveLawManager;
+class integrationPointTopology;
 
 /*---------------------------------------------------------------------------* \
                            Class solidModel Declaration
@@ -227,6 +228,17 @@ private:
         //- Cauchy stress at face quadrature points
         //  In use by high-order discretisation
         mutable autoPtr<CompactListList<symmTensor>> sigmaQuadPtr_;
+
+        //- The neighbour side of the material interfaces, with more than one
+        //  material: the displacement gradient, now and at the previous time
+        //  step, and the stress at the quadrature points of the faces between
+        //  two materials, each reconstructed from, and evaluated by, the face
+        //  neighbour's material. gradDQuad and sigmaQuad hold the owner side.
+        //  One row per face; only the rows of the interface faces are
+        //  non-empty
+        mutable autoPtr<CompactListList<tensor>> gradDQuadNeiPtr_;
+        mutable autoPtr<CompactListList<tensor>> gradDQuadNei0Ptr_;
+        mutable autoPtr<CompactListList<symmTensor>> sigmaQuadNeiPtr_;
 
         //- Time-step index used to determine when it is a new time-step
         mutable label curTimeIndex_;
@@ -502,12 +514,120 @@ protected:
 
         //- Displacement gradient at the face quadrature points.
         //
-        //  hofvc::fGrad() for one material; not implemented for more than one
+        //  hofvc::fGrad(). With more than one material the stencils keep to
+        //  one material, and a face between two materials is reconstructed
+        //  here from its owner's: see materialInterfaceQuad()
         void gradQuad
         (
             const volVectorField& D,
             CompactListList<tensor>& gradDQuad
         ) const;
+
+        // Material interfaces with the high-order face quadrature
+        //
+        //  With more than one material, a face between two materials is
+        //  evaluated from each side: the owner side in gradDQuad and
+        //  sigmaQuad, and the neighbour side in gradDQuadNei and sigmaQuadNei,
+        //  each reconstructed only from cells of its own material and
+        //  evaluated by its own law, with its own history. The face traction
+        //  is the weighted mean of the two sides' tractions
+        //  (combineInterfaceTraction), so that neither material is preferred
+        //  and the result does not depend on the order of the materials. The
+        //  two sides are held together by the momentum stabilisation, whose
+        //  stiffness on these faces is the series stiffness of the two
+        //  materials (interfaceSeriesStiffness), and whose scale factor on
+        //  these faces is interfaceStabilisationScaleFactor
+        //  (addInterfaceStabilisation). On a processor face each processor
+        //  evaluates its own side, as that face's owner, and the other
+        //  side's traction, stiffness and distance are exchanged across the
+        //  processor patch, so that both processors form the same, opposite,
+        //  traction
+
+            //- Is the high-order face quadrature used with more than one
+            //  material?
+            bool materialInterfaceQuad() const;
+
+            //- Refuse what is not supported with more than one material: the
+            //  high-order Jacobian, and the high-order face quadrature in a
+            //  model that does not evaluate both sides of the interfaces
+            void checkHighOrderMaterials() const;
+
+            //- Does this solid model evaluate the neighbour side of the
+            //  material interfaces? A model that does not is refused more
+            //  than one material with the high-order face quadrature
+            virtual bool supportsMaterialInterfaceQuad() const
+            {
+                return false;
+            }
+
+            //- Displacement gradient at the neighbour-side quadrature points
+            CompactListList<tensor>& gradDQuadNei() const;
+
+            //- Displacement gradient at the neighbour-side quadrature points,
+            //  at the previous time step
+            const CompactListList<tensor>& gradDQuadNei0() const;
+
+            //- Stress at the neighbour-side quadrature points
+            CompactListList<symmTensor>& sigmaQuadNei() const;
+
+            //- Calculate the displacement gradient at the neighbour-side
+            //  quadrature points
+            void gradQuadInterfaceNeighbour
+            (
+                const volVectorField& D,
+                CompactListList<tensor>& gradDQuadNei
+            ) const;
+
+            //- The integration-point topology of the neighbour side, for the
+            //  mechanical law manager's flat-list updates
+            const integrationPointTopology& interfaceNeighbourTopology() const;
+
+            //- Replace the traction on each face between two materials,
+            //  which holds the owner side's, by the weighted mean of the two
+            //  sides' tractions. The weights are set by
+            //  interfaceTractionWeighting in highOrderCoeffs, from each
+            //  side's stiffness scale a = K/delta, with K = impK and delta
+            //  the normal distance from the cell centre to the face:
+            //  - average (default): one half each
+            //  - harmonic: proportional to 1/a, the more compliant side
+            //    counting more
+            //  - stiffnessWeighted: proportional to a, the stiffer side
+            //    counting more
+            //  - stiffer, softer: that side's traction alone
+            //  All are symmetric in the two sides, so the result does not
+            //  depend on the order of the materials
+            void combineInterfaceTraction
+            (
+                surfaceVectorField& traction,
+                const surfaceVectorField& neighbourTraction,
+                const volScalarField& impK
+            ) const;
+
+            //- Set impKf on the faces between two materials to the series
+            //  stiffness of the two sides, |n & d|/(delta_o/K_o + delta_n/K_n),
+            //  which is impK where the two materials are the same
+            void interfaceSeriesStiffness
+            (
+                surfaceScalarField& impKf,
+                const volScalarField& impK
+            ) const;
+
+            //- Set the momentum stabilisation on each face between two
+            //  materials to interfaceStabilisationScaleFactor (in
+            //  highOrderCoeffs, default 1) times impKf times the jump between
+            //  the two sides' reconstructions over the cell-centre distance,
+            //  in place of the stabilisation's own scaleFactor. Each side's
+            //  traction depends only on its own material's cells, so this
+            //  penalty is all that couples the two sides. With the small
+            //  scaleFactor used inside a material (e.g. 0.1) the jump is
+            //  barely constrained and the Krylov solver stalls (k-exact);
+            //  with 1, the penalty matches the two-point coupling of the
+            //  approximate Jacobian, impKf/delta, on these faces
+            void addInterfaceStabilisation
+            (
+                surfaceVectorField& traction,
+                const surfaceScalarField& impKf
+            ) const;
 
         //- Refuse a multi-material run whose gradient scheme is not
         //  material-aware.

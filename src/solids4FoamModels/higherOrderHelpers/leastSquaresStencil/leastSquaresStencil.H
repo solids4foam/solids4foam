@@ -118,6 +118,42 @@ class leastSquaresStencil
         //  First value in list is proc ID and second value represents index
         mutable autoPtr<Map<FixedList<label, 2>>> remoteCellLocationPtr_;
 
+        //- With more than one material, the material region of every local
+        //  cell: a global label for each connected region of one material
+        //  (regionSplit, blocked at the faces between two materials).
+        //  Empty with a single material.
+        //  The stencils are restricted to one region, so that no
+        //  reconstruction mixes two materials, nor two disconnected parts of
+        //  one material. A region rather than a material, so that a stencil
+        //  reached by distance across processors and one reached by
+        //  neighbour layers within a processor are filtered alike
+        mutable autoPtr<labelList> cellRegionPtr_;
+
+        //- Whether the case has more than one material, the same on every
+        //  rank. Set with cellRegionPtr_: an empty region list is not
+        //  enough to tell, as a rank may hold no cells
+        mutable bool multiMaterial_;
+
+        //- Whether each face (internal and boundary) lies between two
+        //  materials, empty with a single material. Set with cellRegionPtr_
+        mutable autoPtr<boolList> materialInterfaceFacePtr_;
+
+        //- The material region of each remote stencil candidate, by global
+        //  cell index, exchanged with the candidates' cell centres
+        mutable autoPtr<Map<label>> remoteRegionPtr_;
+
+        //- Region whose cells build each face stencil, or -1 everywhere
+        //  with a single material: the face owner's (the neighbour's is used
+        //  for the neighbour-side stencils of the faces between two
+        //  materials)
+        mutable autoPtr<labelList> faceRegionPtr_;
+
+        //- Face stencils of the neighbour side of the material interfaces:
+        //  for a face between two materials, the stencil built from its
+        //  neighbour's material; empty for every other face
+        mutable autoPtr<CompactListList<label>>
+            interfaceNeighbourFacesStencilPtr_;
+
     // Private Member Functions
 
         //- Disallow default bitwise copy construct
@@ -138,6 +174,32 @@ class leastSquaresStencil
         //- Mark cells at processor boundary
         void calcProcessorCells() const;
 
+        //- Calculate the material region of every local cell (empty with a
+        //  single material), refusing a material interface on a processor
+        //  boundary
+        void calcCellRegion() const;
+
+        //- Collect the material regions of the remote stencil candidates
+        void calcRemoteRegions
+        (
+            const List<labelList>& remoteCells,
+            const labelList& procToQuery
+        ) const;
+
+        //- Calculate the face region list
+        void calcFaceRegion() const;
+
+        //- The material region of the local cells, empty with a single
+        //  material
+        const labelList& cellRegion() const;
+
+        //- Whether the case has more than one material, on every rank
+        bool multiMaterial() const;
+
+        //- Material region of a cell given in global numbering: a local
+        //  cell or a remote stencil candidate (-1 with a single material)
+        label regionOfGlobalCell(const label globalCellID) const;
+
         //- Check processor overlap between bounding box for remote processors
         /// cells and bounding box for local processor faces
         labelList checkProcessorOverlap
@@ -153,6 +215,16 @@ class leastSquaresStencil
             const labelList& procToQuery
         ) const;
 
+        //- For the remote candidates of each processor, the values of a
+        //  cell field on that processor (e.g. its cell centres)
+        template<class Type>
+        List<Field<Type>> remoteCandidatesValues
+        (
+            const List<labelList>& remoteCandidates,
+            const labelList& procToQuery,
+            const UList<Type>& localValues
+        ) const;
+
         //- Get cell centre for remote candidates
         List<vectorField> remoteCandidatesCellCentres
         (
@@ -161,14 +233,18 @@ class leastSquaresStencil
         ) const;
 
         //- Build face stencil
+        //- Build the stencil of a face. Its cells are of the face's material
+        //  region (faceRegion), or of region stencilRegion when that is
+        //  given (>= 0)
         labelList buildFacesStencil
         (
-             const label faceI,
-             const List<labelList>& remoteCells,
-             const List<vectorField>& remoteCellsCentres,
-             const scalar relTol = 1e-8,
-             const scalar overSampleFactor = 1.5,
-             const scalar searchExpansionFactor = 1.3
+            const label faceI,
+            const List<labelList>& remoteCells,
+            const List<vectorField>& remoteCellsCentres,
+            const scalar relTol = 1e-8,
+            const scalar overSampleFactor = 1.5,
+            const scalar searchExpansionFactor = 1.3,
+            const label stencilRegion = -1
         ) const;
 
         //- Filter unused cells and store cells IDs and their cell centres
@@ -222,6 +298,18 @@ public:
 
         //- Returns face stencils (global indexing)
         const CompactListList<label>& facesStencil() const;
+
+        //- Returns the face stencils of the neighbour side of the material
+        //  interfaces (global indexing): non-empty only for the faces between
+        //  two materials, and built from the neighbour's material, where
+        //  facesStencil() is built from the owner's
+        const CompactListList<label>& interfaceNeighbourFacesStencil() const;
+
+        //- Whether each face, internal or boundary, lies between two
+        //  materials: an internal face whose cells are in two materials, or
+        //  a processor face whose cells on the two processors are. Empty
+        //  with a single material, the same on every rank
+        const boolList& materialInterfaceFace() const;
 
         //- Returns cell stencils (global indexing)
         const CompactListList<label>& cellsStencil() const;

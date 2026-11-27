@@ -133,6 +133,13 @@ class kExactLeastSquares
         //- Face-gradient reconstruction coefficients
         mutable autoPtr<List<CompactListList<vector>>> faceGradCoeffsPtr_;
 
+        //- Gradient coefficients at the face quadrature points of the
+        //  neighbour side of the material interfaces: the neighbour cell's
+        //  polynomial, over its cell stencil followed by the cell itself;
+        //  empty for other faces
+        mutable autoPtr<List<CompactListList<vector>>>
+            interfaceNeighbourFaceGradCoeffsPtr_;
+
         //- Prescribed boundary quadrature-point addressing used by each face
         mutable autoPtr
         <
@@ -254,6 +261,10 @@ class kExactLeastSquares
         //  by merging contribution from owner and neighbour side, and
         //  weighted coefficients for fixed-value boundary faces
         void calcFaceGradCoeffs() const;
+
+        //- Calculate the gradient coefficients at the face quadrature points
+        //  of the neighbour side of the material interfaces
+        void calcInterfaceNeighbourFaceGradCoeffs() const;
 
         //- Return prescribed boundary quadrature-point addressing
         const List<List<FixedList<label, 2>>>&
@@ -450,6 +461,25 @@ public:
 
         //- Gradient of a vector field at face quadrature points
         virtual void fGrad
+        (
+            const volVectorField& vf,
+            CompactListList<tensor>& result
+        ) const;
+
+        //- Gradient of field at the face quadrature points of the neighbour
+        //  side of the material interfaces. result has a row per face, sized
+        //  as the face's quadrature points for a face between two materials
+        //  and empty otherwise
+        template<class Type>
+        void fGradInterfaceNeighbour
+        (
+            const GeometricField<Type, fvPatchField, volMesh>& vf,
+            CompactListList<typename outerProduct<vector, Type>::type>& result
+        ) const;
+
+        //- Gradient of vector field at the face quadrature points of the
+        //  neighbour side of the material interfaces
+        virtual void fGradInterfaceNeighbour
         (
             const volVectorField& vf,
             CompactListList<tensor>& result

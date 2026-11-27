@@ -153,6 +153,24 @@ processors whose boundary is the material interface
 from the `inner` cellSet), or with `./Allrun parallel simple` on two
 processors whose boundary cuts across it (`system/decomposeParDict.simple`).
 
+The case can also be run with the high-order face-quadrature discretisation,
+by copying `constant/solidProperties.highOrder`,
+`system/fvSchemes.highOrder` and `system/fvSolution.highOrder` over
+`constant/solidProperties`, `system/fvSchemes` and `system/fvSolution`. A face
+between the two materials is then evaluated from each side, each side
+reconstructed only from cells of its own material and evaluated by its own
+law, and the face traction is a weighted mean of the two sides' tractions
+(`interfaceTractionWeighting`: `average`, the default, `harmonic`,
+`stiffnessWeighted`, `stiffer` or `softer`). The two sides are held together by
+the momentum stabilisation, which on these faces uses
+`interfaceStabilisationScaleFactor` (default 1) in place of its own
+`scaleFactor`: with a weaker penalty the Krylov solver can stall. The result
+does not depend on the order in which the materials are listed. A material
+interface may lie on a processor boundary, as with the `interface`
+decomposition: each processor then evaluates its own side, and the two sides'
+tractions are exchanged, giving the serial answer. A material interface on a
+cyclic patch is not supported.
+
 ```note
 For multi-material cases, solids4foam expects to find a cellZone for each
 material defined in constant/mechanicalProperties, where the cellZone name is
