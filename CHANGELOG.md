@@ -404,6 +404,13 @@ release. For complete commit-level details and contributor information, see the
   couplings. The tube ends use `fluxConsistentPatches` (below), and the
   old-time solid displacements carry exact boundary values; the time-step
   study runs 50/100/200/400 steps per period.
+- The `womersleyTube` tutorial has an optional interface-traction
+  diagnostic, `verification/traction/AllverifyTraction`. It records the
+  pressure, the transferred viscous traction, the momentum equation's wall
+  flux and the traction applied to the solid, and compares their
+  wave-projected first harmonics with the exact solution under mesh,
+  time-step, amplitude and coupling-tolerance refinement. It needs python3
+  with numpy and does not change the tutorial defaults.
 - `pimpleFluid` (OpenFOAM.com) has an opt-in PIMPLE entry,
   `fluxConsistentPatches (<patches>);`, for patches that fix the pressure and
   whose velocity condition fixes the boundary value, such as a mixed
@@ -415,6 +422,13 @@ release. For complete commit-level details and contributor information, see the
 
 ### Changed
 
+- `womersleyTube` verification (`verification/Allverify --reuse`): a stored
+  run is now reused only if, in addition to the case and tutorial files, the
+  time schedule, the case inputs as the driver writes them and the content of
+  the `solids4Foam` executable and `libsolids4Foam*` libraries match.
+  Before, the build was compared by file size and time stamp, so a rebuild
+  or copy of the same binaries forced a rerun while a changed driver
+  substitution did not. Runs stored by an earlier version are rerun once.
 - The OpenFOAM-v2512 Docker images, the solids4foam release image and the CI
   images, are now based on Ubuntu 24.04 (was 22.04, whose standard support
   ends in April 2027). The Dockerfiles of these base images, with OpenFOAM,
@@ -840,6 +854,9 @@ release. For complete commit-level details and contributor information, see the
   mesh flux. **This changes the results of existing Robin-Neumann cases.**
   `viscousTerm no` restores the earlier condition exactly. The terms are
   evaluated for both conditions by the new `wallNormalMomentum`.
+- `womersleyTube`: `Allrun` now exits with the failing step's status when
+  meshing, decomposition, the solver or reconstruction fails. It returned 0
+  before, because the final optional plotting step set the status.
 - `cavityFlexibleBottom`: the fluid continuity flux, `flux(HbyA)`, is now
   skew-corrected. It fell back to `default linear`, and on the strongly
   deformed mesh at the plate ends its slowly converging error put the
