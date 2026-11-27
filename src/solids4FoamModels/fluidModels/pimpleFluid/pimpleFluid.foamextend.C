@@ -667,8 +667,17 @@ bool pimpleFluid::evolve()
             rAU_ = 1.0/UEqn.A();
             rAUf_ = fvc::interpolate(rAU_);
 
-            U() = rAU_*UEqn.H();
-            phi() = (mesh.Sf() & fvc::interpolate(U()));
+            // The predicted velocity is kept in HbyA until the interface
+            // fluxes are set: the viscous term of movingWallPressure and
+            // elasticWallPressure, updated there, reads the current
+            // velocity iterate U
+            volVectorField HbyA("HbyA", U());
+            HbyA = rAU_*UEqn.H();
+            phi() =
+            (
+                mesh.Sf()
+              & fvc::interpolate(HbyA, "interpolate(" + U().name() + ')')
+            );
 
             // Correct phi for temporal consistency
             if (ddtCorr_)
@@ -684,6 +693,10 @@ bool pimpleFluid::evolve()
             }
 
             addMovingWallPressureFlux();
+
+            // As before, U holds the predicted velocity during the pressure
+            // equation, e.g. for conditions such as totalPressure
+            U() = HbyA;
 
             // Non-orthogonal pressure corrector loop
             while (pimple().correctNonOrthogonal())
