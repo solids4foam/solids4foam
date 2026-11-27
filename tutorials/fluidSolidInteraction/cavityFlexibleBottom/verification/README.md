@@ -125,6 +125,60 @@ tutorial README between the solids4foam prediction and the published
 displacement at the coarsest spacing, and it is why the displacement tolerance
 is looser than the force tolerance.
 
+The table above was recorded before the change below, and with the default
+coupling test.
+
+## Continuity-flux interpolation
+
+The fluid `fvSchemes` sets `flux(HbyA) skewCorrected linear`. This is the
+interpolation of the continuity flux in the pressure equation. Without the
+entry it falls back to `default linear`, with no skew correction. The existing
+`interpolate(U)` entry does not cover this flux on OpenFOAM.com and
+OpenFOAM.org. On foam-extend, `pimpleFluid` builds the flux with
+`fvc::interpolate(U)`, so the `interpolate(U)` entry already applied there.
+
+The plate deforms the fluid mesh strongly at its ends. There, the error of
+the uncorrected interpolation shrinks only about 1.5 times per halving of the
+mesh: that is the rate at which the linear and skew-corrected results approach
+each other. The total error still looks second order over levels 2-4, so the
+study extrapolates to
+an interface force 0.054% from two other solutions that agree with each other.
+That gap lies outside the study's own grid convergence index (GCI, safety
+factor 1.25) of 0.019%. The two solutions are:
+
+- SU2 with CalculiX: -0.240559 m and -5.257784 N;
+- FEniCSx: -0.240544 m and -5.257801 N.
+
+Both are available in the `paper-data/cavity_su2_calculix` and
+`paper-data/fenicsx_cavityflexiblebottom` directories of
+<https://github.com/philipcardiff/paper-fsi-verification>.
+
+With skew correction, the limits agree with them. The time step ΔT is
+0.25, 0.125 and 0.0625 s on levels 2, 3 and 4.
+
+| Level | uy linear | uy skew | Fy linear | Fy skew |
+|---:|---:|---:|---:|---:|
+| 2 | -0.231482 | -0.231268 | -5.239862 | -5.233332 |
+| 3 | -0.238403 | -0.238225 | -5.256547 | -5.251155 |
+| 4 | -0.240111 | -0.239986 | -5.2598 | -5.256073 |
+| Limit, 2–4 | -0.240671 | -0.240583 | -5.260619 | -5.257947 |
+| Order | 2.02 | 1.98 | 2.33 | 1.86 |
+
+Units: uy in m, Fy in N. "Limit" is the Richardson limit from levels 2–4.
+The linear Fy limit and order use the four-decimal values -5.2399, -5.2565 and
+-5.2598, so they are approximate.
+
+How the study was run:
+
+- Aitken coupling with `requireAllResidualMeasures yes`, end time 200 s.
+- Level 4 used `nOuterCorr 40` and fluid linear-solver tolerances of 1e-8.
+  With the defaults, the strict coupling test fails at t ≈ 56 s.
+- The linear level-4 values are from the same set-up; the linear level-4 Fy
+  is available only to four decimals.
+
+The change moves the level-1 tutorial result by 0.13% in uy and by 0.15% in Fy,
+well inside the regression-test tolerances.
+
 ## References
 
 Ž. Tuković, A. Karač, P. Cardiff, H. Jasak, A. Ivanković, OpenFOAM finite
