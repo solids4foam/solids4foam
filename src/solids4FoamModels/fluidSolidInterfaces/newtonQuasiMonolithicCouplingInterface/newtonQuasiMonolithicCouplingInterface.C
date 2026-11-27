@@ -3776,6 +3776,10 @@ void newtonQuasiMonolithicCouplingInterface::selectSolidJacobian()
     {
         useFdSolidJacobian_ = useFd;
 
+        // The Krylov reference of the adaptive rebuild belongs to the block
+        // used before
+        solidFdKrylovRef_ = -1;
+
         // The preconditioning matrix changes its sparsity: rebuild the
         // solver state, so that the Jacobian and the preconditioner are
         // rebuilt at the first Newton iteration of this step
