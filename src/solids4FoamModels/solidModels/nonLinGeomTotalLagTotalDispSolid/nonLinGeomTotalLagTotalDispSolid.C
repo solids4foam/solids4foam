@@ -432,9 +432,9 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveImplicitSegregated()
         surfaceVectorField traction(nCurrent & fvc::interpolate(sigma()));
 
         // Add stabilisation to the traction
-        // We add this before enforcing the traction condition as the
-        // stabilisation is set to zero on traction boundaries
-        momentumStabilisation().updateVector(D(), &gradD());
+        // We add this before enforcing the traction condition as the stabilisation
+        // is set to zero on traction boundaries
+        updateMomentumStabilisation(D(), gradD());
         traction += impKf_*momentumStabilisation().faceVector();
 
         // Calculate the force at the faces
@@ -796,6 +796,7 @@ void Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::correctStressQuad()
 
     mechanicalManager().updateStressFiniteStrain
     (
+        mechanicalConstitutiveLawManager::compactLayout::faces,
         FQuadPtr_(),
         FQuad0Ptr_(),
         FinvQuadPtr_(),
@@ -1366,7 +1367,7 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
         const volVectorField gradp(fvc::grad(p));
 
         // Re-calculate the pressure stabilisation parameter
-        pressureStabilisation().updateScalar(p, &gradp);
+        updatePressureStabilisation(p, gradp);
 
         // Dimensional consistency factor
         const dimensionedScalar one
@@ -1446,7 +1447,7 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
     // Note: in the high-order case, the stabilisation is referred to the
     // undeformed configuration; it vanishes on convergence, so this does not
     // change the converged answer
-    momentumStabilisation().updateVector(D, &gradD());
+    updateMomentumStabilisation(D, gradD());
     traction += impKf_*momentumStabilisation().faceVector();
 
     // Calculate the force at the faces

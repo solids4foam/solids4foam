@@ -8,9 +8,25 @@ source solids4FoamScripts.sh
 
 cleanCase
 rm -rf processor* force.pdf case.foam constant/polyMesh
+# foam-extend subsetMesh output
+rm -rf constant/setSubset system/setSubset
+
+# Restore the initial fields if ./Allrun shortOutlet stopped while they were
+# moved aside; any 0 directory then holds only subsetMesh output
+if [ -d 0.subsetMesh ]
+then
+    \rm -rf 0
+    \mv 0.subsetMesh 0
+fi
 
 # Restore the stored case format
 solids4Foam::restoreCaseFormat .
+
+# Restore the default initial velocity after ./Allrun shortOutlet
+if [ -f 0/U.default ]
+then
+    \mv 0/U.default 0/U
+fi
 
 # Reset the fluid model selected by ./Allrun <fluidModel>
 solids4Foam::requireGnuSed

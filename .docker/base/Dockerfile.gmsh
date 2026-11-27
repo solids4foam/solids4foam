@@ -1,0 +1,35 @@
+################################################################################
+# Base image layer: a pinned Gmsh, used by the regression tests
+#
+# Added on top of an existing image, e.g.
+#   docker build \
+#       --build-arg BASE=philippic/openfoam-v2512:ubuntu-24.04-petsc-no-openmp-system-blas \
+#       -t philippic/openfoam-v2512:ubuntu-24.04-petsc-no-openmp-system-blas-gmsh \
+#       -f Dockerfile.gmsh .
+#
+# Built by .github/workflows/docker-base-images.yml; see .docker/base/README.md
+################################################################################
+
+ARG BASE=philippic/openfoam-v2512:ubuntu-24.04-petsc-no-openmp-system-blas
+FROM ${BASE}
+
+ARG GMSH_VERSION=4.13.1
+ARG FINAL_USER=root
+
+USER root
+SHELL ["/bin/bash", "-c"]
+
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        wget ca-certificates libgl1 libglu1-mesa libxrender1 libxcursor1 \
+        libxft2 libxinerama1 libgomp1 && \
+    wget -q https://gmsh.info/bin/Linux/gmsh-${GMSH_VERSION}-Linux64.tgz \
+        -O /tmp/gmsh.tgz && \
+    tar -xzf /tmp/gmsh.tgz -C /opt && \
+    mv /opt/gmsh-${GMSH_VERSION}-Linux64 /opt/gmsh && \
+    ln -sf /opt/gmsh/bin/gmsh /usr/local/bin/gmsh && \
+    rm -f /tmp/gmsh.tgz && \
+    rm -rf /var/lib/apt/lists/* && \
+    gmsh --version
+
+USER ${FINAL_USER}

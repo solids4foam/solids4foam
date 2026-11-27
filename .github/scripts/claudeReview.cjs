@@ -344,7 +344,7 @@ function secondReviewNotice(risk, number, guide = 'CONTRIBUTING.md', raisedFrom 
     '\n\n### Second independent AI review\n\n' +
     `Required for ${risk} risk, but not yet automated. A core maintainer runs it ` +
     'from an up-to-date `development` checkout once the PR is close to final. It ' +
-    'receives the same instructions, repository guide and patches, without this report ' +
+    'receives the same instructions, repository guide, patches and full files, without this report ' +
     'or any PR comment, and posts its result as a separate comment.\n\n' +
     `- Preferred: Codex (gpt-6-astra, xhigh), a different model family: ${secondReviewCommand(number, false)}\n` +
     `- Substitute: Claude Fable 5.2 (high) through the Anthropic API: ${secondReviewCommand(number, true)}. ` +
@@ -392,8 +392,17 @@ function secondReviewRisk(comments) {
 function formatCoverage(coverage, max = Infinity, listed = Infinity) {
   const omitted = coverage.omitted.slice(0, listed);
   const more = coverage.omitted.length - omitted.length;
+  const allFull = Array.isArray(coverage.full_files) ? coverage.full_files : [];
+  const full = allFull.slice(0, listed);
   return `**Patch coverage: ${coverage.status.toUpperCase()}** ` +
-    '(supplied hunks only; surrounding source and linked evidence are not inspected).\n\n' +
+    (allFull.length ?
+      `(supplied hunks, plus the full post-change text of ${allFull.length} changed ` +
+        `file${allFull.length === 1 ? '' : 's'} as context; other source and linked evidence ` +
+        'are not inspected).\n\n' :
+      '(supplied hunks only; surrounding source and linked evidence are not inspected).\n\n') +
+    (full.length ? 'Seen in full:\n' + full.map(path => `- ${plain(path, max)}`).join('\n') +
+      (allFull.length > full.length ? `\n- and ${allFull.length - full.length} more files` : '') +
+      '\n\n' : '') +
     (omitted.length ? 'Not reviewed:\n' + omitted.map(item =>
       `- ${plain(item.path, max)} (${item.reason === 'no_patch' ? 'no patch available' : 'prompt budget'})`)
       .join('\n') + (more ? `\n- and ${more} more files` : '') + '\n\n' : '');
@@ -401,9 +410,10 @@ function formatCoverage(coverage, max = Infinity, listed = Infinity) {
 
 // GitHub rejects comments over 65,536 characters, and escaping can expand
 // model text up to five times. Rather than discard a valid report, shorten
-// each text field (and the not-reviewed list) step by step until it fits. The
-// last step fits any schema-valid report: 48 fields of 121 characters, escaped,
-// plus 20 listed paths, is under 45,000 characters.
+// each text field (and the path lists) step by step until it fits. The last
+// step fits any schema-valid report: 48 fields of 121 characters, escaped,
+// plus 20 full-file and 20 not-reviewed paths, is under 60,000 characters
+// (tested with the worst escaping).
 const commentLimit = 60000;
 const fitSteps = [[Infinity, Infinity], [1000, 100], [500, 50], [250, 30], [120, 20]];
 function fitComment(render) {
@@ -432,10 +442,14 @@ function repositoryGuide(read = readCheckout) {
 // USD 1 of Opus 5.5 input), enough for whole patches of large refactoring PRs.
 // The prompt reaches the analysis step as a file, never as a step output.
 const promptBudget = 600000;
-function buildPrompt(pr, files, read = readCheckout) {
+// `fullFiles` ({path, content}, from fetchFullFiles) adds the post-change text
+// of changed files after the patches, as context, only within what the patches
+// leave of the budget: patches always take priority. `room` reports the bytes
+// the patches left.
+function buildPrompt(pr, files, read = readCheckout, fullFiles = []) {
   const instructions = read('.github/review/instructions.md');
   const guide = repositoryGuide(read);
-  const selected = [], omitted = [];
+  const selected = [], omitted = [], full = [];
   const priority = file => file.filename.startsWith('src/') ? 0 :
     file.filename.startsWith('applications/') ? 1 :
     /(^|\/)(polyMesh|0)\/|\.csv$/.test(file.filename) ? 3 : 2;
@@ -445,7 +459,7 @@ function buildPrompt(pr, files, read = readCheckout) {
   const system = `${instructions}\n\n${guide}`;
   const data = () => `Reviewed head: ${pr.head.sha}\nBase: ${pr.base.sha}\n` +
     `\nUNTRUSTED PR DATA (JSON):\n${JSON.stringify({title: pr.title, body: pr.body,
-      files: selected, not_reviewed: omitted})}`;
+      files: selected, not_reviewed: omitted, full_files: full})}`;
   const prompt = () => `${system}\n\n${data()}`;
   // Reserve manifest space before selecting any patches; never silently truncate a patch.
   // The limit covers instructions and guide (~18 KB escaped) plus the file manifest.
@@ -465,8 +479,89 @@ function buildPrompt(pr, files, read = readCheckout) {
     }
   }
   if (!selected.length) throw new Error('nothing_reviewable');
-  return {prompt: prompt(), system, data: data(),
-    coverage: {status: omitted.length ? 'partial' : 'complete', omitted}};
+  const room = promptBudget - Buffer.byteLength(JSON.stringify(prompt()));
+  // Context only for files whose patch is in the prompt.
+  const reviewed = new Set(selected.map(item => item.filename));
+  for (const file of fullFiles) {
+    if (!reviewed.has(file.path) || full.some(item => item.path === file.path)) continue;
+    full.push({path: file.path, ref: pr.head.sha, content: file.content});
+    if (Buffer.byteLength(JSON.stringify(prompt())) > promptBudget) full.pop();
+  }
+  return {prompt: prompt(), system, data: data(), room,
+    coverage: {status: omitted.length ? 'partial' : 'complete', omitted,
+      full_files: full.map(item => item.path)}};
+}
+
+// Full post-change text of changed files (#729), so the reviewer sees the
+// rest of a half-edited function, the matching header and nearby callers.
+// Fetched at the PR head SHA through the contents API, as data: PR code is
+// never checked out or run. Only modified or renamed files with a reviewed
+// patch qualify: an added file's patch already is the whole file, and
+// deletions have no post-change text. C/C++ in src/ and applications/ come
+// first, then other C/C++ and Make lists, then other text; a class's .C and
+// .H stay adjacent. Tutorial mesh/field/CSV data and binaries are skipped, as
+// is CHANGELOG.md: about 80 KB, touched by most PRs, and its patch says enough.
+// At most maxFullFiles requests per run, well within the Actions token's
+// 1000 requests per hour.
+const maxFullFiles = 40;
+const maxFullFileBytes = 1000000;
+const cxxFile = /\.(C|H|c|h|cc|hh|cpp|hpp|cxx|hxx)$/;
+const dataFile = /(^|\/)(polyMesh|0|0\.orig)\/|\.(csv|dat|xy|vtk|vtu|vtp|stl|obj|msh|gz|tgz|xz|zip|png|jpe?g|gif|svg|pdf|eps)$/i;
+function fullFilePriority(path) {
+  if (dataFile.test(path) || path === 'CHANGELOG.md') return null;
+  if (/^(src|applications)\//.test(path) && cxxFile.test(path)) return 0;
+  return cxxFile.test(path) || /(^|\/)Make\/(files|options)[^/]*$/.test(path) ? 1 : 2;
+}
+function fullFileCandidates(files, omitted = []) {
+  const skip = new Set(omitted.map(item => item.path));
+  const stem = path => path.replace(/\.[^./]*$/, '');
+  return files.filter(file => file.patch && ['modified', 'renamed', 'changed'].includes(file.status) &&
+      !skip.has(file.filename) && fullFilePriority(file.filename) !== null)
+    .map(file => file.filename)
+    .sort((a, b) => fullFilePriority(a) - fullFilePriority(b) ||
+      stem(a).localeCompare(stem(b)) || a.localeCompare(b))
+    .slice(0, maxFullFiles);
+}
+// The text of a contents-API response, or null unless it is a regular UTF-8
+// file under 1 MB (the API sends no content for larger files).
+function fileText(data) {
+  if (data?.type !== 'file' || data.encoding !== 'base64' || typeof data.content !== 'string' ||
+      !Number.isSafeInteger(data.size) || data.size >= maxFullFileBytes) return null;
+  const bytes = Buffer.from(data.content, 'base64');
+  if (bytes.length !== data.size || bytes.includes(0)) return null;
+  try {
+    return new TextDecoder('utf-8', {fatal: true}).decode(bytes);
+  } catch {
+    return null;
+  }
+}
+// Fetches candidates in order while their raw size fits in `room`; a file that
+// cannot be fetched or decoded is left out, never failing the review.
+async function fetchFullFiles(paths, getFile, room) {
+  const out = [];
+  let used = 0;
+  for (const path of paths) {
+    if (room - used < 1000) break;
+    let text = null;
+    try { text = fileText(await getFile(path)); } catch { /* Left out. */ }
+    if (text === null || used + Buffer.byteLength(text) > room) continue;
+    used += Buffer.byteLength(text);
+    out.push({path, content: text});
+  }
+  return out;
+}
+// buildPrompt plus the full files. `getFile(path)` returns the contents-API
+// response for `path` at the PR head SHA. CI and the second review share it.
+async function buildReviewPrompt(pr, files, getFile, read = readCheckout) {
+  const cache = new Map();
+  const cached = path => {
+    if (!cache.has(path)) cache.set(path, read(path));
+    return cache.get(path);
+  };
+  const patchOnly = buildPrompt(pr, files, cached);
+  const full = await fetchFullFiles(fullFileCandidates(files, patchOnly.coverage.omitted),
+    getFile, patchOnly.room);
+  return full.length ? buildPrompt(pr, files, cached, full) : patchOnly;
 }
 async function prepare({github, context, core}, env = process.env) {
   fs.rmSync(inputFile(env), {force: true});
@@ -479,7 +574,9 @@ async function prepare({github, context, core}, env = process.env) {
     }
     const files = await github.paginate(github.rest.pulls.listFiles, {...args, per_page: 100});
     if (!files.length || files.length >= 3000) throw new Error('file_list_incomplete');
-    const result = buildPrompt(current, files);
+    const getFile = path => github.rest.repos.getContent({...context.repo, path,
+      ref: current.head.sha}).then(response => response.data);
+    const result = await buildReviewPrompt(current, files, getFile);
     const {data: after} = await github.rest.pulls.get(args);
     if (after.head.sha !== pr.head.sha || after.base.sha !== current.base.sha) {
       throw new Error('pr_changed_during_collection');
@@ -534,6 +631,8 @@ async function publish({github, context, core}, env = process.env) {
     const data = validate(env.REVIEW_JSON);
     coverage = JSON.parse(env.REVIEW_COVERAGE);
     if (!['complete', 'partial'].includes(coverage.status) || !Array.isArray(coverage.omitted) ||
+        (coverage.full_files !== undefined && (!Array.isArray(coverage.full_files) ||
+          coverage.full_files.some(path => typeof path !== 'string'))) ||
         Buffer.byteLength(env.REVIEW_COVERAGE) > 30000) throw new Error('Invalid coverage');
     const own = classifyRisk(data.risk, env.RISK_FLOOR);
     risk = second ? classifyRisk(own, second) : own;
@@ -567,6 +666,7 @@ async function publish({github, context, core}, env = process.env) {
   if (failed) core.setFailed('AI review incomplete; failure report published.');
   return {status: failed ? 'failed' : 'completed', coverage: failed ? 'incomplete' : coverage.status};
 }
-module.exports = {promptBudget, riskLabels, incompleteLabel, setRiskLabels, secondMarker,
+module.exports = {promptBudget, maxFullFiles, maxFullFileBytes, fullFileCandidates, fileText,
+  fetchFullFiles, buildReviewPrompt, riskLabels, incompleteLabel, setRiskLabels, secondMarker,
   secondReviewRisk, risks, schema, apiSchema, analyse, inputFile, replayContent, addUsage, retryDelay, clientOptions, maxRequests, analysisReasons, httpStatus, limits, maxReportChars, maxReportBytes, commentLimit, fitComment, validate, classifyRisk, pathRisk, riskFloor, buildPrompt,
   formatAssessment, formatCoverage, secondReviewNotice, plain, prepare, publish};

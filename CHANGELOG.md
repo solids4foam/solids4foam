@@ -31,6 +31,14 @@ release. For complete commit-level details and contributor information, see the
 - `solids4Foam::downloadFile` in `solids4FoamScripts.sh`: download a
   tutorial's input data once, e.g. from the solids4foam website, and check its
   SHA-256 sum.
+- The `backflowStabilisedOutletVelocity` outlet velocity condition applies
+  the backflow-stabilised traction of Esmaily Moghadam et al. (2011),
+  `sigma & n = rho*beta*min(U & n, 0)*U` (`beta` default 0.2, as in the
+  Hessenthaler et al. 2017 benchmark), for outlets with a fixed pressure
+  that see backflow. It is zero gradient on outflow faces and works with
+  `pimpleFluid` and `newtonIcoFluid`; it assumes laminar flow with a
+  constant viscosity and stops with an error otherwise.
+  `cylinderInChannel` gains `./Allrun shortOutlet`, which exercises it.
 - Cook's membrane verification studies now store the per-mesh tip
   displacements of the published references migrated from solid-benchmarks
   (Simo and Armero, César de Sá et al., Areias and Abaqus for the
@@ -139,7 +147,7 @@ release. For complete commit-level details and contributor information, see the
   `circulationPressure` boundary condition and coupler
   (`libcirculationCoupling`) that couple a network to a CFD domain with
   explicit or implicit schemes of order 1 to 4. The tutorials are in
-  `tutorials/circulationModels`. It is currently only available for
+  `tutorials/fluids/circulationModels`. It is currently only available for
   OpenFOAM.com.
 - Added the `BDF` ddt scheme, `default BDF 3;` in `ddtSchemes`, which applies
   the backward differentiation formula of order 1 to 6 to `fvm::ddt` and
@@ -421,6 +429,11 @@ release. For complete commit-level details and contributor information, see the
   Before, the build was compared by file size and time stamp, so a rebuild
   or copy of the same binaries forced a rerun while a changed driver
   substitution did not. Runs stored by an earlier version are rerun once.
+- The OpenFOAM-v2512 Docker images, the solids4foam release image and the CI
+  images, are now based on Ubuntu 24.04 (was 22.04, whose standard support
+  ends in April 2027). The Dockerfiles of these base images, with OpenFOAM,
+  PETSc and Gmsh, are now kept in `.docker/base`, with a workflow that builds
+  them (#767).
 - The `beamInCrossFlow` tutorial now follows the stationary 3-D benchmark of
   Richter (2012), section 7.2: the plate moves to x = 0.4-0.5 m, the solid is
   St Venant-Kirchhoff with E = 1.4 MPa (was 10 kPa) and nu = 0.4, and the
@@ -452,6 +465,15 @@ release. For complete commit-level details and contributor information, see the
   solid-model versions are kept), so that models other than solids can use
   them. Solid results are unchanged. The new `Test-patchQuadratureValues`
   utility checks the behaviour of every registered patch field type.
+
+- The stabilisation models no longer look up the solid model. The
+  second-order `alpha` stabilisation can now be used in any model, e.g. as
+  the `newtonIcoFluid` pressure stabilisation, where it used to stop with
+  "Could not find solidModel_region0", and it has a scalar Jacobian, which
+  the `newtonIcoFluid` pressure needs. The high-order form is a separate
+  call, `updateScalarHighOrder` or `updateVectorHighOrder`, which takes the
+  least-squares scheme from the caller; the solid models make this call when
+  `highOrderResidual` is on. Solid results are unchanged.
 
 - The tutorials that used the `pointCellsLeastSquares` gradient scheme now use
   `leastSquaresS4f`, which is implemented in solids4foam and so is the same
@@ -669,6 +691,15 @@ release. For complete commit-level details and contributor information, see the
   iteration: 0.96, about 160 iterations per time step, on `HronTurekFsi3`.
   The estimate is printed at the start of the run, with a warning when it
   exceeds 0.95.
+- The `circulationModels` tutorials moved from `tutorials/circulationModels`
+  to `tutorials/fluids/circulationModels`, beside the other fluid cases.
+  The two CFD cases, `pipeWindkessel` and `pipeClosedLoop`, are now solved
+  by `solids4Foam` with the `pimpleFluid` fluid model, with `./Allrun
+  pimpleFoam` for stock `pimpleFoam` (`pipeWindkesselSolids4Foam` is folded
+  into `pipeWindkessel`), and `pipeClosedLoop0D` is now `./Allrun 0D` in
+  `pipeClosedLoop` (its circuit is in `pipeClosedLoop/reference0D`). The
+  tutorials plot their results with gnuplot instead of Python and
+  `matplotlib`.
 
 ### Removed
 
@@ -796,6 +827,50 @@ release. For complete commit-level details and contributor information, see the
 - `womersleyTube`: `Allrun` now exits with the failing step's status when
   meshing, decomposition, the solver or reconstruction fails. It returned 0
   before, because the final optional plotting step set the status.
+- `cavityFlexibleBottom`: the fluid continuity flux, `flux(HbyA)`, is now
+  skew-corrected. It fell back to `default linear`, and on the strongly
+  deformed mesh at the plate ends its slowly converging error put the
+  extrapolated interface force 0.054% from independent solutions (SU2 with
+  CalculiX, FEniCSx); with skew correction they agree to 0.003%. Other
+  partitioned FSI cases on strongly deformed meshes may need the same entry.
+- A high-order (face-quadrature) parallel run no longer stops at the end of the
+  first time step when a processor holds no cells. The constitutive law manager
+  decided from the row count whether a compact integration-point layout was
+  cell-based or face-based, and a rank with no cells has no faces either, so
+  that rank registered a `compactCell` topology while the others registered
+  `compactFace`. The caller of the `CompactListList` stress updates now states
+  which kind of layout it passes (#707).
+- On OpenFOAM.com and OpenFOAM.org, the non-orthogonal correction of
+  `newMovingWallVelocity`, `elasticWallVelocity`, `normalInletVelocity`,
+  `paraboloidInletVelocity`, `fixedTemperature`, `normalDisplacement`,
+  `solidSymmetry` and, on OpenFOAM.com, the finite-area `clampedMoment` was
+  always zero. Each built its correction vector from `fvPatch::delta()` (or
+  `faPatch::delta()`), which on these forks is only the normal part of the
+  face-cell vector, so removing the normal part left nothing. The correction
+  vector is now taken from the face centre minus the cell centre (for
+  `clampedMoment`, the edge centre minus the adjacent face centre), which is
+  what `delta()` returns on foam-extend, so foam-extend results are
+  unchanged. The foam-extend-only conditions that used the same pattern
+  (`tractionPressureDisplacement`, `solidCohesive` and the block-coupled
+  conditions) were changed in the same way for consistency. Cases with
+  non-orthogonal faces on these patches change slightly: the `hotSphere` and
+  `perforatedPlate` references were re-recorded. `interFluid` now also
+  updates the registered velocity gradient after the pressure correction on
+  OpenFOAM.com and OpenFOAM.org, as it already did on foam-extend and as
+  `pimpleFluid` does, because the corrected velocity conditions read it
+  (#748).
+
+- The `neoHookeanElastic`, `neoHookeanElasticMisesPlastic`,
+  `MooneyRivlinElastic`, `HolzapfelGasserOgdenElastic` and
+  `viscousHolzapfelOgden` laws now give exactly zero stress at the undeformed
+  state. Where the compiler fused the multiply-add in `dev()`, `dev(I)` left a
+  round-off residual of about `5.6e-17*mu`, which was enough to derail an
+  initially unloaded PETSc solve. The identity is now subtracted before
+  `dev()`, which leaves the stress algebraically unchanged. The two
+  Holzapfel-Ogden laws likewise form their fibre strains from `C - I`, since
+  `|N|^2` of a unit fibre direction is not exactly 1 in floating point, and
+  `HolzapfelGasserOgdenElastic` now normalises its fibre directions.
+
 - `IQNILS`: the `preciceStyleCouplingQR` least-squares solve, per interface
   and with `combinedCouplingSystem`, had the wrong sign and moved the interface
   away from the fixed point. With `residualSumPreconditioning`, the residual
