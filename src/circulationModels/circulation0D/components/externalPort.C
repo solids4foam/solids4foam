@@ -125,6 +125,7 @@ Foam::externalPort::externalPort
     hasValve_(dict.isDict("valve")),
     CQ_(0),
     reverseFraction_(0.005),
+    reverseDPmax_(0),
     t0_(0),
     t1_(1),
     c_(0.0)
@@ -134,10 +135,23 @@ Foam::externalPort::externalPort
         const dictionary& v = dict.subDict("valve");
         CQ_ = ctx.read(v, "CQ", circulationContext::quantity::valveCoefficient);
         reverseFraction_ = v.getOrDefault<scalar>("reverseFraction", 0.005);
+        reverseDPmax_ =
+            ctx.read
+            (
+                v,
+                "reverseDPmax",
+                circulationContext::quantity::pressure,
+                0
+            );
 
         if (CQ_ <= 0)
         {
             fail("valve CQ must be positive");
+        }
+
+        if (reverseDPmax_ < 0)
+        {
+            fail("valve reverseDPmax must not be negative");
         }
     }
 
@@ -237,7 +251,14 @@ Foam::scalar Foam::externalPort::patchPressure
         return Pnode;
     }
 
-    const scalar dP = orificeValve::dPfromQ(CQ_, portFlow(t), reverseFraction_);
+    const scalar dP =
+        orificeValve::dPfromQ
+        (
+            CQ_,
+            portFlow(t),
+            reverseFraction_,
+            reverseDPmax_
+        );
 
     return inlet_ ? Pnode - dP : Pnode + dP;
 }

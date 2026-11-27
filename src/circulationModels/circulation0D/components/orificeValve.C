@@ -180,7 +180,8 @@ Foam::scalar Foam::orificeValve::dPfromQ
 (
     const scalar CQ,
     const scalar Q,
-    const scalar fr
+    const scalar fr,
+    const scalar dPmax
 )
 {
     if (Q >= 0)
@@ -191,7 +192,9 @@ Foam::scalar Foam::orificeValve::dPfromQ
 
     const scalar frc = Foam::min(Foam::max(fr, scalar(1e-3)), scalar(1));
     const scalar s = -Q/(frc*CQ);
-    return -s*s;
+    const scalar x = s*s;
+
+    return dPmax > 0 ? -x*dPmax/(x + dPmax) : -x;
 }
 
 

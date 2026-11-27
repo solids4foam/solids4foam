@@ -46,6 +46,11 @@ Description
         dP =  (Q/CQ)^2                       Q >= 0
         dP = -(|Q|/(fr CQ))^2                Q <  0,   fr in [1e-3, 1]
 
+    With dPmax > 0 the reverse branch saturates at -dPmax, the largest
+    adverse pressure a shut valve is asked to hold,
+
+        dP = -x dPmax/(x + dPmax),  x = (|Q|/(fr CQ))^2      Q < 0
+
 Author
     David Kelly, UCD.
 
@@ -116,8 +121,15 @@ public:
         //  where it is shut [m3/s/Pa]
         virtual scalar dFlowdDP(const scalar t, const scalar dP) const;
 
-        //- Pressure drop that carries flow Q through the valve [Pa]
-        static scalar dPfromQ(const scalar CQ, const scalar Q, const scalar fr);
+        //- Pressure drop that carries flow Q through the valve [Pa]; the
+        //  reverse branch is bounded by dPmax when dPmax > 0
+        static scalar dPfromQ
+        (
+            const scalar CQ,
+            const scalar Q,
+            const scalar fr,
+            const scalar dPmax = 0
+        );
 };
 
 
