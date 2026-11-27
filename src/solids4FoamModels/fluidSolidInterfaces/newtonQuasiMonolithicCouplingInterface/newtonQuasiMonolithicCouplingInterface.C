@@ -2401,8 +2401,58 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
     configuredNestedFluidSplit_(false),
     solverPtr_(),
     Pmat_(nullptr),
-    tsLogPtr_()
+    tsLogPtr_(),
+    solidJacobian_
+    (
+        fsiProperties().lookupOrDefault<word>("solidJacobian", "compact")
+    ),
+    solidJacobianRebuild_
+    (
+        fsiProperties().lookupOrDefault<word>
+        (
+            "solidJacobianRebuild",
+            "deltaTChange"
+        )
+    ),
+    solidJacobianCheck_
+    (
+        fsiProperties().lookupOrDefault<Switch>("solidJacobianCheck", false)
+    ),
+    solidFdJacobianPtr_(),
+    solidFdJacobianDeltaT_(-1),
+    solidFdJacobianDeltaT0_(-1)
 {
+    if
+    (
+        solidJacobian_ != "compact"
+     && solidJacobian_ != "colouredFiniteDifference"
+    )
+    {
+        FatalIOErrorInFunction(fsiProperties())
+            << "Unknown solidJacobian " << solidJacobian_
+            << ": valid options are compact and colouredFiniteDifference"
+            << exit(FatalIOError);
+    }
+
+    if
+    (
+        solidJacobianRebuild_ != "deltaTChange"
+     && solidJacobianRebuild_ != "always"
+    )
+    {
+        FatalIOErrorInFunction(fsiProperties())
+            << "Unknown solidJacobianRebuild " << solidJacobianRebuild_
+            << ": valid options are deltaTChange and always"
+            << exit(FatalIOError);
+    }
+
+    if (solidJacobian_ == "colouredFiniteDifference")
+    {
+        Info<< "The solid block of the preconditioning matrix is the coloured "
+            << "finite-difference Jacobian of the solid residual (rebuilt: "
+            << solidJacobianRebuild_ << ")" << endl;
+    }
+
     if (solid().twoD() != fluid().twoD())
     {
         FatalErrorInFunction
@@ -3653,6 +3703,50 @@ label newtonQuasiMonolithicCouplingInterface::formJacobian
         (
             subMats[1][1], xSolid
         );
+
+        if (solidJacobian_ == "colouredFiniteDifference")
+        {
+            // Replace the compact solid block by the Jacobian of the solid
+            // residual, with the interface traction held at its current
+            // value. The compact block misrepresents bending of slender
+            // solids (it omits the coupling between the displacement
+            // components); the Jacobian is computed by coloured forward
+            // differences of the solid residual and, by default, reused
+            // until the time step changes
+            if (!solidFdJacobianPtr_.valid())
+            {
+                solidFdJacobianPtr_.reset
+                (
+                    new colouredFiniteDifferenceJacobian
+                    (
+                        "solidJacobian",
+                        refCast<foamPetscSnesHelper>(solid())
+                    )
+                );
+            }
+
+            const scalar deltaT = physicsModel::runTime().deltaTValue();
+            const scalar deltaT0 = physicsModel::runTime().deltaT0Value();
+            const bool rebuild =
+                solidJacobianRebuild_ == "always"
+             || !solidFdJacobianPtr_->built()
+             || mag(deltaT - solidFdJacobianDeltaT_) > SMALL*deltaT
+             || mag(deltaT0 - solidFdJacobianDeltaT0_) > SMALL*deltaT;
+
+            solidFdJacobianPtr_->apply(subMats[1][1], xSolid, rebuild);
+
+            if (rebuild)
+            {
+                solidFdJacobianDeltaT_ = deltaT;
+                solidFdJacobianDeltaT0_ = deltaT0;
+
+                if (solidJacobianCheck_)
+                {
+                    solidFdJacobianPtr_->check(xSolid);
+                }
+            }
+        }
+
         VecRestoreSubVector(x, isSolid(), &xSolid);
     }
 

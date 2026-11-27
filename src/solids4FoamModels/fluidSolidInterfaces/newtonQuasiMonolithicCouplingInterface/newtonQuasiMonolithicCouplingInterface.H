@@ -46,6 +46,7 @@ SourceFiles
 #include "foamPetscSnesHelper.H"
 #include "foamPetscSnesSolver.H"
 #include "labelPairHashes.H"
+#include "colouredFiniteDifferenceJacobian.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -166,6 +167,30 @@ class newtonQuasiMonolithicCouplingInterface
         //- Optional file for recording the time step sizes and number of
         //  nonlinear iterations
         autoPtr<OFstream> tsLogPtr_;
+
+        //- Solid block of the preconditioning matrix: "compact" (default,
+        //  the solid model's component-wise approximation) or
+        //  "colouredFiniteDifference" (the Jacobian of the solid residual,
+        //  with the interface traction held fixed)
+        const word solidJacobian_;
+
+        //- When to recompute the coloured finite-difference solid block:
+        //  "deltaTChange" (default: once, and again when the time step or
+        //  the previous time step changes) or "always" (at every Jacobian
+        //  evaluation)
+        const word solidJacobianRebuild_;
+
+        //- Print a directional-derivative check of the finite-difference
+        //  solid block after each build
+        const Switch solidJacobianCheck_;
+
+        //- Coloured finite-difference solid block, created on first use
+        autoPtr<colouredFiniteDifferenceJacobian> solidFdJacobianPtr_;
+
+        //- Time step and previous time step at the last build of the
+        //  finite-difference solid block
+        scalar solidFdJacobianDeltaT_;
+        scalar solidFdJacobianDeltaT0_;
 
 
     // Private Member Functions
