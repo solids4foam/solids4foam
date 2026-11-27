@@ -1,0 +1,21 @@
+################################################################################
+# Base image: OpenFOAM-v2512 on Ubuntu 24.04
+#
+# Published as philippic/openfoam-v2512:ubuntu-24.04
+# Built by .github/workflows/docker-base-images.yml; see .docker/base/README.md
+################################################################################
+
+FROM ubuntu:24.04
+
+LABEL maintainer="Philip Cardiff <philip.cardiff@ucd.ie>"
+
+SHELL ["/bin/bash", "-c"]
+
+# Install OpenFOAM-v2512 from the OpenCFD Debian repository
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        wget ca-certificates && \
+    wget -q -O - https://dl.openfoam.com/add-debian-repo.sh | bash && \
+    DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC apt-get install -y \
+        openfoam2512-dev && \
+    rm -rf /var/lib/apt/lists/*

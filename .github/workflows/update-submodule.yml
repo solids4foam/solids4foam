@@ -6,6 +6,11 @@ on:
       - development
   workflow_dispatch:  # Enable manual triggering
 
+# The GITHUB_TOKEN is only needed to read this repository; the push to
+# solids4foam.github.io uses the PAT_GITHUB_IO secret
+permissions:
+  contents: read
+
 jobs:
   update-submodule:
     runs-on: ubuntu-latest

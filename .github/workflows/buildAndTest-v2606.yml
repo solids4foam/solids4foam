@@ -22,6 +22,10 @@ on:
         default: false
         type: boolean
 
+# The GITHUB_TOKEN is only needed to read the repository
+permissions:
+  contents: read
+
 jobs:
   build-and-test-v2606:
     name: Build and test on OpenFOAM-v2606

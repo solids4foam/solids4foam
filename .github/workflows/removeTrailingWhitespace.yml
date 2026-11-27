@@ -10,6 +10,10 @@ on:
       - '**'
   workflow_dispatch:
 
+# The GITHUB_TOKEN is only needed to read the repository
+permissions:
+  contents: read
+
 jobs:
   check-whitespace:
     runs-on: ubuntu-latest
