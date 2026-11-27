@@ -6,7 +6,9 @@ sort: 16
 
 Prepared by Philip Cardiff, from the solids4foam verification campaign
 
-## Tutorial aims
+---
+
+## Tutorial Aims
 
 - Verify a transient fluid-solid interaction (FSI) solution on a moving
   (arbitrary Lagrangian-Eulerian, ALE) fluid mesh with the method of
@@ -15,7 +17,9 @@ Prepared by Philip Cardiff, from the solids4foam verification campaign
   solution, and the observed orders of accuracy under refinement.
 - Provide a fast coarse case and an opt-in convergence study.
 
-## Case overview
+---
+
+## Case Overview
 
 A two-dimensional channel flow is coupled to a compliant wall:
 
@@ -76,9 +80,12 @@ The tutorial-local library `src/` (`libmmsFsi`) provides:
   write times.
 
 The exact solution is evaluated by the generated C++ header
-`src/mmsFsiExact.H`; see [Regenerating the exact solution](#regenerating-the-exact-solution).
+`src/mmsFsiExact.H`; see
+[Regenerating the Exact Solution](#regenerating-the-exact-solution).
 
-## Running the case
+---
+
+## Running the Case
 
 The case uses the partitioned `pimpleFluid` fluid model, the
 `nonLinearGeometryTotalLagrangianTotalDisplacement` solid model with the
@@ -136,7 +143,9 @@ The case is set up for second-order accuracy in space and time:
   it, `pimpleFluid` stops with an error, so uncomment it only with that
   change.
 
-## Verification and regression
+---
+
+## Expected Results
 
 `./regressionTest.sh` runs the coarse case with both couplings and checks the
 L2 errors of `U`, `p`, `D` and `intTrac` at $$t = 0.4$$ against the reference
@@ -177,7 +186,9 @@ order 1.7: the interface pressure gradient that `elasticWallPressure`
 imposes omits the viscous and body-force terms. See the verification README
 for the tables.
 
-## Regenerating the exact solution
+---
+
+## Regenerating the Exact Solution
 
 The generated header `src/mmsFsiExact.H` is committed, so the case needs
 neither Python nor sympy. The construction is in `derivation/`:
@@ -206,7 +217,9 @@ arguments select other variants, which the case does not use: for example
 the interface stays flat and moves only vertically, and the density and
 viscosity arguments change the fluid and solid parameters.
 
-## Not included
+---
+
+## Not Included
 
 The verification paper also runs this case with the quasi-monolithic
 coupling of `newtonIcoFluid` and the velocity-form total Lagrangian solid,
@@ -215,7 +228,9 @@ that are not on the `development` branch, so they are not part of this
 tutorial. IQN-ILS with
 the default settings of this case does not converge on the 32-cell mesh.
 
-## Reference
+---
+
+## References
 
 - The solids4foam fluid-solid interaction verification paper (in
   preparation), section "Manufactured solution for transient ALE FSI with a

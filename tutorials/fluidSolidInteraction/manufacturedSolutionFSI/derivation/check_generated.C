@@ -77,7 +77,7 @@ static void expect(const char* what, double err, double tol)
     );
     if (!ok)
     {
-        nFail++;
+        ++nFail;
     }
 }
 
@@ -130,7 +130,7 @@ static M3 Fof(double X, double Y, double t)
 {
     const double h = 1e-5;
     M3 F{};
-    for (int i = 0; i < 2; i++)
+    for (int i = 0; i < 2; ++i)
     {
         F.a[i][0] =
             (i == 0)
@@ -178,11 +178,11 @@ static void neoHookeanSigma(const M3& F, double sig[3][3], double& J)
     J = F.a[0][0]*F.a[1][1] - F.a[0][1]*F.a[1][0];
 
     double b[3][3] = {};
-    for (int i = 0; i < 3; i++)
+    for (int i = 0; i < 3; ++i)
     {
-        for (int j = 0; j < 3; j++)
+        for (int j = 0; j < 3; ++j)
         {
-            for (int k = 0; k < 3; k++)
+            for (int k = 0; k < 3; ++k)
             {
                 b[i][j] += F.a[i][k]*F.a[j][k];
             }
@@ -192,9 +192,9 @@ static void neoHookeanSigma(const M3& F, double sig[3][3], double& J)
     const double s = std::pow(J, -2.0/3.0);
     double tr = s*(b[0][0] + b[1][1] + b[2][2]);
     const double sigmaHyd = 0.5*kappa*(J*J - 1.0);
-    for (int i = 0; i < 3; i++)
+    for (int i = 0; i < 3; ++i)
     {
-        for (int j = 0; j < 3; j++)
+        for (int j = 0; j < 3; ++j)
         {
             sig[i][j] =
                 (mu/J)*(s*b[i][j] - (i == j)*tr/3.0)
@@ -218,12 +218,12 @@ static void piola(double X, double Y, double t, double P[2][2])
         {-F.a[0][1]/J,  F.a[0][0]/J}
     };
 
-    for (int i = 0; i < 2; i++)
+    for (int i = 0; i < 2; ++i)
     {
-        for (int j = 0; j < 2; j++)
+        for (int j = 0; j < 2; ++j)
         {
             P[i][j] = 0;
-            for (int k = 0; k < 2; k++)
+            for (int k = 0; k < 2; ++k)
             {
                 P[i][j] += J*sig[i][k]*iT[k][j];
             }
@@ -251,7 +251,7 @@ int main()
     double bScale = 0;
     const double h = 1e-4;
 
-    for (int k = 0; k < 200; k++)
+    for (int k = 0; k < 200; ++k)
     {
         const double t = 0.05 + 0.9*U01(gen);
         const double x = L*(0.02 + 0.96*U01(gen));
@@ -260,7 +260,7 @@ int main()
         const double y = hh[0]*(0.02 + 0.96*U01(gen));
         FS c = fl(x, y, t);
         double res[2];
-        for (int i = 0; i < 2; i++)
+        for (int i = 0; i < 2; ++i)
         {
             const double dUdt =
                 d1([&](double e){ return fl(x, y, t + e).U[i]; }, h);
@@ -315,11 +315,11 @@ int main()
         {
             sig[0][0], sig[0][1], sig[0][2], sig[1][1], sig[1][2], sig[2][2]
         };
-        for (int q = 0; q < 6; q++)
+        for (int q = 0; q < 6; ++q)
         {
             eSig = std::max(eSig, std::fabs(sg[q] - sgRef[q]));
         }
-        for (int i = 0; i < 2; i++)
+        for (int i = 0; i < 2; ++i)
         {
             // U = dD/dt and acceleration = d2D/dt2, both from FD of D only
             const double Dt =
@@ -390,7 +390,7 @@ int main()
                 eKin,
                 std::fabs(ci.U[0] - Us[0]) + std::fabs(ci.U[1] - Us[1])
             );
-        for (int i = 0; i < 2; i++)
+        for (int i = 0; i < 2; ++i)
         {
             const double xt =
                 d1
@@ -449,11 +449,11 @@ int main()
         // fluid traction (dynamic): rho*( -p n + nu (G + G^T) n )
         const double G[2][2] = {{ci.G[0], ci.G[1]}, {ci.G[2], ci.G[3]}};
         const double sS[2][2] = {{sg[0], sg[1]}, {sg[1], sg[3]}};
-        for (int i = 0; i < 2; i++)
+        for (int i = 0; i < 2; ++i)
         {
             double tf = -ci.p*n[i];
             double ts = 0;
-            for (int j = 0; j < 2; j++)
+            for (int j = 0; j < 2; ++j)
             {
                 tf += nuF*(G[i][j] + G[j][i])*n[j];
                 ts += sS[i][j]*n[j];
@@ -529,9 +529,9 @@ int main()
     double mRot = 0;
     for (double t : {0.15, 0.3, 0.45, 0.6, 0.75, 0.9})
     {
-        for (int i = 1; i < N; i++)
+        for (int i = 1; i < N; ++i)
         {
-            for (int j = 1; j < N; j++)
+            for (int j = 1; j < N; ++j)
             {
                 const double x = L*i/N;
                 double hh[1];
@@ -545,7 +545,7 @@ int main()
                 double cv[2];
                 double gp[2];
                 double vs[2];
-                for (int q = 0; q < 2; q++)
+                for (int q = 0; q < 2; ++q)
                 {
                     a[q] =
                         d1
@@ -630,7 +630,7 @@ int main()
                         )
                     );
                 double acc[2];
-                for (int q = 0; q < 2; q++)
+                for (int q = 0; q < 2; ++q)
                 {
                     acc[q] =
                         d1
@@ -716,7 +716,7 @@ int main()
                 U[0], U[1], p[0], f[0], f[1], D[0], D[1],
                 Us[0], Us[1], b0[0], b0[1]
             };
-            for (int k = 0; k < 11 && k < int(ref.size()); k++)
+            for (int k = 0; k < 11 && k < int(ref.size()); ++k)
             {
                 eRef =
                     std::max
@@ -725,7 +725,7 @@ int main()
                         std::fabs(got[k] - ref[k])/(1.0 + std::fabs(ref[k]))
                     );
             }
-            nRef++;
+            ++nRef;
         }
         expect
         (

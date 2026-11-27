@@ -25,7 +25,8 @@ nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs
 
     // Second-order deformed area and normal on the interface (solidTraction)
     // faces. This entry is used from solids4foam PR #756 and is ignored
-    // before it; without it, the solid displacement is first order
+    // before it; without it, the solid displacement falls below second order
+    // on meshes finer than n = 64 (see verification/README.md)
     tractionPatchSurfaceGradient yes;
 
     stabilisation

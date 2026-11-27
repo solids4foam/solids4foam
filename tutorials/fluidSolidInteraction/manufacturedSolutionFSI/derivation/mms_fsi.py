@@ -149,7 +149,8 @@ F = sp.Matrix([[F2[0, 0], F2[0, 1], 0], [F2[1, 0], F2[1, 1], 0], [0, 0, 1]])
 J = F2[0, 0] * F2[1, 1] - F2[0, 1] * F2[1, 0]
 
 def cauchy_neoHookean(F, J):
-    # PLACEHOLDER: confirm against solids4foam neoHookeanElastic
+    # As neoHookeanElasticMechanicalConstitutiveLaw::evaluate:
+    # (mu/J)*dev(J^(-2/3)*b) + 0.5*K*(J^2 - 1)/J*I, with the 3-D K
     b = F * F.T
     bbar = J ** R(-2, 3) * b
     devbbar = bbar - bbar.trace() / 3 * sp.eye(3)
