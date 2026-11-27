@@ -233,7 +233,9 @@ void pimpleFluid::correctFluxConsistentPatches
 
         if (isA<fixedGradientFvPatchVectorField>(Ub))
         {
-            const vectorField dUb(Ub.snGrad()/Ub.patch().deltaCoeffs());
+            // Named operand: a reused tmp would alias the quotient
+            const vectorField snGradUb(Ub.snGrad());
+            const vectorField dUb(snGradUb/Ub.patch().deltaCoeffs());
 
             phiHbyA.boundaryFieldRef()[patchI] +=
                 dUb & mesh().Sf().boundaryField()[patchI];
