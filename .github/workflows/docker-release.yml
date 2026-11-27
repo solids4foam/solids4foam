@@ -8,6 +8,11 @@ on:
         required: true
         type: string
 
+# The GITHUB_TOKEN is only needed to read the repository; Docker Hub uses its
+# own secrets
+permissions:
+  contents: read
+
 jobs:
   build-and-push:
     runs-on: ubuntu-22.04

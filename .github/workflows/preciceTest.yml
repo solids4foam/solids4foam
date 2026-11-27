@@ -22,6 +22,10 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, labeled]
 
+# The GITHUB_TOKEN is only needed to read the repository
+permissions:
+  contents: read
+
 jobs:
   precice-test:
     name: preCICE coupling test
