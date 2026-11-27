@@ -121,6 +121,7 @@ REGRESSION_TESTS=(
     "solids/elastoplasticity/notchedBar"
     "solids/fracture/crackingBeams"
     "solids/fracture/crackingPlateHole"
+    "solids/fracture/notchedBarLemaitre"
     "solids/hyperelasticity/rigidRotation/rotatingSphere"
     "solids/hyperelasticity/rigidRotation/rotatingBlock"
     "solids/hyperelasticity/rigidRotation/rotatingCylinder"

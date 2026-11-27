@@ -633,6 +633,8 @@ void Foam::solidModels::nonLinGeomUpdatedLagSolid::correctStress()
 
         addSmoothedHydrostaticStress(sigma(), impK_, &J_);
 
+        solveImplicitGradientFields();
+
         return;
     }
 
@@ -647,6 +649,8 @@ void Foam::solidModels::nonLinGeomUpdatedLagSolid::correctStress()
         mesh().time().deltaTValue(),
         sigma()
     );
+
+    solveImplicitGradientFields();
 }
 
 

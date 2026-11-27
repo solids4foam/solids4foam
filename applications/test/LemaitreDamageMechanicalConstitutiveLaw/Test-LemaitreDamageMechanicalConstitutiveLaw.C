@@ -43,6 +43,15 @@ Description
          the Kirchhoff stress equals the small-strain law's at the
          logarithmic strain.
       8. Inconsistent entries are refused.
+      9. The non-local forms, with the non-local damage supplied as the
+         input the solid model would solve for: with it zero the stress is
+         linearElasticMisesPlastic's while the local damage grows by the
+         explicit update; with it held the state satisfies the discrete
+         equations degraded by it; with the input iterated to the local
+         damage within each step, which is the converged outer iteration
+         for a vanishing length, the local form is recovered; the
+         effective form fails a point once the input reaches Dc and stops
+         its local damage; and the law declares the field.
 
 Author
     Philip Cardiff, UCD.
@@ -106,13 +115,17 @@ class directDriver
     mechanicalConstitutiveLawState state_;
     tensor gradD0_;
 
+    //- The non-local damage input, for the non-local forms
+    scalarField DNonLocal_;
+
 public:
 
     explicit directDriver(const dictionary& dict)
     :
         lawPtr_(mechanicalConstitutiveLaw::New(dict)),
         state_(1),
-        gradD0_(tensor::zero)
+        gradD0_(tensor::zero),
+        DNonLocal_(1, 0.0)
     {
         // The declared defaults, at both times, as the manager applies them
         mechanicalConstitutiveLawStateSpec spec;
@@ -169,6 +182,12 @@ public:
 
         mechanicalConstitutiveLawInputs inputs(1.0, 0.0);
 
+        const wordList inputNames(lawPtr_->requiredScalarInputs());
+        forAll(inputNames, i)
+        {
+            inputs.setScalar(inputNames[i], DNonLocal_);
+        }
+
         lawPtr_->evaluate(kin, inputs, state_, response);
 
         return sigma[0];
@@ -178,6 +197,17 @@ public:
     void beginStep()
     {
         state_.storeOldTime();
+    }
+
+    //- Set the non-local damage input
+    void setNonLocal(const scalar D)
+    {
+        DNonLocal_ = D;
+    }
+
+    const mechanicalConstitutiveLaw& law() const
+    {
+        return lawPtr_();
     }
 
     scalar value(const word& name) const
@@ -901,6 +931,386 @@ int main(int argc, char *argv[])
             refused(lemaitre + hardening + "lemaitreType Malcher;" + damage),
             "Malcher without S0Tension and S0Shear is refused", 0, 0
         );
+
+        check
+        (
+            refused(lemaitre + hardening + damage + "nonLocal classic;"),
+            "a non-local form without a characteristic length is refused",
+            0, 0
+        );
+
+        check
+        (
+            refused
+            (
+                lemaitre + hardening + damage + "nonLocal integral; "
+                "characteristicLength characteristicLength [0 1 0 0 0 0 0] "
+                "1e-3;"
+            ),
+            "an unknown non-local form is refused", 0, 0
+        );
+    }
+
+    // 9. The non-local forms
+    {
+        Info<< nl << "9. The non-local forms" << endl;
+
+        const string classic
+        (
+            "nonLocal classic; "
+            "characteristicLength characteristicLength [0 1 0 0 0 0 0] 1e-3; "
+        );
+
+        // A nearly isochoric path with shear, as in 2
+        auto path = [](const scalar t)
+        {
+            return
+                diagStrain(0.2*t, -0.099*t, -0.099*t)
+              + tensor(0, 0.03*t, 0, 0.03*t, 0, 0, 0, 0, 0);
+        };
+
+        const scalar S0 = 2e6;
+        const string params("S0 S0 [1 -1 -2 0 0 0 0] 2e6; b 1; ");
+
+        // The explicit local damage update with Y from equation 52, at a
+        // stress degraded by DEff
+        auto damageIncrement = [&]
+        (
+            const symmTensor& sigma, const scalar DEff, const scalar dr
+        )
+        {
+            const scalar sigmaEq = Foam::sqrt(1.5)*mag(dev(sigma));
+            const scalar eta = tr(sigma)/(3*sigmaEq);
+            const scalar sv = sigmaEq/(1 - DEff);
+            const scalar Y =
+               -sqr(sv)/(2*E)*((2.0/3.0)*(1 + nu) + 3*(1 - 2*nu)*sqr(eta));
+
+            return dr/(1 - DEff)*(-Y/S0);
+        };
+
+        const label nSteps = 100;
+
+        // 9a. With the non-local damage zero
+        {
+            directDriver law(lawDict(lemaitre + hardening + params + classic));
+            directDriver plastic
+            (
+                lawDict("type linearElasticMisesPlastic; " + hardening)
+            );
+
+            scalar maxStress = 0;
+            scalar maxDamage = 0;
+
+            for (label stepI = 1; stepI <= nSteps; ++stepI)
+            {
+                const tensor g(path(scalar(stepI)/nSteps));
+
+                const symmTensor sigma(law.step(g));
+                const symmTensor sigmaPlastic(plastic.step(g));
+
+                maxStress =
+                    max(maxStress, mag(sigma - sigmaPlastic)/mag(sigmaPlastic));
+
+                const scalar dr =
+                    law.value("epsilonPEq") - law.value0("epsilonPEq");
+
+                maxDamage =
+                    max
+                    (
+                        maxDamage,
+                        mag
+                        (
+                            law.value("damage") - law.value0("damage")
+                          - damageIncrement(sigma, 0, dr)
+                        )
+                    );
+            }
+
+            check
+            (
+                maxStress <= 1e-12,
+                "non-local, zero input: the stress is "
+                "linearElasticMisesPlastic's",
+                maxStress, 1e-12
+            );
+
+            check
+            (
+                maxDamage <= 1e-12 && law.value("damage") > 1e-2,
+                "non-local, zero input: the local damage grows by the "
+                "explicit update, |D - D0 - dD|",
+                maxDamage, 1e-12
+            );
+        }
+
+        // 9b. With the non-local damage held
+        {
+            const scalar DEff = 0.3;
+
+            directDriver law(lawDict(lemaitre + hardening + params + classic));
+            law.setNonLocal(DEff);
+
+            scalar maxYield = 0;
+            scalar maxDamage = 0;
+
+            for (label stepI = 1; stepI <= nSteps; ++stepI)
+            {
+                const symmTensor sigma(law.step(path(scalar(stepI)/nSteps)));
+
+                const scalar r = law.value("epsilonPEq");
+                const scalar dr = r - law.value0("epsilonPEq");
+
+                if (dr <= 0)
+                {
+                    continue;
+                }
+
+                const scalar sigmaEq = Foam::sqrt(1.5)*mag(dev(sigma));
+                const scalar sigmaYr = sigmaY0 + H*r;
+
+                maxYield =
+                    max(maxYield, mag(sigmaEq/(1 - DEff) - sigmaYr)/sigmaYr);
+
+                maxDamage =
+                    max
+                    (
+                        maxDamage,
+                        mag
+                        (
+                            law.value("damage") - law.value0("damage")
+                          - damageIncrement(sigma, DEff, dr)
+                        )
+                    );
+            }
+
+            check
+            (
+                maxYield <= 1e-10,
+                "non-local, input 0.3: the stress is on the yield surface "
+                "degraded by it",
+                maxYield, 1e-10
+            );
+
+            check
+            (
+                maxDamage <= 1e-12,
+                "non-local, input 0.3: the local damage satisfies the update "
+                "at it, |D - D0 - dD|",
+                maxDamage, 1e-12
+            );
+        }
+
+        // 9c. The local form, at the converged outer iteration of a
+        // vanishing length, where the non-local damage is the local one
+        for (label formI = 0; formI < 2; ++formI)
+        {
+            const word form(formI == 0 ? "classic" : "effective");
+
+            directDriver law
+            (
+                lawDict
+                (
+                    lemaitre + hardening + params + "nonLocal " + form + "; "
+                    "characteristicLength characteristicLength "
+                    "[0 1 0 0 0 0 0] 0; "
+                )
+            );
+            directDriver local(lawDict(lemaitre + hardening + params));
+
+            scalar maxStress = 0;
+            scalar maxDamage = 0;
+            label maxIter = 0;
+            scalar DIn = 0;
+
+            for (label stepI = 1; stepI <= nSteps; ++stepI)
+            {
+                const tensor g(path(scalar(stepI)/nSteps));
+
+                law.beginStep();
+
+                // Converged when the evaluation returns the damage it was
+                // given
+                symmTensor sigma(symmTensor::zero);
+                label iter = 0;
+
+                for (; iter < 100; ++iter)
+                {
+                    sigma = law.evaluate(g);
+
+                    const scalar D = law.value("damage");
+                    const scalar change = mag(D - DIn);
+
+                    DIn = D;
+                    law.setNonLocal(DIn);
+
+                    if (change < 1e-15)
+                    {
+                        break;
+                    }
+                }
+
+                maxIter = max(maxIter, iter);
+
+                const symmTensor sigmaLocal(local.step(g));
+
+                maxStress =
+                    max(maxStress, mag(sigma - sigmaLocal)/mag(sigmaLocal));
+
+                maxDamage =
+                    max
+                    (
+                        maxDamage,
+                        mag(law.value("damage") - local.value("damage"))
+                    );
+            }
+
+            Info<< "    " << form << ": damage at the end "
+                << law.value("damage") << ", at most " << maxIter
+                << " iterations a step" << endl;
+
+            check
+            (
+                maxStress <= 1e-10 && maxDamage <= 1e-12,
+                form + " non-local, input iterated to the local damage: the "
+                "local form, |dsigma|/|sigma|",
+                maxStress, 1e-10
+            );
+        }
+
+        // 9d. Failure in the effective form, and in the classic one
+        {
+            const string failure
+            (
+                lemaitre + hardening + params + "Dc 0.5; "
+                "characteristicLength characteristicLength [0 1 0 0 0 0 0] "
+                "1e-3; "
+            );
+
+            directDriver effective(lawDict(failure + "nonLocal effective;"));
+            directDriver classicLaw(lawDict(failure + "nonLocal classic;"));
+            effective.setNonLocal(0.6);
+            classicLaw.setNonLocal(0.6);
+
+            scalar maxYield = 0;
+            scalar maxGrowth = 0;
+
+            for (label stepI = 1; stepI <= 20; ++stepI)
+            {
+                const tensor g(path(scalar(stepI)/nSteps));
+
+                const symmTensor sigma(effective.step(g));
+                classicLaw.step(g);
+
+                // On the yield surface degraded by 0.99
+                const scalar r = effective.value("epsilonPEq");
+                const scalar sigmaEq = Foam::sqrt(1.5)*mag(dev(sigma));
+                const scalar sigmaYr = sigmaY0 + H*r;
+
+                maxYield =
+                    max(maxYield, mag(sigmaEq/0.01 - sigmaYr)/sigmaYr);
+
+                maxGrowth = max(maxGrowth, effective.value("damage"));
+            }
+
+            check
+            (
+                maxYield <= 1e-10,
+                "effective non-local, input past Dc: the stress is on the "
+                "yield surface degraded by 0.99",
+                maxYield, 1e-10
+            );
+
+            check
+            (
+                maxGrowth == 0 && effective.value("epsilonPEq") > 0,
+                "effective non-local, input past Dc: the local damage does "
+                "not grow",
+                maxGrowth, 0
+            );
+
+            check
+            (
+                classicLaw.value("damage") > 0,
+                "classic non-local, input past Dc: the local damage grows",
+                classicLaw.value("damage"), 0
+            );
+
+            // The classic form sets a local damage past Dc to 0.99
+            directDriver capped
+            (
+                lawDict
+                (
+                    lemaitre + hardening
+                  + "S0 S0 [1 -1 -2 0 0 0 0] 2e5; b 1; Dc 0.5; "
+                    "nonLocal classic; characteristicLength "
+                    "characteristicLength [0 1 0 0 0 0 0] 1e-3;"
+                )
+            );
+            capped.setNonLocal(0.4);
+
+            bool reached = false;
+            bool stays = true;
+
+            for (label stepI = 1; stepI <= nSteps; ++stepI)
+            {
+                capped.step(path(scalar(stepI)/nSteps));
+
+                const scalar D = capped.value("damage");
+
+                if (reached && D != 0.99)
+                {
+                    stays = false;
+                }
+
+                if (D >= 0.99)
+                {
+                    reached = true;
+                }
+                else if (D > 0.5)
+                {
+                    stays = false;
+                }
+            }
+
+            check
+            (
+                reached && stays,
+                "classic non-local: a local damage past Dc is set to 0.99",
+                capped.value("damage"), 0.99
+            );
+        }
+
+        // 9e. The declared field
+        {
+            directDriver law(lawDict(lemaitre + hardening + params + classic));
+
+            const List<mechanicalConstitutiveLaw::implicitGradientField>
+                fields(law.law().implicitGradientFields());
+            const wordList inputs(law.law().requiredScalarInputs());
+
+            check
+            (
+                fields.size() == 1
+             && fields[0].name == "damageNonLocal"
+             && fields[0].source == "damage"
+             && mag(fields[0].length - 1e-3) < SMALL
+             && inputs.size() == 1
+             && inputs[0] == "damageNonLocal",
+                "the law declares damageNonLocal, of the local damage over "
+                "the characteristic length, and reads it",
+                fields.size(), 1
+            );
+
+            directDriver localLaw(lawDict(lemaitre + hardening + params));
+
+            check
+            (
+                localLaw.law().implicitGradientFields().empty()
+             && localLaw.law().requiredScalarInputs().empty(),
+                "the local form declares and reads no field",
+                0, 0
+            );
+        }
     }
 
     Info<< nl << "Lemaitre checks: " << nPass << " passed, " << nFail

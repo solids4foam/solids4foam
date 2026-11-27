@@ -271,6 +271,81 @@ void correctStressBoundaries
     }
 }
 
+
+//- Collect the implicit-gradient fields read by a law and the laws below it
+void collectImplicitGradientNames
+(
+    const mechanicalConstitutiveLaw& law,
+    HashSet<word>& names
+)
+{
+    const List<mechanicalConstitutiveLaw::implicitGradientField> fields
+    (
+        law.implicitGradientFields()
+    );
+
+    forAll(fields, i)
+    {
+        names.insert(fields[i].name);
+    }
+
+    const wordList childNames(law.childStateNames());
+
+    forAll(childNames, i)
+    {
+        collectImplicitGradientNames(law.childLaw(childNames[i]), names);
+    }
+}
+
+
+//- The current source of an implicit-gradient field, from the state of the
+//  law that reads it, which is this law or one below it, and its length.
+//  Null if none of them reads it
+const scalarField* implicitGradientSourceOf
+(
+    const mechanicalConstitutiveLaw& law,
+    const mechanicalConstitutiveLawState& state,
+    const word& name,
+    scalar& length
+)
+{
+    const List<mechanicalConstitutiveLaw::implicitGradientField> fields
+    (
+        law.implicitGradientFields()
+    );
+
+    forAll(fields, i)
+    {
+        if (fields[i].name == name)
+        {
+            length = fields[i].length;
+
+            return &state.getScalarField(fields[i].source);
+        }
+    }
+
+    const wordList childNames(law.childStateNames());
+
+    forAll(childNames, i)
+    {
+        const scalarField* sourcePtr =
+            implicitGradientSourceOf
+            (
+                law.childLaw(childNames[i]),
+                state.child(childNames[i]),
+                name,
+                length
+            );
+
+        if (sourcePtr)
+        {
+            return sourcePtr;
+        }
+    }
+
+    return nullptr;
+}
+
 } // End anonymous namespace
 } // End namespace Foam
 
@@ -3824,6 +3899,93 @@ void Foam::mechanicalConstitutiveLawManager::writeStateFields() const
         reportedUnreadInputs_
     );
 }
+
+Foam::wordList
+Foam::mechanicalConstitutiveLawManager::implicitGradientFieldNames() const
+{
+    HashSet<word> names;
+
+    forAll(laws_, lawI)
+    {
+        collectImplicitGradientNames(laws_[lawI], names);
+    }
+
+    wordList result(names.toc());
+    Foam::sort(result);
+
+    return result;
+}
+
+
+void Foam::mechanicalConstitutiveLawManager::implicitGradientSource
+(
+    const word& name,
+    scalarField& source,
+    scalarField& lengthSqr
+) const
+{
+    source.setSize(mesh_.nCells());
+    lengthSqr.setSize(mesh_.nCells());
+    source = 0;
+    lengthSqr = 0;
+
+    const topologyEntry* entryPtr = nullptr;
+
+    forAllIters(topologyEntries_, topoIter)
+    {
+        const topologyEntry& entry = autoPtrRef(topoIter());
+
+        if (entry.topology_.integrationPointsAreCells())
+        {
+            entryPtr = &entry;
+            break;
+        }
+    }
+
+    if (!entryPtr)
+    {
+        FatalErrorInFunction
+            << "The source of the implicit-gradient field " << name
+            << " is taken from the constitutive state at the cells, and the "
+            << "stress has not been evaluated there." << nl
+            << "    The implicit-gradient fields are available with solid "
+            << "models that evaluate the stress at the cell centres only."
+            << exit(FatalError);
+    }
+
+    const topologyEntry& entry = *entryPtr;
+
+    forAll(laws_, lawI)
+    {
+        if (lawI >= entry.states_.size() || !entry.states_.set(lawI))
+        {
+            continue;
+        }
+
+        scalar length = 0;
+
+        const scalarField* sourcePtr =
+            implicitGradientSourceOf
+            (
+                laws_[lawI], entry.states_[lawI], name, length
+            );
+
+        if (!sourcePtr)
+        {
+            continue;
+        }
+
+        const scalarField& lawSource = *sourcePtr;
+        const labelList& cells = entry.lawIntegrationPointIDs_[lawI];
+
+        forAll(cells, i)
+        {
+            source[cells[i]] = lawSource[i];
+            lengthSqr[cells[i]] = sqr(length);
+        }
+    }
+}
+
 
 void Foam::mechanicalConstitutiveLawManager::endTimeStep()
 {

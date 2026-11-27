@@ -148,6 +148,13 @@ class linGeomTotalDispSolid
             return true;
         }
 
+        //- This model solves the implicit-gradient fields the laws read, in
+        //  correctStress()
+        virtual bool supportsImplicitGradientFields() const
+        {
+            return true;
+        }
+
         //- Return the material tangent at mesh faces, indexed by face, for
         //  the high-order Jacobian
         const List<mat66>& faceMaterialTangent

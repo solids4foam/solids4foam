@@ -302,6 +302,41 @@ input's name and written. In parallel the directory is looked for inside each
 
 ---
 
+## Implicit-gradient fields
+
+A law that is regularised by a non-local variable, such as the non-local
+damage of `linearElasticMisesPlasticLemaitreDamage`, needs the solution of
+
+```text
+phi - div(l^2 grad(phi)) = source
+```
+
+over the mesh, with zero flux on the boundary, where the source is one of the
+law's own state variables. A law sees only its integration points and cannot
+solve a field equation, and the manager must not drive a solver, so the
+equation belongs to the solid model:
+
+1. the law names the field, the state variable that is its source and the
+   length `l` through `implicitGradientFields()`, and lists the field among
+   its `requiredScalarInputs()`;
+2. the manager collects the names over every law and the laws they wrap
+   (`implicitGradientFieldNames()`), and gives the source and `l^2` at the
+   cells from the current state of each law that reads the field, zero in
+   the cells of the others (`implicitGradientSource()`);
+3. the solid model makes the field when it builds the manager, so that the
+   first evaluation finds it registered, and solves the equation after every
+   cell-centred stress update (`solidModel::solveImplicitGradientFields()`);
+   the face diffusivity is the harmonic mean of the cells' `l^2`, so no flux
+   crosses into a material that does not read the field.
+
+The law reads the solution as a scalar input at its next evaluation, lagged
+by one outer iteration, which the converged step balances. The field is
+written and read on a restart. It is solved by the updated Lagrangian, total
+Lagrangian and linear geometry total displacement solid models with the
+`implicitSegregated` algorithm; `solidModel::New()` refuses the others.
+
+---
+
 ## Small vs finite strain
 
 Two independent stress update pathways exist:

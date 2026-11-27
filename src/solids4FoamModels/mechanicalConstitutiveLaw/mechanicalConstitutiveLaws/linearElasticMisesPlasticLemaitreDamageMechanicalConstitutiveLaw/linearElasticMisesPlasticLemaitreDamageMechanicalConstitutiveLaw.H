@@ -20,7 +20,7 @@ Class
 
 Description
     Small-strain J2 plasticity with isotropic hardening coupled to Lemaitre
-    ductile damage, local form.
+    ductile damage, in local or non-local form.
 
     With D the damage, r the accumulated plastic multiplier (the hardening
     variable, stored as epsilonPEq) and sigma the stress, the yield function
@@ -67,6 +67,28 @@ Description
     iteration, but it is a function of the kinematics and the old-time state
     alone, as a law here must be.
 
+    Non-local forms. The local damage softens the material without a
+    length scale, so once it localises the solution depends on the mesh.
+    With nonLocal classic or effective, the stress is degraded instead by
+    the implicit non-local damage Dbar of Peerlings et al., the solution of
+
+        Dbar - div(l^2 grad(Dbar)) = D
+
+    with l the characteristic length and zero flux on the boundary, which
+    the solid model solves once per outer iteration (it is the
+    implicit-gradient field damageNonLocal) and this law reads as an input.
+    At each point, with Deff the damage the stress is degraded by:
+
+        Phi = sigmaEq/(1 - Deff) - sigmaY(r),   sigma = (1 - Deff) C : epsilonE
+        D   = D0 + dr/(1 - Deff) (-Y/S)^b
+
+    where Y is evaluated at Deff. For classic, Deff = Dbar, and a local
+    damage past Dc is set to 0.99. For effective, the effective non-local
+    damage of Whelan et al., Deff = Dbar until Dbar reaches Dc and 0.99
+    from then on, and the local damage stops growing once Deff has reached
+    Dc, so that a failed region neither recovers nor feeds the damage of
+    its neighbours.
+
     The law implements the small-strain update and the elastic predictor
     interface, so it is used at finite strain as the sub-law of logStrain,
     which is the formulation of Whelan et al.
@@ -77,6 +99,8 @@ Description
         for Plasticity, Wiley, 2008, chapter 12.
       - L. Malcher, F.M. Andrade Pires & J.M.A. Cesar de Sa, Int. J.
         Plasticity 30-31 (2012) 81-115.
+      - R.H.J. Peerlings, R. de Borst, W.A.M. Brekelmans & J.H.P. de Vree,
+        Int. J. Numer. Meth. Eng. 39 (1996) 3391-3403.
       - A. Whelan, T. Tang, V. Pakrashi & P. Cardiff, Int. J. Numer. Meth.
         Eng. (2025), doi:10.1002/nme.7640.
 
@@ -123,6 +147,14 @@ public:
             triaxiality
         };
 
+        //- The regularisation of the damage
+        enum class nonLocalType
+        {
+            none,
+            classic,
+            effective
+        };
+
 
     // Public Classes
 
@@ -141,8 +173,12 @@ public:
             //- Plastic multiplier increment, the hardening variable's
             scalar DLambda;
 
-            //- Damage at the end of the step
+            //- Damage at the end of the step: the local damage
             scalar D;
+
+            //- Damage the stress is degraded by: D in the local form, the
+            //  effective non-local damage in the non-local forms
+            scalar DStress;
 
             //- Yield stress at the end of the step
             scalar sigmaY;
@@ -207,6 +243,12 @@ private:
         //- Whether damage stops for triaxialities at or below -1/3
         const bool triaxialityCutOff_;
 
+        //- The regularisation of the damage
+        nonLocalType nonLocal_;
+
+        //- Characteristic length of the non-local forms
+        scalar characteristicLength_;
+
         //- Newton loop tolerance
         const scalar loopTol_;
 
@@ -263,6 +305,18 @@ private:
             pointResult& result
         ) const;
 
+        //- The return mapping and local damage update at one point, the
+        //  stress degraded by a given non-local damage
+        void nonLocalUpdate
+        (
+            const symmTensor& epsilonETrial,
+            const scalar epsilonPEq0,
+            const scalar D0,
+            const scalar DNonLocal,
+            const scalar maxMagDEpsilon,
+            pointResult& result
+        ) const;
+
         //- No copy construct
         linearElasticMisesPlasticLemaitreDamageMechanicalConstitutiveLaw
         (
@@ -286,6 +340,9 @@ public:
 
         //- Damage of a failed point
         static const scalar Dfailed;
+
+        //- The name of the non-local damage field
+        static const word nonLocalFieldName;
 
 
     // Constructors
@@ -339,6 +396,14 @@ public:
         {
             return true;
         }
+
+        //- The non-local damage, in the non-local forms
+        virtual wordList requiredScalarInputs() const override;
+
+        //- The non-local damage, in the non-local forms, whose source is
+        //  the local damage
+        virtual List<implicitGradientField>
+        implicitGradientFields() const override;
 
         //- Small-strain constitutive evaluation
         virtual void evaluate

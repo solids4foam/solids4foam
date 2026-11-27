@@ -603,6 +603,8 @@ void Foam::solidModels::linGeomTotalDispSolid::correctStress()
 
         checkVolumetricClosure();
 
+        solveImplicitGradientFields();
+
         return;
     }
 
@@ -622,6 +624,8 @@ void Foam::solidModels::linGeomTotalDispSolid::correctStress()
 
         addSmoothedHydrostaticStress(sigma(), impK_, nullptr);
 
+        solveImplicitGradientFields();
+
         return;
     }
 
@@ -632,6 +636,8 @@ void Foam::solidModels::linGeomTotalDispSolid::correctStress()
         mesh().time().deltaTValue(),
         sigma()
     );
+
+    solveImplicitGradientFields();
 }
 
 

@@ -375,6 +375,10 @@ private:
             //- The law's volumetric response, dU/dJ, before smoothing
             autoPtr<volScalarField> smoothingVolumetricResponsePtr_;
 
+        //- The implicit-gradient fields the laws read, owned and solved by
+        //  the solid model. See solveImplicitGradientFields()
+        mutable PtrList<volScalarField> implicitGradientFields_;
+
 #ifdef OPENFOAM_COM
         //- fvOptions
         fv::options& fvOptions_;
@@ -438,6 +442,11 @@ private:
 
         //- Return a reference to setCellDisplacements
         const setCellDisplacements& setCellDisps() const;
+
+        //- Make the implicit-gradient fields the laws read, once the
+        //  framework is built and before any law is evaluated, so that the
+        //  first evaluation finds them
+        void makeImplicitGradientFields() const;
 
         //- Disallow default bitwise copy construct
         solidModel(const solidModel&);
@@ -572,6 +581,29 @@ protected:
 
         //- Storage for the law's volumetric response on the smoothing path
         volScalarField& smoothingVolumetricResponse();
+
+        //- Can this solid model solve the implicit-gradient fields the laws
+        //  read? Only one that calls solveImplicitGradientFields() after
+        //  each cell-centred stress update can. Checked by New(), so that a
+        //  model which cannot refuses such a law rather than running it with
+        //  the fields frozen at their initial values
+        virtual bool supportsImplicitGradientFields() const
+        {
+            return false;
+        }
+
+        //- Solve each implicit-gradient field a law reads,
+        //
+        //      phi - div(l^2 grad(phi)) = source,
+        //
+        //  with the source the current state the law names, from the stress
+        //  update just made, and zero flux on the boundary. In the cells of
+        //  a law that does not read it, source and l are zero; the face
+        //  diffusivity is the harmonic mean of the cells' l^2, so no flux
+        //  crosses into them. The laws read the solution at the next
+        //  evaluation, lagged by one outer iteration, as Whelan et al.
+        //  (2025) and Peerlings et al. (1996) solve it
+        void solveImplicitGradientFields();
 
         //- Smooth the hydrostatic stress and add it to sigma, which on entry
         //  holds the isochoric stress, with smoothingVolumetricResponse()

@@ -1382,7 +1382,8 @@ Foam::solidModel::solidModel
     sigmaHydPtr_(),
     useBoundaryFaceValuesSigmaHydPtr_(),
     gradSigmaHydPtr_(),
-    smoothingVolumetricResponsePtr_()
+    smoothingVolumetricResponsePtr_(),
+    implicitGradientFields_()
 #ifdef OPENFOAM_COM
     ,
     fvOptions_(fv::options::New(*meshPtr_))
@@ -2660,9 +2661,162 @@ Foam::solidModel::mechanicalManager() const
         (
             restartKinematicsAvailable_
         );
+
+        makeImplicitGradientFields();
     }
 
     return mechanicalManagerPtr_();
+}
+
+
+void Foam::solidModel::makeImplicitGradientFields() const
+{
+    const wordList names
+    (
+        mechanicalManagerPtr_->implicitGradientFieldNames()
+    );
+
+    implicitGradientFields_.setSize(names.size());
+
+    forAll(names, fieldI)
+    {
+        // Read on a restart, and otherwise zero, with zero flux on every
+        // boundary that is not a constraint
+        implicitGradientFields_.set
+        (
+            fieldI,
+            new volScalarField
+            (
+                IOobject
+                (
+                    names[fieldI],
+                    mesh().time().timeName(),
+                    mesh(),
+                    IOobject::READ_IF_PRESENT,
+                    IOobject::AUTO_WRITE
+                ),
+                mesh(),
+                dimensionedScalar("zero", dimless, 0.0),
+                zeroGradientFvPatchScalarField::typeName
+            )
+        );
+
+        Info<< "Solving the implicit-gradient field " << names[fieldI]
+            << " for the mechanical constitutive laws" << endl;
+    }
+}
+
+
+void Foam::solidModel::solveImplicitGradientFields()
+{
+    forAll(implicitGradientFields_, fieldI)
+    {
+        volScalarField& phi = implicitGradientFields_[fieldI];
+
+        volScalarField source
+        (
+            IOobject
+            (
+                phi.name() + "Source",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE,
+                false
+            ),
+            mesh(),
+            dimensionedScalar("zero", phi.dimensions(), 0.0),
+            zeroGradientFvPatchScalarField::typeName
+        );
+
+        volScalarField lengthSqr
+        (
+            IOobject
+            (
+                phi.name() + "LengthSqr",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE,
+                false
+            ),
+            mesh(),
+            dimensionedScalar("zero", dimArea, 0.0),
+            zeroGradientFvPatchScalarField::typeName
+        );
+
+        mechanicalManager().implicitGradientSource
+        (
+            phi.name(),
+            primitiveFieldRef(source),
+            primitiveFieldRef(lengthSqr)
+        );
+
+        // The processor and other coupled patches take the neighbours' values
+        lengthSqr.correctBoundaryConditions();
+
+        // The harmonic mean, which is zero where either cell's is
+        surfaceScalarField lengthSqrf
+        (
+            IOobject
+            (
+                phi.name() + "LengthSqrf",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE,
+                false
+            ),
+            mesh(),
+            dimensionedScalar("zero", dimArea, 0.0)
+        );
+
+        const labelUList& own = mesh().owner();
+        const labelUList& nei = mesh().neighbour();
+        const scalarField& lengthSqrI = lengthSqr.internalField();
+        scalarField& lengthSqrfI = primitiveFieldRef(lengthSqrf);
+
+        forAll(lengthSqrfI, faceI)
+        {
+            const scalar a = lengthSqrI[own[faceI]];
+            const scalar b = lengthSqrI[nei[faceI]];
+
+            lengthSqrfI[faceI] = a + b > 0 ? 2.0*a*b/(a + b) : 0.0;
+        }
+
+        forAll(lengthSqrf.boundaryField(), patchI)
+        {
+            const fvPatchScalarField& pLengthSqr =
+                lengthSqr.boundaryField()[patchI];
+
+            const scalarField a(pLengthSqr.patchInternalField());
+            scalarField b(a);
+
+            if (pLengthSqr.coupled())
+            {
+                b = pLengthSqr.patchNeighbourField();
+            }
+
+            scalarField& pLengthSqrf = boundaryFieldRef(lengthSqrf)[patchI];
+
+            forAll(pLengthSqrf, faceI)
+            {
+                const scalar s = a[faceI] + b[faceI];
+
+                pLengthSqrf[faceI] =
+                    s > 0 ? 2.0*a[faceI]*b[faceI]/s : 0.0;
+            }
+        }
+
+        fvScalarMatrix phiEqn
+        (
+            fvm::Sp(dimensionedScalar("one", dimless, 1.0), phi)
+          - fvm::laplacian(lengthSqrf, phi, "laplacian(" + phi.name() + ")")
+         == source
+        );
+
+        phiEqn.solve();
+    }
 }
 
 
@@ -3000,6 +3154,50 @@ Foam::autoPtr<Foam::solidModel> Foam::solidModel::New
         }
 
         modelPtr->smoothHydrostaticStress();
+    }
+
+    // Likewise for the implicit-gradient fields: a model that does not solve
+    // them would leave them at their initial values
+    if
+    (
+        hasMechProps
+     && modelPtr->mechanicalManager().implicitGradientFieldNames().size()
+    )
+    {
+        const wordList names
+        (
+            modelPtr->mechanicalManager().implicitGradientFieldNames()
+        );
+
+        if (!modelPtr->supportsImplicitGradientFields())
+        {
+            FatalErrorIn("solidModel::New(Time&, const word&)")
+                << "The mechanical constitutive laws read the "
+                << "implicit-gradient fields " << names << ", and solid model "
+                << modelType << " cannot solve them." << nl
+                << "    They are solved by the updated Lagrangian, total "
+                << "Lagrangian and linear geometry total displacement "
+                << "models, with the cell-centred stress."
+                << exit(FatalError);
+        }
+
+        if
+        (
+            modelPtr->solutionAlg()
+         != solutionAlgorithm::IMPLICIT_SEGREGATED
+        )
+        {
+            FatalErrorIn("solidModel::New(Time&, const word&)")
+                << "The mechanical constitutive laws read the "
+                << "implicit-gradient fields " << names << ", and the "
+                << modelType << " solution algorithm is "
+                << solutionAlgorithmNames_[modelPtr->solutionAlg()] << "."
+                << nl
+                << "    The fields are solved once per outer iteration, "
+                << "lagged, which only the implicitSegregated algorithm "
+                << "converges."
+                << exit(FatalError);
+        }
     }
 
     return modelPtr;

@@ -46,6 +46,11 @@ Foam::linearElasticMisesPlasticLemaitreDamageMechanicalConstitutiveLaw::
 Dfailed = 0.99;
 
 
+const Foam::word
+Foam::linearElasticMisesPlasticLemaitreDamageMechanicalConstitutiveLaw::
+nonLocalFieldName = "damageNonLocal";
+
+
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
 inline Foam::scalar
@@ -147,6 +152,7 @@ returnMap
         );
     result.DLambda = DLambda;
     result.D = D;
+    result.DStress = D;
     result.sigmaY = sigmaY;
 
     result.theta = 1.0;
@@ -266,10 +272,10 @@ damageIncrement
         S = 2.0*S0_/(1.0 + 3.0*eta);
     }
 
-    const scalar Y = energyReleaseRate(sigma, result.D);
+    const scalar Y = energyReleaseRate(sigma, result.DStress);
 
     return
-        result.DLambda/(1.0 - result.D)*pow(max(-Y, 0.0)/S, b_);
+        result.DLambda/(1.0 - result.DStress)*pow(max(-Y, 0.0)/S, b_);
 }
 
 
@@ -364,6 +370,49 @@ localUpdate
 }
 
 
+void Foam::linearElasticMisesPlasticLemaitreDamageMechanicalConstitutiveLaw::
+nonLocalUpdate
+(
+    const symmTensor& epsilonETrial,
+    const scalar epsilonPEq0,
+    const scalar D0,
+    const scalar DNonLocal,
+    const scalar maxMagDEpsilon,
+    pointResult& result
+) const
+{
+    // The damage the stress is degraded by. The non-local damage is a
+    // smoothed local damage, so it lies in [0, 0.99] up to the tolerance of
+    // its linear solver, and in the effective form it is the failed damage
+    // once it reaches Dc
+    scalar DEff = DNonLocal;
+
+    if (nonLocal_ == nonLocalType::effective && DNonLocal >= Dc_)
+    {
+        DEff = Dfailed;
+    }
+
+    DEff = min(max(DEff, 0.0), Dfailed);
+
+    returnMap(epsilonETrial, epsilonPEq0, DEff, maxMagDEpsilon, result);
+
+    // Explicit in the local damage, which the stress does not depend on
+    scalar D = D0;
+
+    if (nonLocal_ == nonLocalType::classic || DEff < Dc_)
+    {
+        D += damageIncrement(result, epsilonPEq0);
+    }
+
+    if (nonLocal_ == nonLocalType::classic && D > Dc_)
+    {
+        D = Dfailed;
+    }
+
+    result.D = D;
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 Foam::linearElasticMisesPlasticLemaitreDamageMechanicalConstitutiveLaw::
@@ -393,6 +442,8 @@ linearElasticMisesPlasticLemaitreDamageMechanicalConstitutiveLaw
     (
         dict.lookupOrDefault<Switch>("triaxialityCutOff", true)
     ),
+    nonLocal_(nonLocalType::none),
+    characteristicLength_(0),
     loopTol_(dict.lookupOrDefault<scalar>("NewtonLoopTol", 1e-8)),
     maxNewtonIter_(dict.lookupOrDefault<label>("NewtonMaxIter", 200)),
     finiteDiff_(dict.lookupOrDefault<scalar>("NewtonFiniteDiffEps", 0.25e-6)),
@@ -519,10 +570,50 @@ linearElasticMisesPlasticLemaitreDamageMechanicalConstitutiveLaw
             << exit(FatalIOError);
     }
 
+    // The regularisation
+    const word nonLocal(dict.lookupOrDefault<word>("nonLocal", "none"));
+
+    if (nonLocal == "none")
+    {
+        nonLocal_ = nonLocalType::none;
+    }
+    else if (nonLocal == "classic" || nonLocal == "effective")
+    {
+        nonLocal_ =
+            nonLocal == "classic"
+          ? nonLocalType::classic
+          : nonLocalType::effective;
+
+        const dimensionedScalar l(dict.lookup("characteristicLength"));
+
+        if (l.dimensions() != dimLength || l.value() < 0)
+        {
+            FatalIOErrorInFunction(dict)
+                << "characteristicLength must not be negative, with "
+                << "dimensions " << dimLength << exit(FatalIOError);
+        }
+
+        characteristicLength_ = l.value();
+    }
+    else
+    {
+        FatalIOErrorInFunction(dict)
+            << "Unknown nonLocal " << nonLocal << ". Valid forms are none, "
+            << "classic and effective" << exit(FatalIOError);
+    }
+
     Info<< "    Lemaitre damage: " << type << ", b = " << b_
         << ", epsilonD = " << epsilonD_ << ", Dc = " << Dc_
         << ", crackClosure = " << h_
-        << ", triaxialityCutOff = " << Switch(triaxialityCutOff_) << endl;
+        << ", triaxialityCutOff = " << Switch(triaxialityCutOff_)
+        << ", nonLocal = " << nonLocal;
+
+    if (nonLocal_ != nonLocalType::none)
+    {
+        Info<< ", characteristicLength = " << characteristicLength_;
+    }
+
+    Info<< endl;
 }
 
 
@@ -565,6 +656,40 @@ smallStrainConvergenceScale
     }
 
     return maxMagEpsilon;
+}
+
+
+Foam::wordList
+Foam::linearElasticMisesPlasticLemaitreDamageMechanicalConstitutiveLaw::
+requiredScalarInputs() const
+{
+    if (nonLocal_ == nonLocalType::none)
+    {
+        return wordList();
+    }
+
+    return wordList(1, nonLocalFieldName);
+}
+
+
+Foam::List
+<
+    Foam::mechanicalConstitutiveLaw::implicitGradientField
+>
+Foam::linearElasticMisesPlasticLemaitreDamageMechanicalConstitutiveLaw::
+implicitGradientFields() const
+{
+    if (nonLocal_ == nonLocalType::none)
+    {
+        return List<implicitGradientField>();
+    }
+
+    List<implicitGradientField> fields(1);
+    fields[0].name = nonLocalFieldName;
+    fields[0].source = "damage";
+    fields[0].length = characteristicLength_;
+
+    return fields;
 }
 
 
@@ -647,15 +772,33 @@ evaluateElasticPredictor
 
     maxMagDEpsilon = max(maxMagDEpsilon, SMALL);
 
+    const scalarField* DNonLocalPtr = nullptr;
+
+    if (nonLocal_ != nonLocalType::none)
+    {
+        DNonLocalPtr = &inputs.getScalar(nonLocalFieldName);
+    }
+
     pointResult result;
 
     forAll(sigma, i)
     {
-        localUpdate
-        (
-            epsilonETrial[i], epsilonPEq0[i], damage0[i], maxMagDEpsilon,
-            result
-        );
+        if (DNonLocalPtr)
+        {
+            nonLocalUpdate
+            (
+                epsilonETrial[i], epsilonPEq0[i], damage0[i],
+                (*DNonLocalPtr)[i], maxMagDEpsilon, result
+            );
+        }
+        else
+        {
+            localUpdate
+            (
+                epsilonETrial[i], epsilonPEq0[i], damage0[i], maxMagDEpsilon,
+                result
+            );
+        }
 
         epsilonE[i] = result.epsilonE;
         sigma[i] = result.sigma;
@@ -667,7 +810,7 @@ evaluateElasticPredictor
         {
             // The elastic stiffness, degraded by the damage and scaled by
             // the return
-            const scalar omega = 1.0 - result.D;
+            const scalar omega = 1.0 - result.DStress;
 
             if (deviatoricTan)
             {
