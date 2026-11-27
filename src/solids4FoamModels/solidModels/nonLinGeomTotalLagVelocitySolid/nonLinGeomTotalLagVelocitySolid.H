@@ -104,6 +104,15 @@ class nonLinGeomTotalLagVelocitySolid
         //  based stabilisation
         const Switch velocityBasedMomentumStabilisation_;
 
+        //- Take the tangential rows of the displacement gradient on traction
+        //  patches from the surface gradient over the face, so that the
+        //  deformed area and normal with which the traction is applied are
+        //  second-order accurate (see
+        //  solidModel::correctTractionPatchGradient). Not used by the
+        //  linear-geometry formulation, which applies the traction on the
+        //  undeformed faces
+        const Switch tractionPatchSurfaceGradient_;
+
         //- Number of unknowns per cell, used by PETSc SNES solver
         const label blockSize_;
 
