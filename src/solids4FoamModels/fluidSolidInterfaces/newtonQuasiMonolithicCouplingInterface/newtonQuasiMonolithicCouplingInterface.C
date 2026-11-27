@@ -2519,7 +2519,11 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
         fluid().p().boundaryField()
         [
             fluidSolidInterface::fluidPatchIndices()[0]
-        ].type() == fixedGradientFvPatchScalarField::typeName;
+        ].type() == fixedGradientFvPatchScalarField::typeName
+     || fluid().p().boundaryField()
+        [
+            fluidSolidInterface::fluidPatchIndices()[0]
+        ].type() == "fixedGradientCorrected";
 
     if (interfacePressureGradient)
     {
@@ -3331,7 +3335,11 @@ label newtonQuasiMonolithicCouplingInterface::formResidual
      || fluid().p().boundaryField()
         [
             fluidSolidInterface::fluidPatchIndices()[0]
-        ].type() == fixedGradientFvPatchScalarField::typeName;
+        ].type() == fixedGradientFvPatchScalarField::typeName
+     || fluid().p().boundaryField()
+        [
+            fluidSolidInterface::fluidPatchIndices()[0]
+        ].type() == "fixedGradientCorrected";
 
     if (mapInterfaceBeforeTraction)
     {

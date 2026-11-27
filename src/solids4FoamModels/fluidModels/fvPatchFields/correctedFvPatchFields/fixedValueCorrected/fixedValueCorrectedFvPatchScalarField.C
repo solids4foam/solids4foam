@@ -63,7 +63,7 @@ fixedValueCorrectedFvPatchScalarField
 )
 :
     fixedValueFvPatchScalarField(ptf, p, iF, mapper),
-    nonOrthogonalCorrections_(true)
+    nonOrthogonalCorrections_(ptf.nonOrthogonalCorrections_)
 {}
 
 
@@ -74,7 +74,8 @@ fixedValueCorrectedFvPatchScalarField
     const fixedValueCorrectedFvPatchScalarField& mwvpvf
 )
 :
-    fixedValueFvPatchScalarField(mwvpvf)
+    fixedValueFvPatchScalarField(mwvpvf),
+    nonOrthogonalCorrections_(mwvpvf.nonOrthogonalCorrections_)
 {}
 #endif
 
@@ -85,7 +86,8 @@ fixedValueCorrectedFvPatchScalarField
     const DimensionedField<scalar, volMesh>& iF
 )
 :
-    fixedValueFvPatchScalarField(mwvpvf, iF)
+    fixedValueFvPatchScalarField(mwvpvf, iF),
+    nonOrthogonalCorrections_(mwvpvf.nonOrthogonalCorrections_)
 {}
 
 
