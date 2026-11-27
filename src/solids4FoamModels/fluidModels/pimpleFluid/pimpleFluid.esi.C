@@ -194,7 +194,23 @@ void pimpleFluid::updateRobinFsiInterface
                    *mesh().magSf().boundaryField()[patchI];
             }
         }
-        else if
+    }
+}
+
+
+void pimpleFluid::addMovingWallPressureFlux
+(
+    surfaceScalarField& phiHbyA
+)
+{
+    // The flux rAU*snGrad(p)*|Sf| of the movingWallPressure patches, which
+    // the pressure equation removes again. It is added after adjustPhi: in
+    // an enclosed domain adjustPhi requires a vanishing net boundary flux,
+    // which holds for the wall velocity flux but not, in general, for the
+    // flux of the prescribed gradient
+    forAll(p().boundaryField(), patchI)
+    {
+        if
         (
             isA<movingWallPressureFvPatchScalarField>
             (
@@ -616,6 +632,8 @@ bool pimpleFluid::evolve()
                 adjustPhi(phiHbyA, U, p);
                 fvc::makeAbsolute(phiHbyA, U);
             }
+
+            addMovingWallPressureFlux(phiHbyA);
 
             tmp<volScalarField> rAtU(rAU_);
 

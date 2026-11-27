@@ -415,6 +415,10 @@ release. For complete commit-level details and contributor information, see the
 
 ### Changed
 
+- `movingWallPressure` and `elasticWallPressure` include the viscous term
+  of the wall-normal momentum equation by default (`viscousTerm yes`), which
+  changes the results of existing cases with either condition; set
+  `viscousTerm no` to reproduce earlier results (see Fixed, #721).
 - The OpenFOAM-v2512 Docker images, the solids4foam release image and the CI
   images, are now based on Ubuntu 24.04 (was 22.04, whose standard support
   ends in April 2027). The Dockerfiles of these base images, with OpenFOAM,
@@ -813,10 +817,10 @@ release. For complete commit-level details and contributor information, see the
 - `movingWallPressure` (#721):
   - It now works in enclosed fluid domains, where no boundary fixes the
     pressure; it stopped in `adjustPhi` ("Continuity error cannot be
-    removed"). In such a domain the `rAU`-weighted mean of the prescribed
-    gradient over all `movingWallPressure` patches is subtracted, and
-    `pimpleFluid` updates the condition just before it adds the gradient
-    flux to the predicted flux, so that both use the same gradient. With
+    removed"). `pimpleFluid` now adds the flux of the prescribed gradient
+    to the predicted flux after `adjustPhi`, whose check needs a vanishing
+    net boundary flux, and updates the condition just before, so that this
+    flux and the pressure equation use the same gradient. With
     `movingWallPressure` instead of `zeroGradient` on the interface,
     the IQN-ILS amplitude loss of `ringAddedMass` (2.1% per period on the
     coarsest mesh at the strong level) disappears, as with Robin-Neumann

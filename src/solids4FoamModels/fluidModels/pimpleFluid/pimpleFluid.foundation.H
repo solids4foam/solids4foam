@@ -112,6 +112,9 @@ class pimpleFluid
         //- Update phi for Robin FSI boundary conditions
         void updateRobinFsiInterface(surfaceScalarField& phiHbyA);
 
+        //- Add the gradient flux of the movingWallPressure patches
+        void addMovingWallPressureFlux(surfaceScalarField& phiHbyA);
+
         //- Correct phi function
         void correctPhi();
 

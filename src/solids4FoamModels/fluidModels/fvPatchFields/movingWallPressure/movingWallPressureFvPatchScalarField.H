@@ -40,22 +40,15 @@ Description
 
     The acceleration is that of a newMovingWallVelocity patch; for any other
     velocity condition it is the time derivative of the boundary velocity
-    with the ddt scheme of U.
+    with the ddt scheme of U. This is the acceleration of the fluid at the
+    wall only if the wall moves with the mesh, as at an FSI interface: the
+    convective acceleration of a wall that moves tangentially relative to
+    the mesh, e.g. a rotating wall on a static mesh, is not included.
 
-    Enclosed domains: if no boundary of the pressure fixes its value, the
-    net flux of the prescribed gradient must vanish for the flux treatment
-    below, which neither the discrete wall acceleration nor the other terms
-    satisfy in general; the solver then stops in adjustPhi ("Continuity error
-    cannot be removed"). In this case the weighted mean of the gradient over all
-    movingWallPressure patches of the field is subtracted, with the weights
-    rAU*|Sf| (|Sf| if rAU is not registered). These are the weights of the
-    flux rAU*snGrad(p)*|Sf| that pimpleFluid adds to the predicted flux for
-    this condition; pimpleFluid updates the condition just before, so that
-    the predicted flux and the pressure equation use the same gradient and
-    the net flux checked by adjustPhi is that of the wall velocity. The
-    subtraction makes the prescribed gradient compatible with this flux
-    treatment; in the ringAddedMass case it is a discretisation-level
-    correction.
+    Enclosed domains (no boundary fixes the pressure) need no special
+    treatment: the solver adds the flux of the prescribed gradient,
+    rAU*snGrad(p)*|Sf|, after adjustPhi (see pimpleFluid), so that the net
+    boundary flux that adjustPhi checks is that of the wall velocity.
 
 Usage
     \verbatim
@@ -114,15 +107,12 @@ class movingWallPressureFvPatchScalarField
         tmp<scalarField> patchDensity() const;
 
         //- Return the normal gradient from the wall-normal momentum
-        //  equation, before the enclosed-domain correction; viscousPtr is
-        //  the viscous term field, or null if it is not needed
+        //  equation; viscousPtr is the viscous term field, or null if it is
+        //  not needed
         tmp<scalarField> momentumGradient
         (
             const volVectorField* viscousPtr
         ) const;
-
-        //- Return the weights of the enclosed-domain mean
-        tmp<scalarField> meanWeights() const;
 
 
 public:

@@ -143,19 +143,6 @@ tmp<scalarField> movingWallPressureFvPatchScalarField::momentumGradient
 }
 
 
-tmp<scalarField> movingWallPressureFvPatchScalarField::meanWeights() const
-{
-    tmp<scalarField> tw(new scalarField(patch().magSf()));
-
-    if (db().foundObject<volScalarField>("rAU"))
-    {
-        tmpRef(tw) *= patch().lookupPatchField<volScalarField, scalar>("rAU");
-    }
-
-    return tw;
-}
-
-
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 movingWallPressureFvPatchScalarField::
@@ -233,99 +220,18 @@ void movingWallPressureFvPatchScalarField::updateCoeffs()
         return;
     }
 
-#ifdef OPENFOAM_NOT_EXTEND
-    const word& fieldName = internalField().name();
-#else
-    const word& fieldName = dimensionedInternalField().name();
-#endif
-    const volScalarField& p = db().lookupObject<volScalarField>(fieldName);
-
-    // Enclosed domain: the mean is taken over all movingWallPressure patches
-    // of the field, so all of them need their gradient here. The decisions
-    // depend on dictionary entries and reduced values only, so all
-    // processors take the same ones and call the same collectives
-    const bool enclosed = p.needReference();
-
-    bool needViscous = viscousTerm_;
-
-    if (enclosed)
+    if (viscousTerm_)
     {
-        forAll(p.boundaryField(), patchI)
-        {
-            if
-            (
-                isA<movingWallPressureFvPatchScalarField>
-                (
-                    p.boundaryField()[patchI]
-                )
-            )
-            {
-                needViscous =
-                    needViscous
-                 || refCast<const movingWallPressureFvPatchScalarField>
-                    (
-                        p.boundaryField()[patchI]
-                    ).viscousTerm_;
-            }
-        }
-    }
-
-    autoPtr<volVectorField> viscousFieldPtr;
-
-    if (needViscous)
-    {
-        viscousFieldPtr.reset
+        const volVectorField viscousField
         (
-            wallNormalMomentum::field(db(), "U", patch().name()).ptr()
+            wallNormalMomentum::field(db(), "U", patch().name())
         );
+
+        gradient() = momentumGradient(&viscousField);
     }
-
-    const volVectorField* viscousPtr =
-        needViscous ? &viscousFieldPtr() : nullptr;
-
-    gradient() = momentumGradient(viscousPtr);
-
-    if (enclosed)
+    else
     {
-        scalar sumWeightedGrad = 0;
-        scalar sumWeights = 0;
-
-        forAll(p.boundaryField(), patchI)
-        {
-            if
-            (
-                isA<movingWallPressureFvPatchScalarField>
-                (
-                    p.boundaryField()[patchI]
-                )
-            )
-            {
-                const movingWallPressureFvPatchScalarField& pp =
-                    refCast<const movingWallPressureFvPatchScalarField>
-                    (
-                        p.boundaryField()[patchI]
-                    );
-
-                const scalarField w(pp.meanWeights());
-                const scalarField g
-                (
-                    patchI == patch().index()
-                  ? gradient()
-                  : pp.momentumGradient(viscousPtr)()
-                );
-
-                sumWeightedGrad += sum(w*g);
-                sumWeights += sum(w);
-            }
-        }
-
-        reduce(sumWeightedGrad, sumOp<scalar>());
-        reduce(sumWeights, sumOp<scalar>());
-
-        if (sumWeights > VSMALL)
-        {
-            gradient() -= sumWeightedGrad/sumWeights;
-        }
+        gradient() = momentumGradient(nullptr);
     }
 
     fixedGradientFvPatchScalarField::updateCoeffs();
