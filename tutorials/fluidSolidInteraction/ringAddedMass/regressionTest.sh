@@ -23,6 +23,17 @@ HALF_PERIOD_EXACT_TOL=0.01    # relative difference from the exact half period
 HALF_PERIOD_TOL=2e-4          # relative difference from the reference
 DISP_TOL=2e-6                 # final displacement absolute difference (m)
 
+# The movingWallPressure variant (IQN-ILS with movingWallPressure on the
+# interface of this enclosed fluid domain, #721) is checked against the
+# undamped ring instead: the ratio of the second to the first displacement
+# peak must be one. With zeroGradient, IQN-ILS loses 0.57% of the amplitude
+# in this half period; with movingWallPressure the loss is 4e-5 (v2512).
+# Its half period is compared with the v2512 value 1.743270 s to 1e-3, which
+# covers the variation of the IQN-ILS reference between OpenFOAM variants
+MWP_HALF_PERIOD=1.743270
+MWP_HALF_PERIOD_TOL=1e-3
+AMPLITUDE_RATIO_TOL=1e-3      # |second/first peak - 1|
+
 # Reference values at REG_END_TIME. The final displacement is sensitive to
 # small implementation differences between OpenFOAM variants, so use values
 # from each CI reference platform where required.
@@ -61,7 +72,7 @@ ref_final_ux() {
     esac
 }
 
-VARIANTS=(iqnils robin)
+VARIANTS=(iqnils robin movingWallPressure)
 
 ALLRUN_LOGFILE="log.Allrun"
 DISP_FILE="postProcessing/0/solidPointDisplacement_pointDispX.dat"
@@ -72,6 +83,7 @@ echo "Regression end time               = ${REG_END_TIME}"
 echo "Half period vs exact tolerance    < ${HALF_PERIOD_EXACT_TOL}"
 echo "Half period vs reference tolerance < ${HALF_PERIOD_TOL}"
 echo "Final displacement tolerance      < ${DISP_TOL}"
+echo "Peak ratio tolerance (movingWallPressure) < ${AMPLITUDE_RATIO_TOL}"
 echo "============================================================"
 echo
 
@@ -135,6 +147,41 @@ half_period() {
     }' "$1"
 }
 
+# Ratio of the second to the first peak of |u_x|: the largest sample of each
+# of the first two lobes, both closed by a zero crossing, refined with a
+# parabola through it and its neighbours
+amplitude_ratio() {
+    awk '
+    ($1 + 0) == $1 && $2 != 0 {
+        n++
+        u[n] = $2
+        if (n == 1 || u[n-1]*u[n] < 0) {
+            lobe++
+        }
+        a = (u[n] < 0 ? -u[n] : u[n])
+        if (a > amax[lobe]) {
+            amax[lobe] = a
+            imax[lobe] = n
+        }
+    }
+    END {
+        if (lobe < 3) {
+            exit
+        }
+        for (k = 1; k <= 2; k++) {
+            i = imax[k]
+            if (i < 2) {
+                exit
+            }
+            a = amax[k]
+            am = (u[i-1] < 0 ? -u[i-1] : u[i-1])
+            ap = (u[i+1] < 0 ? -u[i+1] : u[i+1])
+            peak[k] = a - (ap - am)^2/(8*(am - 2*a + ap))
+        }
+        printf "%.8g\n", peak[2]/peak[1]
+    }' "$1"
+}
+
 # Ensure GNU sed is available and resolved into SOLIDS4FOAM_SED
 solids4Foam::requireGnuSed
 
@@ -155,6 +202,7 @@ for variant in "${VARIANTS[@]}"; do
     solver_log="${case_dir}/log.solids4Foam"
     if [[ ! -f "${solver_log}" ]] \
         || grep -q "FOAM FATAL" "${solver_log}" \
+        || grep -q "Continuity error cannot be removed" "${solver_log}" \
         || ! grep -q "^End" "${solver_log}"; then
         echo "FAIL (${variant}): the solver did not run to completion"
         echo "      (see ${case_dir}/${ALLRUN_LOGFILE})"
@@ -184,6 +232,42 @@ for variant in "${VARIANTS[@]}"; do
     if [[ -z "${half}" || -z "${ux}" ]]; then
         echo "FAIL (${variant}): could not extract the half period"
         failures=$((failures + 1))
+        continue
+    fi
+
+    if [[ "${variant}" == "movingWallPressure" ]]; then
+        ratio=$(amplitude_ratio "${disp_file}")
+        if [[ -z "${ratio}" ]]; then
+            echo "FAIL (${variant}): could not extract two displacement peaks"
+            failures=$((failures + 1))
+            continue
+        fi
+        exact_diff=$(abs \
+            "$(awk "BEGIN {print ${half}/${EXACT_HALF_PERIOD} - 1}")")
+        ref_diff=$(abs "$(awk "BEGIN {print ${half}/${MWP_HALF_PERIOD} - 1}")")
+        ratio_diff=$(abs "$(awk "BEGIN {print ${ratio} - 1}")")
+
+        if awk "BEGIN {exit !(${exact_diff} < ${HALF_PERIOD_EXACT_TOL} \
+            && ${ref_diff} < ${MWP_HALF_PERIOD_TOL})}"; then
+            printf "PASS (%s): half period = %.6g s (exact %.2g, ref %.2g)\n" \
+                "${variant}" "${half}" "${exact_diff}" "${ref_diff}"
+        else
+            printf "FAIL (%s): half period = %.8g s, exact %.6g s (%.2g),\n" \
+                "${variant}" "${half}" "${EXACT_HALF_PERIOD}" "${exact_diff}"
+            printf "      reference %.7g s (%.2g)\n" \
+                "${MWP_HALF_PERIOD}" "${ref_diff}"
+            failures=$((failures + 1))
+        fi
+
+        if awk "BEGIN {exit !(${ratio_diff} < ${AMPLITUDE_RATIO_TOL})}"; then
+            printf "PASS (%s): peak ratio = %.6g (|ratio - 1| = %.2g)\n" \
+                "${variant}" "${ratio}" "${ratio_diff}"
+        else
+            printf "FAIL (%s): peak ratio = %.6g, |ratio - 1| = %.2g > %g\n" \
+                "${variant}" "${ratio}" "${ratio_diff}" "${AMPLITUDE_RATIO_TOL}"
+            failures=$((failures + 1))
+        fi
+        echo
         continue
     fi
 

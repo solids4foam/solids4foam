@@ -125,6 +125,7 @@ added mass applies; the exact viscous correction to the frequency is 0.03%.
 ```bash
 ./Allrun              # IQN-ILS, high-order solid
 ./Allrun robin        # Robin-Neumann coupling
+./Allrun movingWallPressure  # IQN-ILS, movingWallPressure at the interface
 ./Allrun standard     # standard (second-order) solid residual
 ./Allrun robin parallel
 ```
@@ -147,6 +148,9 @@ i.e. within 0.06% and 0.12%; most of the difference is the error of the
 second-order time scheme at 100 steps per period. The IQN-ILS solution loses
 about 1.2% of its amplitude per period on this mesh, which halves with each
 mesh refinement, whereas the Robin-Neumann solution is essentially undamped.
+With `./Allrun movingWallPressure`, the IQN-ILS solution with
+`movingWallPressure` instead of `zeroGradient` on the fluid interface is also
+essentially undamped.
 
 ![Figure 2: Ovalling displacement against time](./images/ringAddedMass-displacement.png)
 

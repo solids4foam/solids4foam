@@ -9,6 +9,7 @@ source solids4FoamScripts.sh
 # Example usage
 # ./Allrun            # default behaviour is IQNILS coupling
 # ./Allrun robin      # Robin-Neumann coupling
+# ./Allrun movingWallPressure  # IQN-ILS, movingWallPressure at the interface
 # ./Allrun standard   # standard (second-order) solid residual
 # ./Allrun robin standard parallel
 
@@ -23,6 +24,7 @@ fi
 
 coupling=iqnils
 interfaceCondition=dirichletNeumann
+pressureCondition=
 runMode=serial
 solidModel=highOrder
 
@@ -32,10 +34,19 @@ do
         iqnils|IQNILS)
             coupling=iqnils
             interfaceCondition=dirichletNeumann
+            pressureCondition=
             ;;
         robin|Robin)
             coupling=robin
             interfaceCondition=robin
+            pressureCondition=
+            ;;
+        movingWallPressure)
+            # IQN-ILS with movingWallPressure instead of zeroGradient on the
+            # fluid interface pressure, in this enclosed fluid domain
+            coupling=iqnils
+            interfaceCondition=dirichletNeumann
+            pressureCondition=movingWallPressure
             ;;
         standard)
             solidModel=standard
@@ -48,7 +59,8 @@ do
             ;;
         *)
             echo "Unknown option: $arg"
-            echo "Usage: ./Allrun [iqnils|robin] [highOrder|standard] [parallel]"
+            echo "Usage: ./Allrun [iqnils|robin|movingWallPressure]" \
+                "[highOrder|standard] [parallel]"
             exit 1
             ;;
     esac
@@ -65,7 +77,7 @@ fi
 ln -vnsf "fsiProperties.${coupling}" constant/fsiProperties
 ln -vnsf "solidProperties.${solidModel}" constant/solid/solidProperties
 ln -vnsf "U.${interfaceCondition}" 0/fluid/U
-ln -vnsf "p.${interfaceCondition}" 0/fluid/p
+ln -vnsf "p.${pressureCondition:-${interfaceCondition}}" 0/fluid/p
 
 # Set D_0 and D_0_0 from the current mesh description and time-step
 python3 setInitialVelocity.py \

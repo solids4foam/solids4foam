@@ -839,6 +839,12 @@ release. For complete commit-level details and contributor information, see the
     the IQN-ILS amplitude loss of `ringAddedMass` (2.1% per period on the
     coarsest mesh at the strong level) disappears, as with Robin-Neumann
     coupling.
+  - `ringAddedMass` gains `./Allrun movingWallPressure` (IQN-ILS with
+    `movingWallPressure` on the interface of its enclosed fluid domain),
+    which its regression test runs: it must finish without an `adjustPhi`
+    error, and the ratio of the second to the first displacement peak must
+    be one to 1e-3 (with `zeroGradient` IQN-ILS loses 0.57% in this half
+    period).
   - It includes the viscous term of the wall-normal momentum equation,
     `n & (laplacian(nuEff, U) + div(nuEff*dev2(T(grad(U)))))` in the wall
     cells, and on OpenFOAM.com the normal fvOptions momentum source, by
