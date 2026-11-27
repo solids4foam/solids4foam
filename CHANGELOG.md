@@ -824,6 +824,12 @@ release. For complete commit-level details and contributor information, see the
 
 ### Fixed
 
+- The `addTinyPatch` and `splitPatch` utilities, and the halo-depth estimate of
+  the high-order least-squares stencil in parallel runs, no longer read
+  destroyed memory. Each bound a `const vectorField&` to the temporary
+  `subField` that `polyPatch::faceCentres()` or `polyPatch::faceAreas()`
+  returns, so the reference outlived the object it pointed to. They now copy
+  the field. GCC 13 reports this as `-Wdangling-reference` (#779).
 - `womersleyTube`: `Allrun` now exits with the failing step's status when
   meshing, decomposition, the solver or reconstruction fails. It returned 0
   before, because the final optional plotting step set the status.

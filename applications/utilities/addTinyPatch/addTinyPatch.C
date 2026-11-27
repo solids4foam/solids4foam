@@ -156,7 +156,8 @@ int main(int argc, char *argv[])
 
     // Find the face on the patch closest to approxFaceC
 
-    const vectorField& patchCf = mesh.boundaryMesh()[curPatchID].faceCentres();
+    // Copy: polyPatch::faceCentres() returns a temporary subField
+    const vectorField patchCf(mesh.boundaryMesh()[curPatchID].faceCentres());
 
     label closestFaceID = -1;
     scalar closestDist = GREAT;

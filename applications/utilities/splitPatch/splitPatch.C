@@ -142,7 +142,8 @@ int main(int argc, char *argv[])
     // Find faces within the bounding boxes
     Info<< "Find faces inside bounding boxes" << endl;
     const polyPatch& ppatch = mesh.boundaryMesh()[patchToSplitID];
-    const vectorField& patchCf = ppatch.faceCentres();
+    // Copy: polyPatch::faceCentres() returns a temporary subField
+    const vectorField patchCf(ppatch.faceCentres());
     labelHashSet facesToSplit;
     forAll(boundBoxes, boxI)
     {

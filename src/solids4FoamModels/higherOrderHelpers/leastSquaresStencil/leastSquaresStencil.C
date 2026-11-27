@@ -54,7 +54,8 @@ List<scalar> leastSquaresStencil::calcFirstHaloDepth() const
 
         if (isA<processorPolyPatch>(pp))
         {
-            const vectorField& Sf = pp.faceAreas();
+            // Copy: polyPatch::faceAreas() returns a temporary subField
+            const vectorField Sf(pp.faceAreas());
             const labelUList& faceCells = pp.faceCells();
 
             forAll(faceCells, i)
