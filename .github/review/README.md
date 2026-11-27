@@ -58,9 +58,9 @@ Classify by consequences, not diff size. Use the highest relevant risk.
 
 | Risk | Examples | Agreed policy (not enforced by GitHub) |
 | --- | --- | --- |
-| LOW | Documentation; no expected behaviour change | One core maintainer |
-| MEDIUM | Isolated functionality | Second AI review; one core maintainer |
-| HIGH | Core numerics, architecture, security | Second AI review; both core maintainers |
+| LOW | Documentation, new tests, one tutorial's own set-up; no change to results | One core maintainer |
+| MEDIUM | Opt-in additions; fixes confined to one class or tutorial | Second AI review; one core maintainer |
+| HIGH | Results of many existing cases change by default; CI or agent security | Second AI review; both core maintainers |
 
 <!-- markdownlint-enable MD013 -->
 
@@ -227,11 +227,16 @@ counts and fixed reason codes, never prompt, model, or API error text, and SDK
 logging is off. The runner is GitHub-hosted and ephemeral. The analysis job has
 a read-only GitHub token and no publishing token. The publisher uses a fresh
 runner, has no Anthropic secret, validates the report again, and escapes model
-text before creating a comment. Path floors cover all changed and renamed paths,
-including omitted files: core numerical/model/solver directories and CI, tests,
-build scripts, and agent configuration force HIGH. Other `src/` changes are at
-least MEDIUM. Non-document changes default to at least MEDIUM. These floors are
-conservative heuristics, not an exhaustive semantic classifier.
+text before creating a comment. Automatic floors cover all changed and renamed paths,
+including omitted files. CI, agent configuration (`.github/`, `.claude/`,
+`.agents/`, `CLAUDE.md`, `AGENTS.md`, `.mcp.json`, `.claude.json`), `.docker/`,
+`.gitmodules`, `CODEOWNERS`, `SECURITY.md` and `CONTRIBUTING.md` force HIGH,
+because a PR there could steer the model or change the merge rules. Other
+non-document changes are at least MEDIUM, and documents can be LOW. A PR that
+changes existing reference values or tolerances in the `regressionTest.sh` of
+two or more tutorials is HIGH, since it changes existing results broadly.
+Otherwise the model judges HIGH from the consequences. These floors are
+heuristics, not an exhaustive semantic classifier.
 
 If the model declines a request for safety reasons, the API's server-side
 fallback re-runs it on a fallback model in the same call. The report then says

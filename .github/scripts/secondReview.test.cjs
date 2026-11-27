@@ -40,7 +40,7 @@ test('second review builds the CI prompt from the base branch on GitHub, not the
   assert.match(c.prompt, /Latest released version in CHANGELOG.md: v9\.9/);
   assert.match(c.prompt, /BASE SKILL/);
   assert.equal(c.prompt, buildPrompt(pr, files, endpoint => api.raw(`x/${endpoint}?ref=development`)).prompt);
-  assert.equal(c.floor, 'HIGH');
+  assert.equal(c.floor, 'MEDIUM');
   assert.ok(!c.prompt.includes('Claude advisory review'));
 });
 

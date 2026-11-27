@@ -119,18 +119,24 @@ nothing suspicious, because the review sends its content to the API at our
 cost. The label starts the review, and later pushes to that PR are reviewed
 automatically. It authorises the review only, not a merge.
 
-Risk follows the consequences of a change, not its size. Changes to core
-numerics, solvers, FSI coupling, CI or agent configuration are at least HIGH
-by path. The highest assessment applies: if a second review or a maintainer
+Risk follows the consequences of a change, not its size or location. HIGH
+means the results of many existing cases change by default (shared operators,
+default values, widely used laws or boundary conditions, FSI coupling, restart
+data), or the change affects security. CI, agent configuration and this file
+are HIGH by path, and so is a PR that changes regression references in two or
+more tutorials. Opt-in additions and fixes confined to one class or tutorial
+are MEDIUM; documentation and changes confined to one tutorial's set-up can be
+LOW. The highest assessment applies: if a second review or a maintainer
 rates the risk higher, follow the higher risk's rule and say so on the PR. A
 second review posted with `--post` raises the label automatically, and later
 Claude reports keep that higher risk. Labels are never lowered by a second
 review.
 
-The reviews see the changed lines with three lines of context each, as in the
-GitHub diff, not whole files. Unchanged code next to a change, such as the
-other half of an edited function, is not reviewed. Human reviewers and private
-agents with a full checkout cover that.
+The reviews see every patch and, as far as the prompt budget allows, the full
+post-change text of modified files, with C/C++ sources first. The report lists
+which files were seen in full. Unchanged code is used only as context for the
+changed lines; other files, such as callers elsewhere, are not seen. Human
+reviewers and private agents with a full checkout cover that.
 
 ### 2. Merge rules
 
