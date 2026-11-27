@@ -495,9 +495,11 @@ void  leastSquaresStencil::calcProcessorCells() const
 }
 
 
-labelList leastSquaresStencil::buildFacesStencil
+labelList leastSquaresStencil::buildStencil
 (
-    const label faceI,
+    const point& centre,
+    const labelUList& seedCells,
+    const label N,
     const List<labelList>& remoteCells,
     const List<vectorField>& remoteCellsCentres,
     const scalar relTol,
@@ -507,7 +509,7 @@ labelList leastSquaresStencil::buildFacesStencil
 {
     // When this number of cell is reached, layer approach stops
     const label nbOfCandidates =
-        label(std::ceil(overSampleFactor * scalar(N_)));
+        label(std::ceil(overSampleFactor * scalar(N)));
 
     // When building stencils, stencil is larger than N if there are cells with
     // equall distance. We use relTol to detect such cases. This results in
@@ -522,15 +524,10 @@ labelList leastSquaresStencil::buildFacesStencil
     labelHashSet currentLayer;
     labelHashSet nextLayer;
 
-    const label ownerCell = mesh_.faceOwner()[faceI];
-    currentLayer.insert(ownerCell);
-    localCandidates.insert(ownerCell);
-
-    if (faceI < mesh_.nInternalFaces())
+    forAll(seedCells, i)
     {
-        const label nei = mesh_.faceNeighbour()[faceI];
-        currentLayer.insert(nei);
-        localCandidates.insert(nei);
+        currentLayer.insert(seedCells[i]);
+        localCandidates.insert(seedCells[i]);
     }
 
     const labelListList& cellCells = mesh_.cellCells();
@@ -561,7 +558,7 @@ labelList leastSquaresStencil::buildFacesStencil
         currentLayer.transfer(nextLayer);
     }
 
-    // Above algorithm works only on owned faces since for remote cells we did
+    // Above algorithm works only on owned cells since for remote cells we did
     // not transfered cellCells structure.
 
     // Algorithm: 1) Sort current candidates (distance based)
@@ -575,7 +572,6 @@ labelList leastSquaresStencil::buildFacesStencil
     // Phase 1: Build distance list for local candidates
     //          Using squared distance for efficiency
 
-    const vector faceCentre = mesh_.faceCentres()[faceI];
     const vectorField& C = primitiveField(mesh_.C());
 
     labelList localList(localCandidates.size());
@@ -592,7 +588,7 @@ labelList leastSquaresStencil::buildFacesStencil
     forAll(localList, i)
     {
         const label cI = localList[i];
-        localDist[i] = Tuple2<label, scalar>(cI, magSqr(C[cI] - faceCentre));
+        localDist[i] = Tuple2<label, scalar>(cI, magSqr(C[cI] - centre));
     }
 
     Foam::sort
@@ -612,7 +608,7 @@ labelList leastSquaresStencil::buildFacesStencil
     //          boundary to activate looping over remote cells
 
     bool localStencil = true;
-    const label nCheck = min(N_, localDist.size());
+    const label nCheck = min(N, localDist.size());
 
     for (label pos = 0; pos < nCheck; ++pos)
     {
@@ -627,23 +623,21 @@ labelList leastSquaresStencil::buildFacesStencil
     // If stencil is local we can already return the stencil
     if (localStencil)
     {
-        if ( localList.size() < N_ )
+        // If there are fewer than N candidates, all of them are returned
+        const label nReq = min(N, localDist.size());
+
+        if (nReq == 0)
         {
-            FatalErrorInFunction
-                << "Local candidates for stencil have size of: "
-                << localList.size()
-                << " but required minimum  stencil size is larger: " << N_ << nl
-                << "Increase the mesh size!"
-                << exit(FatalError);
+            return labelList();
         }
 
         // When building stencils, stencil is larger than N if there are cells
         // with equall distance. We use relTol to detect such cases.
         // This results in symmetric stencils on regular meshes.
-        const scalar cut = localDist[N_-1].second();
+        const scalar cut = localDist[nReq-1].second();
         const scalar cutTol = cut*(1.0 + relTol);
 
-        label nPick = N_;
+        label nPick = nReq;
         while (nPick < localDist.size() && localDist[nPick].second() <= cutTol)
         {
             ++nPick;
@@ -662,7 +656,7 @@ labelList leastSquaresStencil::buildFacesStencil
     // Phase 3: Radius from position posR = ceil(searchExpansionFactor*N)
 
     const label unboundedPosR =
-        label(std::ceil(searchExpansionFactor * scalar(N_)));
+        label(std::ceil(searchExpansionFactor * scalar(N)));
 
     label posR = min(max(unboundedPosR, 0), localDist.size()-1);
 
@@ -695,7 +689,7 @@ labelList leastSquaresStencil::buildFacesStencil
 
         forAll(procCells, i)
         {
-            const scalar d2 = magSqr(procCellCentres[i] - faceCentre);
+            const scalar d2 = magSqr(procCellCentres[i] - centre);
             if (d2 <= R2)
             {
                 allDist.append(Tuple2<label, scalar>(procCells[i], d2));
@@ -715,7 +709,7 @@ labelList leastSquaresStencil::buildFacesStencil
 
     // The local radius is under-estimated if the processor partition contains
     // too few local cells; use all exchanged remote candidates before failing.
-    if (allDist.size() < N_ && unboundedPosR >= localDist.size())
+    if (allDist.size() < N && unboundedPosR >= localDist.size())
     {
         allDist.clear();
         allDist.reserve(localDist.size() + 100);
@@ -747,7 +741,7 @@ labelList leastSquaresStencil::buildFacesStencil
                     Tuple2<label, scalar>
                     (
                         procCells[i],
-                        magSqr(procCellCentres[i] - faceCentre)
+                        magSqr(procCellCentres[i] - centre)
                     )
                 );
             }
@@ -763,48 +757,80 @@ labelList leastSquaresStencil::buildFacesStencil
         );
     }
 
-    // Check minimum stencil size
-    if ( allDist.size() < N_ )
+    // If there are fewer than N candidates, all of them are returned
+    const label nReq = min(N, allDist.size());
+
+    if (nReq == 0)
     {
-        FatalErrorInFunction
-            << "Candidates for stencil have size of: " << allDist.size()
-            << " but required minimum stencil size is larger: " << N_ << nl
-            << "Increase the mesh size!"
-            << exit(FatalError);
+        return labelList();
     }
 
     // Enlarge stencil to include cells with the same distance
-    const scalar cut = allDist[N_-1].second();
+    const scalar cut = allDist[nReq-1].second();
     const scalar cutTol = cut*(1.0 + relTol);
 
-    label nPick = N_;
+    label nPick = nReq;
     while (nPick < allDist.size() && allDist[nPick].second() <= cutTol)
     {
         ++nPick;
     }
 
-    labelList faceStencil(nPick);
+    labelList stencil(nPick);
     for (label i = 0; i < nPick; ++i)
     {
-        faceStencil[i] = allDist[i].first();
+        stencil[i] = allDist[i].first();
     }
 
-    return faceStencil;
+    return stencil;
 }
 
 
-void leastSquaresStencil::filterUnusedCandidates
+labelList leastSquaresStencil::buildFacesStencil
 (
-    const List<labelList>& remoteCellsPerProc,
-    const List<vectorField>& remoteCellsCentresPerProc
+    const label faceI,
+    const label N,
+    const List<labelList>& remoteCells,
+    const List<vectorField>& remoteCellsCentres
 ) const
 {
+    // Layer search starts from the cells sharing the face
+    DynamicList<label> seedCells(2);
+    seedCells.append(mesh_.faceOwner()[faceI]);
+
+    if (faceI < mesh_.nInternalFaces())
+    {
+        seedCells.append(mesh_.faceNeighbour()[faceI]);
+    }
+
+    return buildStencil
+    (
+        mesh_.faceCentres()[faceI],
+        seedCells,
+        N,
+        remoteCells,
+        remoteCellsCentres
+    );
+}
+
+
+void leastSquaresStencil::filterUnusedCandidates() const
+{
+    // All remote candidates inside the halo region
+    const List<labelList>& remoteCellsPerProc =
+        autoPtrRef(remoteCandidatesPerProcPtr_);
+    const List<vectorField>& remoteCellsCentresPerProc =
+        autoPtrRef(remoteCandidateCentresPerProcPtr_);
+
     // Initialise storage
     remoteCellsPerProcPtr_.reset(new List<labelList>(Pstream::nProcs()));
     remoteCentresPerProcPtr_.reset(new List<vectorField>(Pstream::nProcs()));
     List<labelList>& storedRemoteCells = autoPtrRef(remoteCellsPerProcPtr_);
     List<vectorField>& storedRemoteCentres =
         autoPtrRef(remoteCentresPerProcPtr_);
+
+    // Data derived from the stored remote cells is not valid anymore
+    remoteCentresMapPtr_.clear();
+    remoteCellLocationPtr_.clear();
 
     labelHashSet usedRemoteCells;
 
@@ -817,21 +843,34 @@ void leastSquaresStencil::filterUnusedCandidates
     usedRemoteCells.reserve(totalRemote);
 #endif
 
-    auto& facesStencil =
-        compactListListCRef(this->facesStencil());
-
-    forAll(facesStencil, faceI)
+    // Collect remote cells used by the stencils
+    const auto insertRemoteCells =
+    [&](const CompactListList<label>& stencilList)
     {
-        const labelUList faceStencil = facesStencil[faceI];
+        auto& stencils = compactListListCRef(stencilList);
 
-        forAll(faceStencil, cellI)
+        forAll(stencils, i)
         {
-            const label gCellID = faceStencil[cellI];
-            if (!globalCells_.isLocal(gCellID))
+            const labelUList stencil = stencils[i];
+
+            forAll(stencil, cellI)
             {
-                usedRemoteCells.insert(gCellID);
+                const label gCellID = stencil[cellI];
+                if (!globalCells_.isLocal(gCellID))
+                {
+                    usedRemoteCells.insert(gCellID);
+                }
             }
         }
+    };
+
+    insertRemoteCells(autoPtrRef(facesStencilPtr_));
+
+    // Cell stencils are a subset of the face stencils unless they have been
+    // enlarged
+    if (cellsStencilPtr_.valid())
+    {
+        insertRemoteCells(autoPtrRef(cellsStencilPtr_));
     }
 
     forAll(remoteCellsPerProc, procI)
@@ -907,13 +946,41 @@ void leastSquaresStencil::calcFacesStencil() const
     labelList procToQuery =
        checkProcessorOverlap(allOwnedCellsBox, allOwnedFacesBox);
 
-    // List of remote cells (per processor) written using global indexing
-    List<labelList> remoteCells =
-        remoteCandidates(allOwnedFacesBox, procToQuery);
+    // List of remote cells (per processor) written using global indexing.
+    // The complete candidate lists are stored, as they are used again if
+    // stencils are enlarged
+    remoteCandidatesPerProcPtr_.reset
+    (
+        new List<labelList>(remoteCandidates(allOwnedFacesBox, procToQuery))
+    );
+    const List<labelList>& remoteCells =
+        autoPtrRef(remoteCandidatesPerProcPtr_);
 
     // Get cell centre for remote candidates
-    List<vectorField> remoteCellsCentres =
-        remoteCandidatesCellCentres(remoteCells, procToQuery);
+    remoteCandidateCentresPerProcPtr_.reset
+    (
+        new List<vectorField>
+        (
+            remoteCandidatesCellCentres(remoteCells, procToQuery)
+        )
+    );
+    const List<vectorField>& remoteCellsCentres =
+        autoPtrRef(remoteCandidateCentresPerProcPtr_);
+
+    // The requested stencil size must be available
+    const auto checkFaceStencilSize =
+    [&](const label faceI, const label stencilSize)
+    {
+        if (stencilSize < N_)
+        {
+            FatalErrorInFunction
+                << "Candidates for the stencil of face " << faceI
+                << " have size of: " << stencilSize
+                << " but required minimum stencil size is larger: " << N_
+                << nl << "Increase the mesh size!"
+                << exit(FatalError);
+        }
+    };
 
     // Build face stencils using local and remote cells
     List<labelList> facesStencil(mesh_.nFaces());
@@ -929,9 +996,12 @@ void leastSquaresStencil::calcFacesStencil() const
             buildFacesStencil
             (
                 faceI,
+                N_,
                 remoteCells,
                 remoteCellsCentres
             );
+
+        checkFaceStencilSize(faceI, facesStencil[faceI].size());
     }
 
     // Build stencil for boundary faces
@@ -953,9 +1023,12 @@ void leastSquaresStencil::calcFacesStencil() const
                 buildFacesStencil
                 (
                     faceI,
+                    N_,
                     remoteCells,
                     remoteCellsCentres
                 );
+
+            checkFaceStencilSize(faceI, facesStencil[faceI].size());
         }
     }
 
@@ -981,7 +1054,7 @@ void leastSquaresStencil::calcFacesStencil() const
     }
 
     // Filter and store remote cells and cell centres
-    filterUnusedCandidates(remoteCells, remoteCellsCentres);
+    filterUnusedCandidates();
 }
 
 
@@ -1151,6 +1224,74 @@ void leastSquaresStencil::calcCellsStencil(const scalar relTol) const
 }
 
 
+void leastSquaresStencil::replaceStencilRows
+(
+    autoPtr<CompactListList<label>>& stencilsPtr,
+    const labelUList& rows,
+    const List<labelList>& newStencils
+)
+{
+    auto& oldStencils =
+        compactListListCRef
+        (
+            static_cast<const CompactListList<label>&>
+            (
+                autoPtrRef(stencilsPtr)
+            )
+        );
+
+    // Position of each replaced row in the list of new stencils
+    labelList newStencilID(oldStencils.size(), -1);
+    labelList sizes(oldStencils.size());
+
+    forAll(sizes, rowI)
+    {
+        sizes[rowI] = oldStencils[rowI].size();
+    }
+
+    forAll(rows, i)
+    {
+        if (newStencils[i].size())
+        {
+            newStencilID[rows[i]] = i;
+            sizes[rows[i]] = newStencils[i].size();
+        }
+    }
+
+    autoPtr<CompactListList<label>> updatedPtr
+    (
+        new CompactListList<label>(sizes)
+    );
+    CompactListList<label>& updated = autoPtrRef(updatedPtr);
+
+    forAll(sizes, rowI)
+    {
+        labelUList dst = updated[rowI];
+
+        if (newStencilID[rowI] < 0)
+        {
+            const labelUList src = oldStencils[rowI];
+
+            forAll(src, j)
+            {
+                dst[j] = src[j];
+            }
+        }
+        else
+        {
+            const labelList& src = newStencils[newStencilID[rowI]];
+
+            forAll(src, j)
+            {
+                dst[j] = src[j];
+            }
+        }
+    }
+
+    stencilsPtr.reset(updatedPtr.ptr());
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 
@@ -1172,6 +1313,8 @@ leastSquaresStencil::leastSquaresStencil
     cellsStencilPtr_(),
     remoteCellsPerProcPtr_(),
     remoteCentresPerProcPtr_(),
+    remoteCandidatesPerProcPtr_(),
+    remoteCandidateCentresPerProcPtr_(),
     remoteCentresMapPtr_(),
     remoteCellLocationPtr_()
 {
@@ -1374,12 +1517,161 @@ leastSquaresStencil::remoteCellLocation() const
 }
 
 
+label leastSquaresStencil::enlargeFacesStencil
+(
+    const labelUList& faces,
+    const labelUList& nExtra
+)
+{
+    if (faces.size() != nExtra.size())
+    {
+        FatalErrorInFunction
+            << "Number of faces " << faces.size() << " and number of "
+            << "requested stencil enlargements " << nExtra.size()
+            << " are not the same" << abort(FatalError);
+    }
+
+    // Make sure that the stencils and remote candidates exist
+    auto& stencils = compactListListCRef(this->facesStencil());
+
+    const List<labelList>& remoteCells =
+        autoPtrRef(remoteCandidatesPerProcPtr_);
+    const List<vectorField>& remoteCellsCentres =
+        autoPtrRef(remoteCandidateCentresPerProcPtr_);
+
+    List<labelList> newStencils(faces.size());
+    label nGrown = 0;
+
+    forAll(faces, i)
+    {
+        const label faceI = faces[i];
+        const label oldSize = stencils[faceI].size();
+
+        // Faces without a stencil, e.g. empty faces, are skipped
+        if (oldSize == 0)
+        {
+            continue;
+        }
+
+        labelList stencil
+        (
+            buildFacesStencil
+            (
+                faceI,
+                oldSize + nExtra[i],
+                remoteCells,
+                remoteCellsCentres
+            )
+        );
+
+        if (stencil.size() > oldSize)
+        {
+            newStencils[i].transfer(stencil);
+            ++nGrown;
+        }
+    }
+
+    if (nGrown > 0)
+    {
+        replaceStencilRows(facesStencilPtr_, faces, newStencils);
+
+        // Remote cells used by the stencils have changed
+        filterUnusedCandidates();
+    }
+
+    return nGrown;
+}
+
+
+label leastSquaresStencil::enlargeCellsStencil
+(
+    const labelUList& cells,
+    const labelUList& nExtra
+)
+{
+    if (cells.size() != nExtra.size())
+    {
+        FatalErrorInFunction
+            << "Number of cells " << cells.size() << " and number of "
+            << "requested stencil enlargements " << nExtra.size()
+            << " are not the same" << abort(FatalError);
+    }
+
+    // Make sure that the stencils and remote candidates exist
+    auto& stencils = compactListListCRef(this->cellsStencil());
+
+    const List<labelList>& remoteCells =
+        autoPtrRef(remoteCandidatesPerProcPtr_);
+    const List<vectorField>& remoteCellsCentres =
+        autoPtrRef(remoteCandidateCentresPerProcPtr_);
+
+    const vectorField& C = primitiveField(mesh_.C());
+
+    List<labelList> newStencils(cells.size());
+    label nGrown = 0;
+
+    labelList seedCell(1);
+
+    forAll(cells, i)
+    {
+        const label cellI = cells[i];
+        const label oldSize = stencils[cellI].size();
+        const label globalCellID = globalCells_.toGlobal(cellI);
+
+        seedCell[0] = cellI;
+
+        // The cell itself is the closest candidate, so one more cell is
+        // requested. It is removed below as cell stencils contain neighbours
+        // only
+        const labelList candidates
+        (
+            buildStencil
+            (
+                C[cellI],
+                seedCell,
+                oldSize + nExtra[i] + 1,
+                remoteCells,
+                remoteCellsCentres
+            )
+        );
+
+        DynamicList<label> stencil(candidates.size());
+
+        forAll(candidates, j)
+        {
+            if (candidates[j] != globalCellID)
+            {
+                stencil.append(candidates[j]);
+            }
+        }
+
+        if (stencil.size() > oldSize)
+        {
+            newStencils[i].transfer(stencil);
+            ++nGrown;
+        }
+    }
+
+    if (nGrown > 0)
+    {
+        replaceStencilRows(cellsStencilPtr_, cells, newStencils);
+
+        // Remote cells used by the stencils have changed
+        filterUnusedCandidates();
+    }
+
+    return nGrown;
+}
+
+
 void leastSquaresStencil::clear() const
 {
     facesStencilPtr_.clear();
     cellsStencilPtr_.clear();
     remoteCellsPerProcPtr_.clear();
     remoteCentresPerProcPtr_.clear();
+    remoteCandidatesPerProcPtr_.clear();
+    remoteCandidateCentresPerProcPtr_.clear();
     procCellsPtr_.clear();
     remoteCentresMapPtr_.clear();
     remoteCellLocationPtr_.clear();

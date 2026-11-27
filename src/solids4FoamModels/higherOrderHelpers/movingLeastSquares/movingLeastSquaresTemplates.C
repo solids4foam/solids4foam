@@ -57,6 +57,27 @@ inline Type movingLeastSquares::fieldValue
 
 
 template<class Type>
+void movingLeastSquares::exchangeProcessorPatchField
+(
+    const processorFvPatch& procPatch,
+    const Field<Type>& sendField,
+    Field<Type>& receiveField
+) const
+{
+    if (Pstream::myProcNo() < procPatch.neighbProcNo())
+    {
+        procPatch.send(Pstream::commsTypes::blocking, sendField);
+        procPatch.receive(Pstream::commsTypes::blocking, receiveField);
+    }
+    else
+    {
+        procPatch.receive(Pstream::commsTypes::blocking, receiveField);
+        procPatch.send(Pstream::commsTypes::blocking, sendField);
+    }
+}
+
+
+template<class Type>
 Type movingLeastSquares::evaluateAtPoint
 (
     const GeometricField<Type, fvPatchField, volMesh>& vf,
@@ -405,6 +426,69 @@ void movingLeastSquares::fGrad
                 }
             }
         }
+    }
+
+    // Check of the processor faces, performed only in debug mode. The two
+    // processors sharing a face evaluate its gradient independently, so both
+    // must use the same stencil to obtain the same gradient and consistent
+    // fluxes. The gradients are exchanged and the largest difference between
+    // the two sides is reported; it should be at the level of round-off.
+    if (debug && Pstream::parRun())
+    {
+        scalar maxDifference = 0.0;
+        scalar maxGradient = 0.0;
+
+        forAll(mesh.boundary(), patchI)
+        {
+            const fvPatch& patch = mesh.boundary()[patchI];
+
+            if (!isA<processorFvPatch>(patch))
+            {
+                continue;
+            }
+
+            const processorFvPatch& procPatch =
+                refCast<const processorFvPatch>(patch);
+            const label patchStart = patch.patch().start();
+
+            // Face quadrature points have the same ordering on both sides
+            label nValues = 0;
+            forAll(patch, patchFaceI)
+            {
+                nValues += faceQuadPts[patchStart + patchFaceI].size();
+            }
+
+            Field<GradType> sendGrad(nValues);
+
+            label valueI = 0;
+            forAll(patch, patchFaceI)
+            {
+                const label faceI = patchStart + patchFaceI;
+
+                forAll(faceQuadPts[faceI], qpI)
+                {
+                    sendGrad[valueI++] = result[faceI][qpI];
+                }
+            }
+
+            Field<GradType> receiveGrad(nValues);
+            exchangeProcessorPatchField(procPatch, sendGrad, receiveGrad);
+
+            forAll(sendGrad, i)
+            {
+                maxDifference =
+                    max(maxDifference, mag(sendGrad[i] - receiveGrad[i]));
+                maxGradient = max(maxGradient, mag(sendGrad[i]));
+            }
+        }
+
+        reduce(maxDifference, maxOp<scalar>());
+        reduce(maxGradient, maxOp<scalar>());
+
+        Info<< "movingLeastSquares: largest difference between the two "
+            << "sides of the processor-face gradients = "
+            << maxDifference << ", largest processor-face gradient = "
+            << maxGradient << endl;
     }
 }
 

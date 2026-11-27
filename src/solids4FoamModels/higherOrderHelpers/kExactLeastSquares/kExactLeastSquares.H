@@ -70,6 +70,7 @@ Author
     #include "symmetryPlanePolyPatch.H"
 #endif
 #include "weightFunction.H"
+#include "adaptiveStencil.H"
 #include <Eigen/Dense>
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -114,6 +115,9 @@ class kExactLeastSquares
         //- Calculate the condition number field for cells
         //  Very expensive but useful, use only for debugging purposes
         const Switch calcConditionNumber_;
+
+        //- Adaptive enlargement of poorly conditioned stencils
+        const adaptiveStencil adaptiveStencil_;
 
         //- Cell centre gradient coefficients
         mutable autoPtr<CompactListList<vector>> cellGradCoeffsPtr_;
@@ -220,14 +224,22 @@ class kExactLeastSquares
         //- Make the cell and face stencil pointer
         void makeStencils() const;
 
+        //- Enlarge the cell stencils with a poor condition number
+        void adaptStencils() const;
+
         //- Make the fvMeshQuadrature pointer
         void makeQuadrature() const;
 
         //- Make the weight function
         void makeWeightFunction() const;
 
-        //- Calculate interpolation coefficients for the cell centres
-        void calcCellCoeffs() const;
+        //- Calculate interpolation coefficients for the cell centres.
+        //  If conditioning is requested, only the condition number estimates
+        //  of the least-squares systems are calculated
+        void calcCellCoeffs
+        (
+            adaptiveStencil::conditioning* conditioningPtr = nullptr
+        ) const;
 
         //- Calculate the cell reconstruction gradient coefficients at a
         //  specified point, aligned with the cell stencil

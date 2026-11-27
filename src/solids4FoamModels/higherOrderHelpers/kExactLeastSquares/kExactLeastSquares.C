@@ -1645,6 +1645,57 @@ void kExactLeastSquares::makeStencils() const
             cellNn
         )
     );
+
+    // Stencils are final before they are used by anyone else, as the matrix
+    // sparsity and coefficient storage depend on their size
+    if (adaptiveStencil_.active())
+    {
+        adaptStencils();
+    }
+}
+
+
+void kExactLeastSquares::adaptStencils() const
+{
+    leastSquaresStencil& stencilRef = autoPtrRef(stencilPtr_);
+
+    const auto stencilSize =
+    [&](const label cellI) -> label
+    {
+        return compactListListCRef(stencilRef.cellsStencil())[cellI].size();
+    };
+
+    const scalarField estimate
+    (
+        adaptiveStencil_.adapt
+        (
+            "cell",
+            mesh_.nCells(),
+            [&](adaptiveStencil::conditioning& request)
+            {
+                calcCellCoeffs(&request);
+            },
+            stencilSize,
+            [&](const labelUList& cells, const labelUList& nExtra)
+            {
+                stencilRef.enlargeCellsStencil(cells, nExtra);
+            }
+        )
+    );
+
+    scalarField size(mesh_.nCells());
+    forAll(size, cellI)
+    {
+        size[cellI] = stencilSize(cellI);
+    }
+
+    adaptiveStencil::writeCellField(mesh_, "kExactCellStencilSize", size);
+    adaptiveStencil::writeCellField
+    (
+        mesh_,
+        "kExactCellConditionEstimate",
+        estimate
+    );
 }
 
 
@@ -1743,7 +1794,10 @@ kExactLeastSquares::QRSolution kExactLeastSquares::QRSolve
 }
 
 
-void kExactLeastSquares::calcCellCoeffs() const
+void kExactLeastSquares::calcCellCoeffs
+(
+    adaptiveStencil::conditioning* conditioningPtr
+) const
 {
     if (debug)
     {
@@ -1776,24 +1830,27 @@ void kExactLeastSquares::calcCellCoeffs() const
         rowSizes[cI] = stencils[cI].size();
     }
 
-    // Allocate CompactListList for gradient interpolation coefficients
-    cellGradCoeffsPtr_.set(new CompactListList<vector>(rowSizes));
-    CompactListList<vector>& cellGradCoeffs =
-        autoPtrRef(cellGradCoeffsPtr_);
+    // Coefficients are not stored if only the condition number estimates
+    // are requested
+    if (!conditioningPtr)
+    {
+        // Allocate CompactListList for gradient interpolation coefficients
+        cellGradCoeffsPtr_.set(new CompactListList<vector>(rowSizes));
 
-    if (polynomialOrder() >= 2)
-    {
-        cellSecondGradCoeffsPtr_.set
-        (
-            new CompactListList<symmTensor>(rowSizes)
-        );
-    }
-    if (polynomialOrder() >= 3)
-    {
-        cellThirdGradCoeffsPtr_.set
-        (
-            new CompactListList<symmTensor3rdOrder>(rowSizes)
-        );
+        if (polynomialOrder() >= 2)
+        {
+            cellSecondGradCoeffsPtr_.set
+            (
+                new CompactListList<symmTensor>(rowSizes)
+            );
+        }
+        if (polynomialOrder() >= 3)
+        {
+            cellThirdGradCoeffsPtr_.set
+            (
+                new CompactListList<symmTensor3rdOrder>(rowSizes)
+            );
+        }
     }
 
     // Calculate Taylor series exponents, exponents differs for 2D and 3D case
@@ -1999,6 +2056,12 @@ void kExactLeastSquares::calcCellCoeffs() const
 
     forAll(stencils, cellI)
     {
+        // Condition number estimate is requested for active stencils only
+        if (conditioningPtr && !conditioningPtr->active[cellI])
+        {
+            continue;
+        }
+
         const labelUList stencil = stencils[cellI];
         const vector& cellC = CI[cellI];
         const label ownerGlobalCellID = globalCells.toGlobal(cellI);
@@ -2082,9 +2145,20 @@ void kExactLeastSquares::calcCellCoeffs() const
             W.diagonal()[cI] = weightFunc().weight(d, maxDist);
         }
 
+        if (conditioningPtr)
+        {
+            conditioningPtr->estimate[cellI] =
+                adaptiveStencil_.conditionEstimate(Q, W);
+
+            continue;
+        }
+
         QRSolution qrs = QRSolve(Q, W);
 
         const Eigen::MatrixXd& A = qrs.A;
+
+        CompactListList<vector>& cellGradCoeffs =
+            autoPtrRef(cellGradCoeffsPtr_);
 
         if (calcConditionNumber_)
         {
@@ -2198,7 +2272,7 @@ void kExactLeastSquares::calcCellCoeffs() const
         }
     }
 
-    if (calcConditionNumber_)
+    if (calcConditionNumber_ && !conditioningPtr)
     {
         Info<< "Writing " << cellConditionNumber().name() << " to time = "
             << mesh.time().value() << endl;
@@ -2241,6 +2315,7 @@ kExactLeastSquares::kExactLeastSquares
     (
         dict.lookupOrDefault<Switch>("calcConditionNumber", false)
     ),
+    adaptiveStencil_(dict, minNn()),
     cellGradCoeffsPtr_(),
     cellSecondGradCoeffsPtr_(),
     cellThirdGradCoeffsPtr_(),

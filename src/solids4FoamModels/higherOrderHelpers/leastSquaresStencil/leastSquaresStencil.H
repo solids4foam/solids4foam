@@ -111,6 +111,14 @@ class leastSquaresStencil
         //- Geometric centres corresponding to remoteCellsPerProc
         mutable autoPtr<List<vectorField>> remoteCentresPerProcPtr_;
 
+        //- All remote (off-processor) candidate cells inside the halo region,
+        //  grouped per processor. Kept so that stencils can be enlarged
+        //  without further parallel communication
+        mutable autoPtr<List<labelList>> remoteCandidatesPerProcPtr_;
+
+        //- Geometric centres corresponding to remoteCandidatesPerProc
+        mutable autoPtr<List<vectorField>> remoteCandidateCentresPerProcPtr_;
+
         //- Remote cell centres stored in a global cell id map
         mutable autoPtr<Map<vector>> remoteCentresMapPtr_;
 
@@ -160,10 +168,17 @@ class leastSquaresStencil
             const labelList& procToQuery
         ) const;
 
-        //- Build face stencil
-        labelList buildFacesStencil
+        //- Build a stencil of the N cells closest to the given point.
+        //  Local candidates are collected layer by layer starting from the
+        //  seed cells; remote candidates are added near processor
+        //  boundaries. Cells at the same distance as the N-th cell are also
+        //  included, so the stencil can be larger than N. If fewer than N
+        //  candidates are available, all of them are returned.
+        labelList buildStencil
         (
-             const label faceI,
+             const point& centre,
+             const labelUList& seedCells,
+             const label N,
              const List<labelList>& remoteCells,
              const List<vectorField>& remoteCellsCentres,
              const scalar relTol = 1e-8,
@@ -171,12 +186,27 @@ class leastSquaresStencil
              const scalar searchExpansionFactor = 1.3
         ) const;
 
-        //- Filter unused cells and store cells IDs and their cell centres
-        void filterUnusedCandidates
+        //- Build face stencil with N cells
+        labelList buildFacesStencil
         (
-            const List<labelList>& remoteCellsPerProc,
-            const List<vectorField>& remoteCellsCentresPerProc
+             const label faceI,
+             const label N,
+             const List<labelList>& remoteCells,
+             const List<vectorField>& remoteCellsCentres
         ) const;
+
+        //- Store the remote candidate cells, and their centres, that are used
+        //  by the current face and cell stencils
+        void filterUnusedCandidates() const;
+
+        //- Replace the given rows of a stencil list. Empty new rows are
+        //  skipped
+        static void replaceStencilRows
+        (
+            autoPtr<CompactListList<label>>& stencilsPtr,
+            const labelUList& rows,
+            const List<labelList>& newStencils
+        );
 
         //- Calculate faces stencil
         void calcFacesStencil() const;
@@ -243,6 +273,30 @@ public:
 
         //- Clear all data, call after mesh topology change
         void clear() const;
+
+    // Stencil enlargement
+
+        //- Enlarge the stencil of each given face by nExtra cells, plus any
+        //  further cells at the same distance as the last one added.
+        //  Returns the number of faces whose stencil has grown. Stencils
+        //  that cannot grow (no more candidate cells) are left unchanged.
+        //  No parallel communication is performed.
+        label enlargeFacesStencil
+        (
+            const labelUList& faces,
+            const labelUList& nExtra
+        );
+
+        //- Enlarge the stencil of each given cell by nExtra cells, plus any
+        //  further cells at the same distance as the last one added.
+        //  Returns the number of cells whose stencil has grown. Stencils
+        //  that cannot grow (no more candidate cells) are left unchanged.
+        //  No parallel communication is performed.
+        label enlargeCellsStencil
+        (
+            const labelUList& cells,
+            const labelUList& nExtra
+        );
 
     // Data exchange
 
