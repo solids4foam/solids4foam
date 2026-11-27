@@ -269,14 +269,21 @@ Jacobian of the solid residual, with the interface traction held at its
 current value, computed by coloured forward differences: the pattern is that
 of the square of the compact block (the two-layer stencil of the residual),
 PETSc colours it so that no two columns of a colour share a row, and the solid
-residual is evaluated once per colour and component (tens of solid-only
-residual evaluations). With `solidJacobianRebuild deltaTChange` (default) it
-is built once and rebuilt only when the time step or the previous time step
-changes, which suffices because the preconditioner needs the linearised
-elastic operator rather than the current tangent; `always` rebuilds it at
+residual is evaluated once per colour (about 40 colours in 2-D, 126 on the
+`3dTube` solid). After the first build the block is compared with a forward
+difference of the residual along a random direction; a relative difference
+above `solidJacobianCheckTolerance` (default 1e-4; typically about 1e-8) stops
+the run, as it would mean that the residual depends on cells beyond two layers
+or is not differentiable. With `solidJacobianRebuild deltaTChange` (default) it
+is built once, again at the second time step if it was built in the first, and
+then only when the time step or the previous time step changes by more than
+`solidJacobianRebuildTolerance` (default 0.05); this suffices because the
+preconditioner needs the linearised elastic operator rather than the current
+tangent; `always` rebuilds it at
 every Jacobian evaluation. Only the preconditioner changes, so the converged
-solution does not. Use it for thin, bending structures; on compact solids it
-neither helps nor costs much (a few per cent). `solidJacobianCheck yes`
+solution does not. Use it for thin, bending structures; on compact solids it does not reduce the
+Krylov iterations and can cost more (`blobInTreacle`: +7 %; `3dTube` with
+BoomerAMG on the solid block: about +50 %), for which `automatic` is intended. `solidJacobianCheck yes`
 prints the relative difference between J v and a forward difference of the
 residual along a random direction after each build (about 1e-8 expected).
 Serial and parallel; tested with OpenFOAM v2512 and PETSc 3.24.
@@ -308,14 +315,17 @@ preconditioning.
 `systemScaling forceBalanced` multiplies the fluid rows by the fluid density
 and leaves the solid rows unscaled, so that the momentum residuals of both
 regions count as forces. With the factors of the tutorials on
-`collapsibleChannel` (1e8 and 1/(mu*deltaT)), the solid rows are about 1e-12 of
-the fluid rows in the norm, although in force units the solid residual is the
-larger at the start of a step: the Newton test is then met by the fluid rows
-alone and the solid residual is reduced by only about 1e3-1e4. With
-`forceBalanced` it is reduced by the requested factor, at the cost of about one
-more Newton iteration per step; the wall displacement of the coarse tutorial
-then agrees with a tightly converged solution to 1e-11 instead of 4e-6
-(relative to its peak). Do not combine it with `fluidSystemScaleFactor` or
+`collapsibleChannel` (1e8 and 1/(mu*deltaT)), the solid rows are 1e-14 to
+1e-12 of the fluid rows in the norm, although in force units the solid residual
+is the larger at the start of a step: the Newton test is then met by the fluid
+rows, and the solid residual is reduced in a time step by a factor between 1.4
+and 5e4 (median 3e2) instead of 1e6. With `forceBalanced` the reduction is
+between 3e3 and 4e7 (median 2e6; the step-norm test `snes_stol` stops some
+steps first), at the cost of 1-1.5 more Newton iterations per step (on the coarse
+tutorial about 70 % more time with the compact solid block, 35 % with the
+finite-difference one); the wall displacement then agrees with a
+tightly converged solution to the output precision (1e-8 of its peak) instead
+of 4e-6. Do not combine it with `fluidSystemScaleFactor` or
 `solidSystemScaleFactor`. Right preconditioning
 (`ksp_pc_side right`, `ksp_norm_type unpreconditioned`) appears faster with
 the default factors only because its Krylov test then ignores the solid rows;
