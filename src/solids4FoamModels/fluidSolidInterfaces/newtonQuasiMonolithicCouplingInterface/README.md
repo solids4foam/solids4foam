@@ -66,7 +66,8 @@ NewtonQuasiMonolithicCoeffs
     // Optional: solid block of the preconditioning matrix, compact
     // (default), colouredFiniteDifference or automatic (see Solid Block)
     //solidJacobian colouredFiniteDifference;
-    //solidJacobianRebuild deltaTChange;   // or always
+    //solidJacobianRebuild adaptive;       // or deltaTChange, always
+    //solidJacobianRebuildKrylovRatio 1.5; // adaptive only
     //solidJacobianCheck no;               // print a directional check
     //solidJacobianTrialInterval 20;       // automatic only
     //solidJacobianSwitchMargin 0.1;       // automatic only
@@ -274,12 +275,18 @@ residual is evaluated once per colour (about 40 colours in 2-D, 126 on the
 difference of the residual along a random direction; a relative difference
 above `solidJacobianCheckTolerance` (default 1e-4; typically about 1e-8) stops
 the run, as it would mean that the residual depends on cells beyond two layers
-or is not differentiable. With `solidJacobianRebuild deltaTChange` (default) it
-is built once, again at the second time step if it was built in the first, and
-then only when the time step or the previous time step changes by more than
-`solidJacobianRebuildTolerance` (default 0.05); this suffices because the
-preconditioner needs the linearised elastic operator rather than the current
-tangent; `always` rebuilds it at
+or is not differentiable. With `solidJacobianRebuild deltaTChange` it is built
+once, again at the second time step if it was built in the first, and then only
+when the time step or the previous time step changes by more than
+`solidJacobianRebuildTolerance` (default 0.05): the preconditioner needs the
+linearised elastic operator rather than the current tangent, and on
+`collapsibleChannel` a block built at the first step is as effective as one
+rebuilt at every Newton iteration until the wall has deflected strongly. Near
+its first trough, however, the Krylov iterations per Newton iteration rise from
+about 27 to 42. With `solidJacobianRebuild adaptive` (default), the block is
+also rebuilt when the Krylov iterations per Newton iteration of a time step
+exceed `solidJacobianRebuildKrylovRatio` (default 1.5) times those of the first
+step after the last build; `always` rebuilds it at
 every Jacobian evaluation. Only the preconditioner changes, so the converged
 solution does not. Use it for thin, bending structures; on compact solids it does not reduce the
 Krylov iterations and can cost more (`blobInTreacle`: +7 %; `3dTube` with
