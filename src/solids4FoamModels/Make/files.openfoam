@@ -167,6 +167,7 @@ $(fluidFvPatchFields)/extrapolated/extrapolatedFvPatchFields.C
 $(fluidFvPatchFields)/extrapolatedPressure/extrapolatedPressureFvPatchScalarField.C
 $(fluidFvPatchFields)/fixedVelocityPressure/fixedVelocityPressureFvPatchScalarField.C
 $(fluidFvPatchFields)/movingWallPressure/movingWallPressureFvPatchScalarField.C
+$(fluidFvPatchFields)/wallNormalMomentum/wallNormalMomentum.C
 $(fluidFvPatchFields)/newMovingWallVelocity/newMovingWallVelocityFvPatchVectorField.C
 $(fluidFvPatchFields)/normalInletVelocity/normalInletVelocityFvPatchVectorField.C
 $(fluidFvPatchFields)/outflowPressure/outflowPressureFvPatchScalarField.C

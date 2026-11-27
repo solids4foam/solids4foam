@@ -156,6 +156,27 @@ void interFluid::updateRobinFsiInterfacePhi
             }
 
             pRobin.setKinematicConsistency(consistent);
+
+            // With the viscous term the Robin condition imposes
+            // snGrad(p_rgh) = gSrc + rho*(V - a_n), with V the normal viscous
+            // term: rAU*rho*V*|Sf| is added here, so that the converged flux
+            // is unchanged. The condition is updated first, so that the
+            // pressure equation uses the same V
+            if (pRobin.viscousTerm())
+            {
+                pRobin.updateCoeffs();
+
+                const scalarField& rhoB =
+                    mesh().lookupObject<volScalarField>
+                    (
+                        "rho"
+                    ).boundaryField()[patchI];
+
+                phiHbyA.boundaryFieldRef()[patchI] +=
+                    rAU.boundaryField()[patchI]
+                   *mesh().magSf().boundaryField()[patchI]
+                   *rhoB*pRobin.viscousNormal();
+            }
         }
         else if
         (
@@ -165,6 +186,25 @@ void interFluid::updateRobinFsiInterfacePhi
             )
         )
         {
+            // Update the prescribed gradient first, as in pimpleFluid, so
+            // that this flux and the pressure equation use the same
+            // gradient. The legacy condition (viscousTerm no, with a
+            // fixed-pressure boundary) keeps the gradient of the previous
+            // update, as before
+            movingWallPressureFvPatchScalarField& pMovingWall =
+                const_cast<movingWallPressureFvPatchScalarField&>
+                (
+                    refCast<const movingWallPressureFvPatchScalarField>
+                    (
+                        p.boundaryField()[patchI]
+                    )
+                );
+
+            if (p.needReference() || pMovingWall.viscousTerm())
+            {
+                pMovingWall.updateCoeffs();
+            }
+
             phiHbyA.boundaryFieldRef()[patchI] +=
                 rAU.boundaryField()[patchI]
                *p.boundaryField()[patchI].snGrad()

@@ -142,8 +142,43 @@ void pimpleFluid::updateRobinFsiInterface()
                     rAU_.boundaryField()[patchI] = deltaT/Cn;
                 }
             }
+
+            elasticWallPressureFvPatchScalarField& pRobin =
+                refCast<elasticWallPressureFvPatchScalarField>
+                (
+                    p().boundaryField()[patchI]
+                );
+
+            // With the viscous term the Robin condition imposes
+            // dp/dn = rho_f*(V - a_n), with V the normal viscous term, and
+            // the pressure equation removes rAU*(V - a_n)*|Sf| from the
+            // flux: rAU*V*|Sf| is added here, so that the converged flux is
+            // unchanged. The condition is updated first, so that the
+            // pressure equation uses the same V
+            if (pRobin.viscousTerm())
+            {
+                pRobin.updateCoeffs();
+
+                phi().boundaryField()[patchI] +=
+                    rAU_.boundaryField()[patchI]
+                   *pRobin.viscousNormal()
+                   *mesh().magSf().boundaryField()[patchI];
+            }
         }
-        else if
+    }
+}
+
+
+void pimpleFluid::addMovingWallPressureFlux()
+{
+    // The flux rAU*snGrad(p)*|Sf| of the movingWallPressure patches, which
+    // the pressure equation removes again. It is added after adjustPhi: in
+    // an enclosed domain adjustPhi requires a vanishing net boundary flux,
+    // which holds for the wall velocity flux but not, in general, for the
+    // flux of the prescribed gradient
+    forAll(p().boundaryField(), patchI)
+    {
+        if
         (
             isA<movingWallPressureFvPatchScalarField>
             (
@@ -151,6 +186,23 @@ void pimpleFluid::updateRobinFsiInterface()
             )
         )
         {
+            // Update the prescribed gradient first, from the current velocity
+            // and rAU, so that this flux and the pressure equation use the
+            // same gradient and the wall flux equals the wall velocity flux.
+            // The legacy condition (viscousTerm no, with a fixed-pressure
+            // boundary) keeps the gradient of the previous update, as before
+            if
+            (
+                p().needReference()
+             || refCast<const movingWallPressureFvPatchScalarField>
+                (
+                    p().boundaryField()[patchI]
+                ).viscousTerm()
+            )
+            {
+                p().boundaryField()[patchI].updateCoeffs();
+            }
+
             phi().boundaryField()[patchI] +=
                 rAU_.boundaryField()[patchI]
                *p().boundaryField()[patchI].snGrad()
@@ -615,8 +667,17 @@ bool pimpleFluid::evolve()
             rAU_ = 1.0/UEqn.A();
             rAUf_ = fvc::interpolate(rAU_);
 
-            U() = rAU_*UEqn.H();
-            phi() = (mesh.Sf() & fvc::interpolate(U()));
+            // The predicted velocity is kept in HbyA until the interface
+            // fluxes are set: the viscous term of movingWallPressure and
+            // elasticWallPressure, updated there, reads the current
+            // velocity iterate U
+            volVectorField HbyA("HbyA", U());
+            HbyA = rAU_*UEqn.H();
+            phi() =
+            (
+                mesh.Sf()
+              & fvc::interpolate(HbyA, "interpolate(" + U().name() + ')')
+            );
 
             // Correct phi for temporal consistency
             if (ddtCorr_)
@@ -630,6 +691,12 @@ bool pimpleFluid::evolve()
             {
                 adjustPhi(phi(), U(), p());
             }
+
+            addMovingWallPressureFlux();
+
+            // As before, U holds the predicted velocity during the pressure
+            // equation, e.g. for conditions such as totalPressure
+            U() = HbyA;
 
             // Non-orthogonal pressure corrector loop
             while (pimple().correctNonOrthogonal())

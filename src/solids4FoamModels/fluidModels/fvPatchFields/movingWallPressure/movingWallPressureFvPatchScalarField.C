@@ -21,13 +21,127 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "fvPatchFieldMapper.H"
 #include "volFields.H"
-#include "uniformDimensionedFields.H"
+#include "surfaceFields.H"
+#include "fvc.H"
 #include "newMovingWallVelocityFvPatchVectorField.H"
+#include "wallNormalMomentum.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
 {
+
+// * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
+
+tmp<vectorField> movingWallPressureFvPatchScalarField::wallAcceleration() const
+{
+    const fvPatchVectorField& Up =
+        patch().lookupPatchField<volVectorField, vector>("U");
+
+    if (isA<newMovingWallVelocityFvPatchVectorField>(Up))
+    {
+        return tmp<vectorField>
+        (
+            new vectorField
+            (
+                refCast<const newMovingWallVelocityFvPatchVectorField>
+                (
+                    Up
+                ).acceleration()
+            )
+        );
+    }
+
+    // Time derivative of the boundary velocity with the ddt scheme of U
+    const volVectorField& U = db().lookupObject<volVectorField>("U");
+
+    return tmp<vectorField>
+    (
+        new vectorField(fvc::ddt(U)().boundaryField()[patch().index()])
+    );
+}
+
+
+tmp<scalarField> movingWallPressureFvPatchScalarField::patchDensity() const
+{
+    if (db().foundObject<volScalarField>("rho"))
+    {
+        return tmp<scalarField>
+        (
+            new scalarField
+            (
+                patch().lookupPatchField<volScalarField, scalar>("rho")
+            )
+        );
+    }
+
+    // The transport properties of the fluid model, or else those on disk
+    autoPtr<IOdictionary> readDictPtr;
+
+    if (!db().foundObject<IOdictionary>("transportProperties"))
+    {
+        readDictPtr.reset
+        (
+            new IOdictionary
+            (
+                IOobject
+                (
+                    "transportProperties",
+                    db().time().constant(),
+                    db(),
+                    IOobject::MUST_READ,
+                    IOobject::NO_WRITE,
+                    false
+                )
+            )
+        );
+    }
+
+    const dictionary& transportProperties =
+        readDictPtr.valid()
+      ? readDictPtr()
+      : db().lookupObject<IOdictionary>("transportProperties");
+
+    const dimensionedScalar rho(transportProperties.lookup("rho"));
+
+    return tmp<scalarField>(new scalarField(patch().size(), rho.value()));
+}
+
+
+tmp<scalarField> movingWallPressureFvPatchScalarField::momentumGradient
+(
+    const volVectorField* viscousPtr
+) const
+{
+    const vectorField n(patch().nf());
+
+    vectorField momentum(-wallAcceleration());
+
+    if (viscousTerm_)
+    {
+        momentum +=
+            viscousPtr->boundaryField()[patch().index()].patchInternalField();
+    }
+
+    tmp<scalarField> tgrad(new scalarField(n & momentum));
+
+#ifdef OPENFOAM_NOT_EXTEND
+    const word& fieldName = internalField().name();
+#else
+    const word& fieldName = dimensionedInternalField().name();
+#endif
+
+    const volScalarField& p = db().lookupObject<volScalarField>(fieldName);
+
+    if (p.dimensions() == dimPressure)
+    {
+        tmpRef(tgrad) *= patchDensity();
+    }
+
+    return tgrad;
+}
+
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
@@ -38,7 +152,8 @@ movingWallPressureFvPatchScalarField
     const DimensionedField<scalar, volMesh>& iF
 )
 :
-    fixedGradientFvPatchScalarField(p, iF)
+    fixedGradientFvPatchScalarField(p, iF),
+    viscousTerm_(true)
 {}
 
 
@@ -50,7 +165,8 @@ movingWallPressureFvPatchScalarField
     const dictionary& dict
 )
 :
-    fixedGradientFvPatchScalarField(p, iF)
+    fixedGradientFvPatchScalarField(p, iF),
+    viscousTerm_(dict.lookupOrDefault<Switch>("viscousTerm", true))
 {
     fvPatchField<scalar>::operator=(patchInternalField());
 }
@@ -65,7 +181,8 @@ movingWallPressureFvPatchScalarField
     const fvPatchFieldMapper& mapper
 )
 :
-    fixedGradientFvPatchScalarField(ptf, p, iF, mapper)
+    fixedGradientFvPatchScalarField(ptf, p, iF, mapper),
+    viscousTerm_(ptf.viscousTerm_)
 {}
 
 
@@ -76,7 +193,8 @@ movingWallPressureFvPatchScalarField
     const movingWallPressureFvPatchScalarField& ptf
 )
 :
-    fixedGradientFvPatchScalarField(ptf)
+    fixedGradientFvPatchScalarField(ptf),
+    viscousTerm_(ptf.viscousTerm_)
 {}
 #endif
 
@@ -88,92 +206,12 @@ movingWallPressureFvPatchScalarField
     const DimensionedField<scalar, volMesh>& iF
 )
 :
-    fixedGradientFvPatchScalarField(ptf, iF)
+    fixedGradientFvPatchScalarField(ptf, iF),
+    viscousTerm_(ptf.viscousTerm_)
 {}
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
-
-
-// void movingWallPressureFvPatchScalarField::evaluate
-// (
-//     const Pstream::commsTypes
-// )
-// {
-//     if (!this->updated())
-//     {
-//         this->updateCoeffs();
-//     }
-
-//     const fvMesh& mesh = this->patch().boundaryMesh().mesh();
-// #ifdef OPENFOAM_NOT_EXTEND
-//     word fieldName = internalField().name();
-// #else
-//     word fieldName = dimensionedInternalField().name();
-// #endif
-
-//     const volScalarField& p =
-//         mesh.lookupObject<volScalarField>(fieldName);
-
-//     const fvPatchField<vector>& gradP =
-//         patch().lookupPatchField<volVectorField, vector>("grad(p)");
-
-//     const fvPatchField<vector>& ddtU =
-//         patch().lookupPatchField<volVectorField, vector>("ddt(U)");
-
-//     const vectorField n(patch().nf());
-//     const vectorField delta(patch().delta());
-//     const vectorField k((I - sqr(n)) & delta);
-
-//     const scalarField dPP(k & gradP.patchInternalField());
-
-//     scalarField nGradPb(patch().size(), 0);
-
-//     if (p.dimensions() == dimPressure)
-//     {
-//         const IOdictionary transportProperties
-//         (
-//             IOobject
-//             (
-//                 "transportProperties",
-//                 mesh.time().constant(),
-//                 mesh,
-//                 IOobject::MUST_READ,
-//                 IOobject::NO_WRITE,
-//                 false  // Do not register
-//             )
-//         );
-
-//         const dimensionedScalar rho
-//         (
-//             transportProperties.lookup("rho")
-//         );
-
-//         nGradPb = -rho.value()*(n&ddtU);
-//     }
-//     else
-//     {
-//         nGradPb = -(n&ddtU);
-//     }
-
-//     Info<< "ddtUn, max: " << max(n&ddtU)
-//         << ", avg: " << average(n&ddtU)
-//         << ", min: " << min(n&ddtU) << endl;
-
-//     Field<scalar>::operator=
-//     (
-//         this->patchInternalField() + dPP
-//       + nGradPb/this->patch().deltaCoeffs()
-//     //+ 0.5*(gradient() + gradPp)/this->patch().deltaCoeffs()
-//     );
-
-//     Info<< "p, max: " << max(*this)
-//         << ", avg: " << average(*this)
-//         << ", min: " << min(*this) << endl;
-
-//     fvPatchField<scalar>::evaluate();
-// }
-
 
 void movingWallPressureFvPatchScalarField::updateCoeffs()
 {
@@ -182,51 +220,18 @@ void movingWallPressureFvPatchScalarField::updateCoeffs()
         return;
     }
 
-    const fvMesh& mesh = this->patch().boundaryMesh().mesh();
-#ifdef OPENFOAM_NOT_EXTEND
-    word fieldName = internalField().name();
-#else
-    word fieldName = dimensionedInternalField().name();
-#endif
-    const volScalarField& p =
-        mesh.lookupObject<volScalarField>(fieldName);
-
-    // const fvPatchField<vector>& ddtU =
-    //      patch().lookupPatchField<volVectorField, vector>("ddt(U)");
-
-    const newMovingWallVelocityFvPatchVectorField& movingWallVelocity =
-        refCast<const newMovingWallVelocityFvPatchVectorField>
-        (
-            patch().lookupPatchField<volVectorField, vector>("U")
-        );
-
-    vectorField n(patch().nf());
-
-    if (p.dimensions() == dimPressure)
+    if (viscousTerm_)
     {
-        IOdictionary transportProperties
+        const volVectorField viscousField
         (
-            IOobject
-            (
-                "transportProperties",
-                mesh.time().constant(),
-                mesh,
-                IOobject::MUST_READ,
-                IOobject::NO_WRITE
-            )
+            wallNormalMomentum::field(db(), "U", patch().name())
         );
 
-        dimensionedScalar rho
-        (
-            transportProperties.lookup("rho")
-        );
-
-        gradient() = -rho.value()*(n & movingWallVelocity.acceleration());
+        gradient() = momentumGradient(&viscousField);
     }
     else
     {
-        gradient() = -(n & movingWallVelocity.acceleration());
-        // gradient() = -(n&ddtU);
+        gradient() = momentumGradient(nullptr);
     }
 
     fixedGradientFvPatchScalarField::updateCoeffs();
@@ -236,6 +241,8 @@ void movingWallPressureFvPatchScalarField::updateCoeffs()
 void movingWallPressureFvPatchScalarField::write(Ostream& os) const
 {
     fixedGradientFvPatchScalarField::write(os);
+    os.writeKeyword("viscousTerm")
+        << viscousTerm_ << token::END_STATEMENT << nl;
 #ifdef OPENFOAM_ORG
     writeEntry(os, "value", *this);
 #else

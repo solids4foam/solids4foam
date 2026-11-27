@@ -434,6 +434,10 @@ release. For complete commit-level details and contributor information, see the
   ends in April 2027). The Dockerfiles of these base images, with OpenFOAM,
   PETSc and Gmsh, are now kept in `.docker/base`, with a workflow that builds
   them (#767).
+- `movingWallPressure` and `elasticWallPressure` include the viscous term
+  of the wall-normal momentum equation by default (`viscousTerm yes`), which
+  changes the results of existing cases with either condition; set
+  `viscousTerm no` to reproduce earlier results (see Fixed, #721).
 - The `beamInCrossFlow` tutorial now follows the stationary 3-D benchmark of
   Richter (2012), section 7.2: the plate moves to x = 0.4-0.5 m, the solid is
   St Venant-Kirchhoff with E = 1.4 MPa (was 10 kPa) and nu = 0.4, and the
@@ -824,6 +828,42 @@ release. For complete commit-level details and contributor information, see the
 
 ### Fixed
 
+- `movingWallPressure` (#721):
+  - It now works in enclosed fluid domains, where no boundary fixes the
+    pressure; it stopped in `adjustPhi` ("Continuity error cannot be
+    removed"). `pimpleFluid` now adds the flux of the prescribed gradient
+    to the predicted flux after `adjustPhi`, whose check needs a vanishing
+    net boundary flux, and updates the condition just before, so that this
+    flux and the pressure equation use the same gradient. With
+    `movingWallPressure` instead of `zeroGradient` on the interface,
+    the IQN-ILS amplitude loss of `ringAddedMass` (2.1% per period on the
+    coarsest mesh at the strong level) disappears, as with Robin-Neumann
+    coupling.
+  - `ringAddedMass` gains `./Allrun movingWallPressure` (IQN-ILS with
+    `movingWallPressure` on the interface of its enclosed fluid domain),
+    which its regression test runs: it must finish without an `adjustPhi`
+    error, and the ratio of the second to the first displacement peak must
+    be one to 1e-3 (with `zeroGradient` IQN-ILS loses 0.57% in this half
+    period).
+  - It includes the viscous term of the wall-normal momentum equation,
+    `n & (laplacian(nuEff, U) + div(nuEff*dev2(T(grad(U)))))` in the wall
+    cells, and on OpenFOAM.com the normal fvOptions momentum source, by
+    default. **This changes the results of existing cases.**
+    `viscousTerm no` restores the earlier condition, which prescribes only
+    the acceleration term; with a fixed-pressure boundary it reproduces the
+    earlier results exactly.
+  - Any velocity condition can be used with it: the acceleration is that of
+    `newMovingWallVelocity`, or else the time derivative of the boundary
+    velocity. The density comes from the `rho` field or the fluid's
+    `transportProperties`, which are no longer read from disk at every
+    update.
+- `elasticWallPressure` (Robin-Neumann coupling) includes the same viscous
+  and source terms by default: the Robin condition uses the solid normal
+  acceleration minus these terms, and `pimpleFluid` and `interFluid` add the
+  corresponding flux, so that the converged interface flux still equals the
+  mesh flux. **This changes the results of existing Robin-Neumann cases.**
+  `viscousTerm no` restores the earlier condition exactly. The terms are
+  evaluated for both conditions by the new `wallNormalMomentum`.
 - `womersleyTube`: `Allrun` now exits with the failing step's status when
   meshing, decomposition, the solver or reconstruction fails. It returned 0
   before, because the final optional plotting step set the status.

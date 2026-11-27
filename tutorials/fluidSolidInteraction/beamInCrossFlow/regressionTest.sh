@@ -374,6 +374,16 @@ REF_HO_MAX_DISP=9.64144e-5
 REF_HO_FINAL_DISP=5.22025e-5
 REF_HO_FINAL_FORCE=1.41024
 
+# Robin-Neumann: elasticWallPressure includes the viscous term of the
+# wall-normal momentum equation (viscousTerm, default yes, #721), which the
+# IQN-ILS runs' zero-gradient interface pressure omits. On this coarse mesh
+# it raises the tip displacement by 1.7% and the force by 1.5%; the
+# difference falls to 0.35% with the meshes refined twice. From OpenFOAM
+# v2512 (GCC); with viscousTerm no the Robin runs match the IQN-ILS values
+REF_ROBIN_MAX_DISP=8.37025e-5
+REF_ROBIN_FINAL_DISP=4.49453e-5
+REF_ROBIN_FINAL_FORCE=1.43061
+
 # diffusionElastic fluid mesh motion, to t = 0.5, from the same CI image (it
 # runs only on OpenFOAM.com): the tip displacement is still increasing, so its
 # maximum is its final value
@@ -419,7 +429,8 @@ check_case iqnils "${iqnils_case}" \
     || failures=$((failures + $?))
 
 check_case robin "${robin_case}" \
-    "${REF_MAX_DISP}" "${REF_FINAL_DISP}" "${REF_FINAL_FORCE}" \
+    "${REF_ROBIN_MAX_DISP}" "${REF_ROBIN_FINAL_DISP}" \
+    "${REF_ROBIN_FINAL_FORCE}" \
     || failures=$((failures + $?))
 
 check_case highOrder "${high_order_case}" \

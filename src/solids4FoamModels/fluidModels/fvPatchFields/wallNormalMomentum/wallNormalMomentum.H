@@ -1,0 +1,103 @@
+/*---------------------------------------------------------------------------*\
+License
+    This file is part of solids4foam.
+
+    solids4foam is free software: you can redistribute it and/or modify it
+    under the terms of the GNU General Public License as published by the
+    Free Software Foundation, either version 3 of the License, or (at your
+    option) any later version.
+
+    solids4foam is distributed in the hope that it will be useful, but
+    WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
+
+Namespace
+    Foam::wallNormalMomentum
+
+Description
+    The viscous and source terms of the wall-normal momentum equation,
+    shared by the wall pressure conditions movingWallPressure and
+    elasticWallPressure.
+
+    At a no-slip wall the convective term vanishes, so the normal momentum
+    equation gives
+
+        n & grad(p) = n & (viscous term + source - a)
+
+    with the viscous term of the incompressible momentum equation
+
+        laplacian(nuEff, U) + div(nuEff*dev2(T(grad(U))))
+
+    and, on OpenFOAM.com, the momentum source of the fvOptions (e.g. a body
+    force), evaluated in the cells next to the wall at the current iterate,
+    with nuEff from the fluid's turbulence (momentum transport) model. The
+    transpose part is the Gauss linear divergence of linearly interpolated
+    face values, so that it needs no scheme of its own. The fvModels of
+    OpenFOAM.org are not included, nor are momentum sources that the solver
+    adds itself, e.g. the Boussinesq buoyancy of pimpleFluid with the energy
+    equation. nuEff gives the stress of laminar flow and of linear
+    eddy-viscosity models; for other models, e.g. Reynolds-stress or
+    nonlinear eddy-viscosity models, the term is an approximation. The
+    transpose part uses dev2, as the OpenFOAM.com and OpenFOAM.org models;
+    the dev of the foam-extend laminar model differs from it by a multiple
+    of div(U), which vanishes for incompressible flow.
+
+    With a registered rho field (variable density, e.g. interFluid) the
+    viscous term is that of rho*nuEff, divided by rho, and the fvOptions,
+    which these solvers do not apply to the momentum equation, are not
+    included. On OpenFOAM.org and foam-extend, whose interFluid does not add
+    the corresponding interface flux, the terms are omitted (zero) for
+    variable density.
+
+    The evaluation uses finite volume operators on the whole field, i.e.
+    processor-boundary communication: all processors must call it together.
+
+SourceFiles
+    wallNormalMomentum.C
+
+\*---------------------------------------------------------------------------*/
+
+#ifndef wallNormalMomentum_H
+#define wallNormalMomentum_H
+
+#include "volFields.H"
+#include "fvPatch.H"
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+namespace Foam
+{
+
+namespace wallNormalMomentum
+{
+
+//- Return the viscous and source terms of the momentum equation of the
+//  velocity field UName in all cells; patchName is used in error messages
+tmp<volVectorField> field
+(
+    const objectRegistry& db,
+    const word& UName,
+    const word& patchName
+);
+
+//- Return the normal component of the given term in the cells next to the
+//  patch
+tmp<scalarField> patchNormal
+(
+    const fvPatch& patch,
+    const volVectorField& term
+);
+
+} // End namespace wallNormalMomentum
+
+} // End namespace Foam
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+#endif
+
+// ************************************************************************* //

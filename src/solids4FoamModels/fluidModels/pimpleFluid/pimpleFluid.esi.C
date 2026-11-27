@@ -177,8 +177,40 @@ void pimpleFluid::updateRobinFsiInterface
             }
 
             pRobin.setKinematicConsistency(consistent);
+
+            // With the viscous term the Robin condition imposes
+            // dp/dn = rho_f*(V - a_n), with V the normal viscous term, and
+            // the pressure equation removes rAU*(V - a_n)*|Sf| from the
+            // flux: rAU*V*|Sf| is added here, so that the converged flux is
+            // unchanged. The condition is updated first, so that the
+            // pressure equation uses the same V
+            if (pRobin.viscousTerm())
+            {
+                pRobin.updateCoeffs();
+
+                phiHbyA.boundaryFieldRef()[patchI] +=
+                    rAU_.boundaryField()[patchI]
+                   *pRobin.viscousNormal()
+                   *mesh().magSf().boundaryField()[patchI];
+            }
         }
-        else if
+    }
+}
+
+
+void pimpleFluid::addMovingWallPressureFlux
+(
+    surfaceScalarField& phiHbyA
+)
+{
+    // The flux rAU*snGrad(p)*|Sf| of the movingWallPressure patches, which
+    // the pressure equation removes again. It is added after adjustPhi: in
+    // an enclosed domain adjustPhi requires a vanishing net boundary flux,
+    // which holds for the wall velocity flux but not, in general, for the
+    // flux of the prescribed gradient
+    forAll(p().boundaryField(), patchI)
+    {
+        if
         (
             isA<movingWallPressureFvPatchScalarField>
             (
@@ -186,6 +218,23 @@ void pimpleFluid::updateRobinFsiInterface
             )
         )
         {
+            // Update the prescribed gradient first, from the current velocity
+            // and rAU, so that this flux and the pressure equation use the
+            // same gradient and the wall flux equals the wall velocity flux.
+            // The legacy condition (viscousTerm no, with a fixed-pressure
+            // boundary) keeps the gradient of the previous update, as before
+            if
+            (
+                p().needReference()
+             || refCast<const movingWallPressureFvPatchScalarField>
+                (
+                    p().boundaryField()[patchI]
+                ).viscousTerm()
+            )
+            {
+                p().boundaryFieldRef()[patchI].updateCoeffs();
+            }
+
             phiHbyA.boundaryFieldRef()[patchI] +=
                 rAU_.boundaryField()[patchI]
                *p().boundaryField()[patchI].snGrad()
@@ -583,6 +632,8 @@ bool pimpleFluid::evolve()
                 adjustPhi(phiHbyA, U, p);
                 fvc::makeAbsolute(phiHbyA, U);
             }
+
+            addMovingWallPressureFlux(phiHbyA);
 
             tmp<volScalarField> rAtU(rAU_);
 
