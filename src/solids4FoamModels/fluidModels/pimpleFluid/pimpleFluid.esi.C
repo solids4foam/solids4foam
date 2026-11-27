@@ -33,6 +33,7 @@ License
 #include "EulerDdtScheme.H"
 #include "backwardDdtScheme.H"
 #include "thermalRobinFvPatchScalarField.H"
+#include "fixedGradientFvPatchFields.H"
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -212,24 +213,30 @@ void pimpleFluid::correctFluxConsistentPatches
     // = -(h/4) d2p/dn2 for a fixed-value pressure): an O(deltaT h) term,
     // formally first order in time at a fixed mesh. The fixed pressure stays
     // implicit in the pressure equation.
-    // On a patch whose velocity condition does not fix the value, e.g. a
-    // prescribed (non-zero) normal gradient, HbyA_b is the cell value, so the
-    // flux is that of the cell-centre velocity, U_P.S_f, which differs from
-    // U_b.S_f by (h/2) dU/dn.S_f: the pressure equation corrects this O(h)
-    // flux error with an O(h^2/deltaT) pressure error in the boundary cells.
-    // There the increment (U_b - U_P).S_f of the velocity condition is added
+    // On a patch with a fixedGradient velocity condition (or one derived from
+    // it), HbyA_b is the cell value, so the flux is that of the cell-centre
+    // velocity, U_P.S_f, which differs from U_b.S_f by (h/2) dU/dn.S_f: the
+    // pressure equation corrects this O(h) flux error with an O(h^2/deltaT)
+    // pressure error in the boundary cells. There the increment
+    // U_b - U_P = snGrad(U)/deltaCoeffs of the velocity condition is added
     // to the flux, which keeps the current HbyA (and any ddtCorr) and leaves
-    // a zero-gradient velocity unchanged
+    // a zero gradient unchanged. The increment is taken from the gradient,
+    // which updateCoeffs has set for the current time when the momentum
+    // matrix was built, and the current deltaCoeffs, rather than from the
+    // stored boundary value: without a momentum predictor, in the first
+    // corrector of a time-step that value is still the one of the previous
+    // time-step (and mesh)
     forAll(fluxConsistentPatches_, i)
     {
         const label patchI = fluxConsistentPatches_[i];
         const fvPatchVectorField& Ub = U().boundaryField()[patchI];
 
-        if (Ub.assignable())
+        if (isA<fixedGradientFvPatchVectorField>(Ub))
         {
+            const vectorField dUb(Ub.snGrad()/Ub.patch().deltaCoeffs());
+
             phiHbyA.boundaryFieldRef()[patchI] +=
-                (Ub - Ub.patchInternalField())
-              & mesh().Sf().boundaryField()[patchI];
+                dUb & mesh().Sf().boundaryField()[patchI];
         }
         else
         {
@@ -327,12 +334,27 @@ pimpleFluid::pimpleFluid
         {
             const label patchI = fluxConsistentPatches_[i];
 
-            if (!p().boundaryField()[patchI].fixesValue())
+            // The velocity condition either fixes the boundary value
+            // (fixedValue, or mixed) or is a fixedGradient: other assignable
+            // conditions, e.g. inletOutlet, which takes its inlet value on
+            // backflow faces, are not supported
+            const fvPatchVectorField& Ub = U().boundaryField()[patchI];
+
+            if
+            (
+                !p().boundaryField()[patchI].fixesValue()
+             || (
+                    Ub.assignable()
+                 && !isA<fixedGradientFvPatchVectorField>(Ub)
+                )
+            )
             {
                 FatalErrorInFunction
                     << "fluxConsistentPatches: patch "
                     << mesh().boundary()[patchI].name()
-                    << " needs a fixed pressure"
+                    << " needs a fixed pressure and a velocity condition"
+                    << " that fixes the boundary value (fixedValue or mixed)"
+                    << " or is a fixedGradient"
                     << abort(FatalError);
             }
         }

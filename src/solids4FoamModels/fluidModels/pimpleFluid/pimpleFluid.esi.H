@@ -98,21 +98,24 @@ class pimpleFluid
         //  condition
         const bool robinKinematicConsistency_;
 
-        //- Patches with a fixed pressure and a velocity condition that fixes
-        //  the boundary value (fixedValue, or mixed, e.g. a prescribed
-        //  normal gradient). On such a patch constrainHbyA sets HbyA_b = U_b,
-        //  and the flux is U_b.S_f - rAU snGrad(p)|S_f|, which differs from
-        //  the boundary velocity flux by a term proportional to the
-        //  time-step; on these patches HbyA_b carries the pressure gradient
-        //  of the boundary cell, so the flux is the boundary velocity flux
-        //  to O(rAU h), i.e. O(deltaT h): formally first order in time at a
-        //  fixed mesh, with a coefficient that vanishes with h (the same
-        //  order as a standard fixed-pressure outlet). The patches may also
-        //  have a velocity condition that does not fix the value, e.g. a
-        //  prescribed normal gradient: HbyA_b is then the cell value, and
-        //  the flux that of the cell-centre velocity, an O(h) flux error
-        //  that becomes an O(h^2/deltaT) pressure error in the boundary
-        //  cells; there the increment (U_b - U_P).S_f is added to the flux.
+        //- Patches with a fixed pressure and one of two kinds of velocity
+        //  condition. (1) A condition that fixes the boundary value:
+        //  fixedValue, or mixed (including a mixed condition with a zero
+        //  value fraction, i.e. a prescribed normal gradient). There
+        //  constrainHbyA sets HbyA_b = U_b, and the flux is
+        //  U_b.S_f - rAU snGrad(p)|S_f|, which differs from the boundary
+        //  velocity flux by a term proportional to the time-step; on these
+        //  patches HbyA_b carries the pressure gradient of the boundary cell,
+        //  so the flux is the boundary velocity flux to O(rAU h), i.e.
+        //  O(deltaT h): formally first order in time at a fixed mesh, with a
+        //  coefficient that vanishes with h (the same order as a standard
+        //  fixed-pressure outlet). (2) A fixedGradient condition, or one
+        //  derived from it, which does not fix the value. There HbyA_b is
+        //  the cell value, and the flux that of the cell-centre velocity, an
+        //  O(h) flux error that becomes an O(h^2/deltaT) pressure error in
+        //  the boundary cells; on these patches the increment
+        //  (U_b - U_P).S_f = (snGrad(U)/deltaCoeffs).S_f is added to the
+        //  flux. Other velocity conditions, e.g. inletOutlet, are rejected.
         //  Read from the PIMPLE dictionary; empty by default
         labelList fluxConsistentPatches_;
 
@@ -146,7 +149,7 @@ class pimpleFluid
 
         //- Set phiHbyA on fluxConsistentPatches to
         //  (U_b + rAtU_b grad(p)_P).S_f, or add (U_b - U_P).S_f where the
-        //  velocity condition does not fix the value
+        //  velocity condition is a fixedGradient
         void correctFluxConsistentPatches
         (
             surfaceScalarField& phiHbyA,

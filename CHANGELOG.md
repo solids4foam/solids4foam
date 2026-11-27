@@ -415,14 +415,18 @@ release. For complete commit-level details and contributor information, see the
 
 ### Changed
 
-- `pimpleFluid` `fluxConsistentPatches` also accepts fixed-pressure patches
-  whose velocity condition does not fix the value, such as a prescribed
-  normal velocity gradient. There the boundary flux was that of the
-  boundary-cell velocity, an O(h) flux error that the pressure equation
-  turned into an O(h²/Δt) pressure error in the boundary cells (first order
-  with Δt ∝ h, and growing as Δt falls). In the manufactured-solution FSI
-  case, the outlet layer goes and the fluid velocity and pressure converge at
-  second order (#750). Patches not listed are unchanged.
+- `pimpleFluid` (OpenFOAM.com) `fluxConsistentPatches` also accepts
+  fixed-pressure patches with a `fixedGradient` velocity condition, or one
+  derived from it, such as `uniformFixedGradient`. There the boundary flux
+  was that of the boundary-cell velocity, an O(h) flux error that the
+  pressure equation turned into an O(h²/Δt) pressure error in the boundary
+  cells (first order with Δt ∝ h, and growing as Δt falls). The added
+  increment is taken from the current gradient, so it also holds without a
+  momentum predictor. Other velocity conditions that do not fix the value,
+  e.g. `inletOutlet`, are rejected. In the manufactured-solution FSI case,
+  the outlet layer goes and the fluid velocity and pressure converge at
+  second order (#750). A new tutorial, `fluids/stagnationPointFlow`, checks
+  it against an exact unsteady solution. Patches not listed are unchanged.
 - The OpenFOAM-v2512 Docker images, the solids4foam release image and the CI
   images, are now based on Ubuntu 24.04 (was 22.04, whose standard support
   ends in April 2027). The Dockerfiles of these base images, with OpenFOAM,
