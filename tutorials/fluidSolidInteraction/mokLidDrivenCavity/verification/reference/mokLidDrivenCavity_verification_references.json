@@ -5,7 +5,16 @@
   "lid_period_s": 5.0,
   "references": {
     "Valdes2007": {"file": "Valdes2007_fig5.12.csv", "group_b": true},
-    "Kratos": {"file": "KratosZorrilla.csv", "group_b": true},
+    "KratosFixedOpenings": {
+      "file": "KratosFixedOpenings_n128.csv",
+      "group_b": true,
+      "source": "Kratos 10.3.0 with the openings fixed, 128x128, dt 0.0125 s (A. Taran 2026; paper-fsi-verification paper-data/kratos_mok_lid_driven_cavity)"
+    },
+    "Kratos": {
+      "file": "KratosZorrilla.csv",
+      "group_b": false,
+      "source": "Kratos example: its openings move with the mesh (about 15% smaller at the peak), so it does not solve the group B problem"
+    },
     "Tiba2026": {
       "values": {"peak": 0.2769, "mean": 0.2466},
       "group_b": true,

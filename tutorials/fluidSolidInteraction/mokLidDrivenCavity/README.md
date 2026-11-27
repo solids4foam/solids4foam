@@ -61,9 +61,12 @@ The published solutions of this problem fall into two groups that differ by
 about 25% in the mean membrane position, because the openings have been
 defined in two ways. The original definition of Wall [1] and Mok [2] leaves the
 velocity unconstrained at the top two nodes of each side wall, which makes the
-opening size depend on the mesh. Valdés [3], the Kratos Multiphysics example
-[4] and Tiba et al. [5] instead prescribe the linear inflow profile above over a
-fixed 0.125 m opening and fix the outlet pressure. This tutorial uses the
+opening size depend on the mesh. Valdés [3], Tiba et al. [5] and an
+independent Kratos Multiphysics solution with fixed openings [6] instead
+prescribe the linear inflow profile above over a fixed 0.125 m opening and fix
+the outlet pressure. The Kratos Multiphysics example [4] was previously counted
+with them, but its openings move with the mesh and are about 15% smaller at the
+peak, so it does not solve this problem. This tutorial uses the
 second, fully specified definition. The
 [verification README](verification/README.md) documents both groups and the
 evidence behind this choice.
@@ -140,30 +143,27 @@ published solutions**
 | :--- | ---: | ---: | ---: |
 | solids4foam, tutorial (32 x 32) | 0.289 | 0.198 | 0.243 |
 | solids4foam, 96 x 96 | 0.286 | 0.204 | 0.245 |
+| Kratos, openings fixed, 128 x 128 [6] | 0.284 | 0.206 | 0.244 |
 | Valdés [3] | 0.270 | 0.197 | 0.232 |
-| Kratos Multiphysics [4] | 0.262 | 0.203 | 0.232 |
+| Kratos Multiphysics example [4] (moving openings) | 0.262 | 0.203 | 0.232 |
 | Mok [2] (other opening definition) | 0.215 | 0.143 | 0.177 |
 
 **Table 2: Periodic response of the midpoint for $$t = 20$$-$$70$$ s.**
 
-The trough and the mean lie within, or within 0.6% of, the range of the
-published group B solutions (Valdés [3], Kratos Multiphysics [4] and Tiba et
-al. [5]), and the phase of the oscillation agrees closely. The peak is 6.2%
-above the solution of Valdés and 9.2% above the Kratos solution, and 3.3%
-above the highest group B value: the solids4foam oscillation has a somewhat
-larger amplitude. The published solutions themselves differ by about 6% in
-their peaks and 20% in their amplitudes.
+The independent Kratos solution with fixed openings [6], computed on meshes up
+to 128 x 128 with its own convergence study, agrees with solids4foam: on the
+same sequence of meshes and time steps the 96 x 96 peak, trough and mean differ
+by -0.77%, +0.71% and -0.13%, and the trough and mean differences shrink with
+refinement. The two codes use slightly different outlet conditions, which
+limits the comparison to about 1%.
 
-None of the published solutions demonstrates mesh or time-step insensitivity:
-each is a single computation on one mesh with one time step. The solids4foam
-solution is mesh- and time-step-converged: the response changes by 0.8% of the
-peak between the 64 x 64 and 96 x 96 meshes (the peak by 0.3%), and by 0.04%
-between time steps of 0.05 s and 0.025 s. The 6-9% difference in the peak
-therefore cannot be attributed to the solids4foam discretisation, and the
-solids4foam result may be the more accurate one, but this cannot be decided
-from the published data. An independent solution from a commercial finite
-element code (COMSOL, LS-DYNA or ANSYS) has been requested and will be added as
-a reference when it is available.
+The published single-mesh solutions of Valdés [3] and Tiba et al. [5] lie
+below both converged solutions: the solids4foam 96 x 96 peak is 6.2% above
+that of Valdés and 3.3% above that of Tiba et al., and the trough is 3.9%
+above that of Valdés. The mean lies within their range. None of the published
+solutions demonstrates mesh or time-step insensitivity. The solids4foam
+solution changes by 0.8% of the peak between the 64 x 64 and 96 x 96 meshes
+(the peak by 0.3%), and by 0.04% between time steps of 0.05 s and 0.025 s.
 
 The solution of Mok [2] lies about 25% lower, because his openings are defined
 by unconstrained mesh nodes rather than a prescribed inflow; see the
@@ -181,8 +181,8 @@ minutes with the standard solid.
 The opt-in [`verification/`](verification/) directory holds a mesh study, a
 time-step study and a comparison of the standard and the high-order solids.
 Each checks that the peak, trough and mean lie within 5% of the range spanned
-by the group B solutions [3-5], and that the history stays within 10% of the
-peak of the band between the Valdés and Kratos curves:
+by the group B solutions [3, 5, 6], and that the history stays within 10% of
+the peak of the band between the Valdés and fixed-opening Kratos curves:
 
 ```bash
 cd verification
@@ -194,9 +194,9 @@ by 0.8% of the peak between the two finest meshes, and the standard and the
 high-order solids agree to 0.04%. For this tension-dominated membrane the
 high-order solid gives no accuracy benefit: the standard solid reaches the same
 answer with two cells through the thickness, whereas the high-order solid needs
-eight and costs 1.5 times as much. A 128 x 128 mesh level could not be
-completed: the partitioned coupling diverges at that resolution, with either
-solid, and the cause has not been found. The study is separate from
+eight and costs 1.5 times as much. A 128 x 128 mesh level needs relaxed PIMPLE
+outer correctors: with the tutorial settings the fluid's outer loop diverges at
+that resolution (see the verification README). The study is separate from
 `regressionTest.sh` and is not run by the normal tutorial test suites. See the
 verification README for the benchmark definition, the reference quality, the
 acceptance criteria and the recorded results.
@@ -226,3 +226,9 @@ cavity.](https://github.com/KratosMultiphysics/Examples/tree/master/fluid_struct
 [Tiba, A. et al. (2026). Online adaptive non-intrusive model reduction via
 manifold interpolation and subspace updates: application to FSI convergence
 acceleration. arXiv:2609.16876.](https://arxiv.org/abs/2609.16876)
+
+[6]
+Taran, A. (2026). Kratos Multiphysics 10.3.0 solution of the lid-driven
+cavity with fixed openings, `paper-data/kratos_mok_lid_driven_cavity/` in the
+paper-fsi-verification repository; the 128 x 128 history is
+`verification/reference/KratosFixedOpenings_n128.csv`.
