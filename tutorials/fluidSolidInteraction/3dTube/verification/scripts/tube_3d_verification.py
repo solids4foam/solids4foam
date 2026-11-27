@@ -402,6 +402,39 @@ def dictionary_scalar(path: Path, key: str) -> float | None:
     return float(match.group(1)) if match else None
 
 
+def case_delta_t(case: Path) -> float:
+    """Return the fixed time step from the case's controlDict."""
+    delta_t = dictionary_scalar(case / "system/controlDict", "deltaT")
+    if delta_t is None or delta_t <= 0.0:
+        fail(f"Could not read deltaT for {case}")
+    return delta_t
+
+
+def time_steps(path: Path, times: list[float], delta_t: float) -> list[int]:
+    """Return the time-step index of each time written in a history.
+
+    The function objects write the time with the case's timePrecision
+    (6 significant digits, a relative rounding error of at most 5e-6),
+    which does not resolve dt = 6.25e-6 s beyond t = 10 ms. Each time must
+    therefore lie within twice that rounding error of a multiple of dt;
+    the check is only meaningful while this bound is well below dt/2,
+    so it is required to stay below dt/4.
+    """
+    def tolerance(time: float) -> float:
+        return 1e-5 * abs(time) + 1e-3 * delta_t
+
+    if times and tolerance(max(times, key=abs)) >= 0.25 * delta_t:
+        fail(f"{path}: the written time precision cannot resolve "
+             f"dt = {delta_t:g} up to t = {max(times, key=abs):g}")
+    steps = [round(time / delta_t) for time in times]
+    for time, step in zip(times, steps):
+        if abs(time - step * delta_t) > tolerance(time):
+            fail(f"{path}: t = {time:.10g} is not a multiple of "
+                 f"dt = {delta_t:g} (nearest step {step}, "
+                 f"t = {step * delta_t:.10g})")
+    return steps
+
+
 def require_complete(path: Path, rows: list[list[float]], end_time: float,
                      columns: int) -> None:
     """Require one complete, finite row per time step up to the end time.
@@ -416,9 +449,7 @@ def require_complete(path: Path, rows: list[list[float]], end_time: float,
     control = path
     while control.name != "postProcessing":
         control = control.parent
-    delta_t = dictionary_scalar(control.parent / "system/controlDict", "deltaT")
-    if delta_t is None or delta_t <= 0.0:
-        fail(f"Could not read deltaT for {path}")
+    delta_t = case_delta_t(control.parent)
     expected = round(end_time / delta_t)
     times = [row[0] for row in rows]
     if not times or not math.isclose(
@@ -427,20 +458,19 @@ def require_complete(path: Path, rows: list[list[float]], end_time: float,
         reached = times[-1] if times else 0.0
         fail(f"{path} ends at t={reached:g}, not at the end time "
              f"t={end_time:g}")
-    # The function objects write the time with the case's timePrecision
-    # (6 significant digits), which does not resolve dt = 6.25e-6 s beyond
-    # t = 10 ms; each time must therefore round to the next multiple of dt,
-    # and is then replaced by that exact multiple, so that the histories
-    # are equally spaced for the peak and arrival interpolation.
-    steps = [round(time / delta_t) for time in times]
-    if len(times) != expected or steps != list(
-        range(steps[0], steps[0] + expected)
-    ) or any(
-        abs(time - step * delta_t) > 1e-5 * abs(time) + 1e-3 * delta_t
-        for time, step in zip(times, steps)
-    ):
+    # Each time is snapped to its exact multiple of dt, so that the
+    # histories are equally spaced for the peak and arrival interpolation.
+    steps = time_steps(path, times, delta_t)
+    if len(times) != expected:
         fail(f"{path} has {len(times)} time levels, expected {expected} "
              f"at dt = {delta_t:g}")
+    for (earlier, earlier_step), (later, later_step) in zip(
+        zip(times, steps), zip(times[1:], steps[1:])
+    ):
+        if later_step != earlier_step + 1:
+            fail(f"{path} does not have one row per time step: "
+                 f"t = {earlier:.10g} (step {earlier_step}) is followed by "
+                 f"t = {later:.10g} (step {later_step})")
     for row, step in zip(rows, steps):
         row[0] = step * delta_t
     if any(not math.isfinite(value) for row in rows for value in row):
@@ -723,12 +753,14 @@ def coupling_summary(case: Path, coupling: str, end_time: float
     # The residual evaluated for each step must be that of its last
     # FSI iteration, as recorded independently in fsiConvergenceData.dat.
     _, residuals = residual_rows(case, end_time)
-    delta_t = dictionary_scalar(case / "system/controlDict", "deltaT")
-    iterations = {
-        round(row[0] / delta_t): row[1] for row in last_per_time(numeric_rows(
-            next(case.glob("postProcessing/**/fsiConvergenceData.dat"))
-        ))
-    }
+    delta_t = case_delta_t(case)
+    path = next(case.glob("postProcessing/**/fsiConvergenceData.dat"))
+    rows = last_per_time(numeric_rows(path))
+    steps = time_steps(path, [row[0] for row in rows], delta_t)
+    if len(set(steps)) != len(steps):
+        fail(f"{path} has rows at distinct times that map to the same "
+             "time step")
+    iterations = dict(zip(steps, (row[1] for row in rows)))
     mismatched = [row[0] for row in residuals
                   if iterations.get(round(row[0] / delta_t)) != row[1]]
     if mismatched:
