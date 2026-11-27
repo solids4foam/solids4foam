@@ -45,6 +45,7 @@ License
 #include "labelPairHashes.H"
 #include "compatibilityFunctions.H"
 #include "fvcMeshPhi.H"
+#include "petscErrorHandling.H"
 #include "clockTime.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -2418,9 +2419,19 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
         fsiProperties().lookupOrDefault<word>
         (
             "solidJacobianRebuild",
-            "deltaTChange"
+            "adaptive"
         )
     ),
+    solidJacobianRebuildKrylovRatio_
+    (
+        fsiProperties().lookupOrDefault<scalar>
+        (
+            "solidJacobianRebuildKrylovRatio",
+            1.5
+        )
+    ),
+    solidFdKrylovRef_(-1),
+    solidFdRebuildRequest_(false),
     solidJacobianCheck_
     (
         fsiProperties().lookupOrDefault<Switch>("solidJacobianCheck", false)
@@ -2483,13 +2494,21 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
 
     if
     (
-        solidJacobianRebuild_ != "deltaTChange"
+        solidJacobianRebuild_ != "adaptive"
+     && solidJacobianRebuild_ != "deltaTChange"
      && solidJacobianRebuild_ != "always"
     )
     {
         FatalIOErrorInFunction(fsiProperties())
             << "Unknown solidJacobianRebuild " << solidJacobianRebuild_
-            << ": valid options are deltaTChange and always"
+            << ": valid options are adaptive, deltaTChange and always"
+            << exit(FatalIOError);
+    }
+
+    if (solidJacobianRebuildKrylovRatio_ <= 1)
+    {
+        FatalIOErrorInFunction(fsiProperties())
+            << "solidJacobianRebuildKrylovRatio must be greater than 1"
             << exit(FatalIOError);
     }
 
@@ -3221,6 +3240,7 @@ bool newtonQuasiMonolithicCouplingInterface::evolve()
     }
 
     recordSolidJacobianSolveTime(solveTime);
+    checkSolidJacobianQuality();
 
     // Retrieve the solution from PETSc and copy into UFluid, p, and USolid
     retrieveSolution
@@ -3828,6 +3848,49 @@ void newtonQuasiMonolithicCouplingInterface::recordSolidJacobianSolveTime
     }
 }
 
+
+void newtonQuasiMonolithicCouplingInterface::checkSolidJacobianQuality()
+{
+    if
+    (
+        solidJacobianRebuild_ != "adaptive"
+     || !useFdSolidJacobian_
+     || !solidFdJacobianPtr_.valid()
+     || !solidFdJacobianPtr_->built()
+    )
+    {
+        return;
+    }
+
+    PetscInt newtonIts = 0;
+    PetscInt linearIts = 0;
+    AssertPETSc(SNESGetIterationNumber(solver().snes(), &newtonIts));
+    AssertPETSc(SNESGetLinearSolveIterations(solver().snes(), &linearIts));
+    if (newtonIts < 1)
+    {
+        return;
+    }
+    const scalar krylovPerNewton = scalar(linearIts)/scalar(newtonIts);
+
+    // The first step solved after a build sets the reference; a later step
+    // that needs solidJacobianRebuildKrylovRatio times as many Krylov
+    // iterations per Newton iteration requests a rebuild (e.g. after a large
+    // change of configuration)
+    if (solidFdKrylovRef_ < 0)
+    {
+        solidFdKrylovRef_ = krylovPerNewton;
+    }
+    else if (krylovPerNewton > solidJacobianRebuildKrylovRatio_*solidFdKrylovRef_)
+    {
+        solidFdRebuildRequest_ = true;
+
+        Info<< "    solidJacobian: " << krylovPerNewton
+            << " Krylov iterations per Newton iteration against "
+            << solidFdKrylovRef_ << " after the last build: rebuild requested"
+            << endl;
+    }
+}
+
 label newtonQuasiMonolithicCouplingInterface::formJacobian
 (
     Mat jac,
@@ -3949,7 +4012,8 @@ label newtonQuasiMonolithicCouplingInterface::formJacobian
                  && timeIndex > solidFdJacobianTimeIndex_
                 )
              || mag(deltaT - solidFdJacobianDeltaT_) > tol
-             || mag(deltaT0 - solidFdJacobianDeltaT0_) > tol;
+             || mag(deltaT0 - solidFdJacobianDeltaT0_) > tol
+             || solidFdRebuildRequest_;
 
             const bool firstBuild = !solidFdJacobianPtr_->built();
 
@@ -3960,6 +4024,8 @@ label newtonQuasiMonolithicCouplingInterface::formJacobian
                 solidFdJacobianDeltaT_ = deltaT;
                 solidFdJacobianDeltaT0_ = deltaT0;
                 solidFdJacobianTimeIndex_ = timeIndex;
+                solidFdRebuildRequest_ = false;
+                solidFdKrylovRef_ = -1;
 
                 // The pattern assumes that the solid residual of a cell
                 // depends on the cells within two layers only; a wider

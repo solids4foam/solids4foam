@@ -175,10 +175,24 @@ class newtonQuasiMonolithicCouplingInterface
         const word solidJacobian_;
 
         //- When to recompute the coloured finite-difference solid block:
-        //  "deltaTChange" (default: once, and again when the time step or
-        //  the previous time step changes) or "always" (at every Jacobian
-        //  evaluation)
+        //  "adaptive" (default: as deltaTChange, and also when the Krylov
+        //  iterations per Newton iteration of a time step exceed
+        //  solidJacobianRebuildKrylovRatio times those of the first step after
+        //  the last build), "deltaTChange" (once, again at the second step,
+        //  and when the time step or the previous time step changes) or
+        //  "always" (at every Jacobian evaluation)
         const word solidJacobianRebuild_;
+
+        //- adaptive: ratio of Krylov iterations per Newton iteration to the
+        //  reference that triggers a rebuild
+        const scalar solidJacobianRebuildKrylovRatio_;
+
+        //- adaptive: reference Krylov iterations per Newton iteration (first
+        //  step after the last build; negative: not yet set)
+        scalar solidFdKrylovRef_;
+
+        //- adaptive: rebuild requested at the next Jacobian evaluation
+        bool solidFdRebuildRequest_;
 
         //- Print a directional-derivative check of the finite-difference
         //  solid block after each build
@@ -241,6 +255,10 @@ class newtonQuasiMonolithicCouplingInterface
         //- Record the solve time of the time step just completed and update
         //  the automatic selection after a paired trial
         void recordSolidJacobianSolveTime(const scalar solveTime);
+
+        //- adaptive rebuild: compare the Krylov iterations per Newton
+        //  iteration of the time step just solved with the reference
+        void checkSolidJacobianQuality();
 
         //- Make the isFluid, isFluidVelocity, isFluidPressure and isSolid
         //  index sets (the name is historical: there is no mesh-motion set)
