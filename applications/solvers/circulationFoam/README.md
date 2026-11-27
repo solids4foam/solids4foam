@@ -32,7 +32,7 @@ A case needs only two files, as there is no mesh:
 
 `deltaT` is the **output interval**: the ODE solver takes whatever internal
 steps its tolerances need inside it. See
-[`tutorials/circulationModels/healthyHuman`](../../../tutorials/circulationModels/healthyHuman)
+[`tutorials/fluids/circulationModels/healthyHuman`](../../../tutorials/fluids/circulationModels/healthyHuman)
 for a complete case.
 
 ---
@@ -86,7 +86,7 @@ at the start time). See
 domain is solved inside the CFD solver (for example `pimpleFoam`), through the
 `circulationCoupling` library. See the tutorials `pipeWindkessel` and
 `pipeClosedLoop` in
-[`tutorials/circulationModels`](../../../tutorials/circulationModels).
+[`tutorials/fluids/circulationModels`](../../../tutorials/fluids/circulationModels).
 `circulationFoam -check` still works on those cases, to see what was
 understood from the circuit and that the coupled patches are in the mesh.
 

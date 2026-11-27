@@ -827,6 +827,25 @@ protected:
             return pressureStabilisationPtr_();
         }
 
+        //- Update the momentum stabilisation for the primary displacement
+        //  field (D, or DD for incremental models) and its gradient
+        //  With highOrderResidual, a model that supports it uses the
+        //  displacement least-squares scheme; otherwise the gradient is used
+        void updateMomentumStabilisation
+        (
+            const volVectorField& D,
+            const volTensorField& gradD
+        ) const;
+
+        //- Update the pressure stabilisation for p and its gradient
+        //  With highOrderResidual, a model that supports it uses the
+        //  pressure least-squares scheme; otherwise the gradient is used
+        void updatePressureStabilisation
+        (
+            const volScalarField& p,
+            const volVectorField& gradp
+        ) const;
+
         //- Allocate the rAUf field
         void makeRAUf() const;
 
@@ -1306,7 +1325,8 @@ public:
             //- This function will check that the DD field was read from disk
             virtual void DDisRequired();
 
-            //- This function will check that the pointD field was read from disk
+            //- This function will check that the pointD field was read from
+            //  disk
             virtual void pointDisRequired();
 
             //- Make the global poly patches

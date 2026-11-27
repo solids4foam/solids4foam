@@ -22,6 +22,10 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, labeled]
 
+# The GITHUB_TOKEN is only needed to read the repository
+permissions:
+  contents: read
+
 jobs:
   precice-test:
     name: preCICE coupling test
@@ -41,7 +45,7 @@ jobs:
     # the preCICE build dependencies missing from the image can be installed
     # with apt.
     container:
-      image: "philippic/openfoam-v2512:ubuntu-22.04-petsc-no-openmp-system-blas-gmsh"
+      image: "philippic/openfoam-v2512:ubuntu-24.04-petsc-no-openmp-system-blas-gmsh"
       env:
         HOME: ${{ github.workspace }}
 
@@ -74,7 +78,7 @@ jobs:
         with:
           path: ${{ env.PRECICE_PREFIX }}
           # Bump the trailing number after changing the build options below
-          key: precice-${{ env.PRECICE_VERSION }}-openfoam-v2512-ubuntu-22.04-1
+          key: precice-${{ env.PRECICE_VERSION }}-openfoam-v2512-ubuntu-24.04-1
 
       - name: Build preCICE
         # Built from source rather than installed from the release .deb, whose

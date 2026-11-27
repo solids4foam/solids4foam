@@ -128,7 +128,7 @@ void Foam::faceCracker::detachInternalFaces
             const label edgeID = curFaceEdges[eI];
             const labelList& curEdgeFaces = edgeFaces[edgeID];
 
-            forAll (curEdgeFaces, fI)
+            forAll(curEdgeFaces, fI)
             {
                 const label faceID = curEdgeFaces[fI];
 
@@ -943,7 +943,7 @@ void Foam::faceCracker::detachInternalFaces
                 const face& oldFace = faces[faceID];
                 face newFace = oldFace;
 
-                forAll (oldFace, pI)
+                forAll(oldFace, pI)
                 {
                     const label oldPointID = oldFace[pI];
 
@@ -1056,7 +1056,7 @@ void Foam::faceCracker::detachInternalFaces
             const face oldFace = faceToBreak.reverseFace();
             face newFace = oldFace;
 
-            forAll (oldFace, pI)
+            forAll(oldFace, pI)
             {
                 const label oldPointID = oldFace[pI];
 
@@ -1720,7 +1720,7 @@ void Foam::faceCracker::detachCoupledFaces
                 const face& oldFace = faces[faceID];
                 face newFace = oldFace;
 
-                forAll (oldFace, pI)
+                forAll(oldFace, pI)
                 {
                     const label oldPointID = oldFace[pI];
 

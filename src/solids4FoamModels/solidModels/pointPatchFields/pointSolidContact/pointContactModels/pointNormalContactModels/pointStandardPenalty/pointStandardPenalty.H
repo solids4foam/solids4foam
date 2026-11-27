@@ -122,7 +122,10 @@ public:
         //- Construct and return a clone
         virtual autoPtr<pointNormalContactModel> clone() const
         {
-            return autoPtr<pointNormalContactModel>(new pointStandardPenalty(*this));
+            return autoPtr<pointNormalContactModel>
+            (
+                new pointStandardPenalty(*this)
+            );
         }
 
 
@@ -181,7 +184,8 @@ public:
 //         {
 //             return areaInContact_;
 // // #ifdef OPENFOAM_NOT_EXTEND
-// //             return areaInContactVolField_.boundaryFieldRef()[slavePatchID()];
+// //             return
+// //                 areaInContactVolField_.boundaryFieldRef()[slavePatchID()];
 // // #else
 // //             return areaInContactVolField_.boundaryField()[slavePatchID()];
 // // #endif

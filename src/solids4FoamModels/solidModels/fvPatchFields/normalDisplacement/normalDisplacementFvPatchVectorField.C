@@ -18,6 +18,7 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "normalDisplacementFvPatchVectorField.H"
+#include "patchCorrectionVectors.H"
 #include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
 #include "surfaceFields.H"
@@ -80,7 +81,7 @@ normalDisplacementFvPatchVectorField::normalDisplacementFvPatchVectorField
 
         fvPatchField<vector>::operator==
         (
-	    patch().nf()*dispSeries_(this->db().time().timeOutputValue())
+            patch().nf()*dispSeries_(this->db().time().timeOutputValue())
         );
     }
     else
@@ -89,7 +90,7 @@ normalDisplacementFvPatchVectorField::normalDisplacementFvPatchVectorField
 
         fvPatchField<vector>::operator==
         (
-	    patch().nf()*normalDisp_
+            patch().nf()*normalDisp_
         );
     }
 }
@@ -205,14 +206,8 @@ normalDisplacementFvPatchVectorField::snGrad() const
 #endif
         );
 
-    // Unit normal vectors
-    const vectorField n(patch().nf());
-
-    // Delta vectors
-    const vectorField delta(patch().delta());
-
     // Correction vectors
-    const vectorField k((I - sqr(n)) & delta);
+    const vectorField k(patchCorrectionVectors(patch()));
 
     return
     (
@@ -234,14 +229,8 @@ normalDisplacementFvPatchVectorField::gradientBoundaryCoeffs() const
 #endif
         );
 
-    // Unit normal vectors
-    const vectorField n(patch().nf());
-
-    // Delta vectors
-    const vectorField delta(patch().delta());
-
     // Correction vectors
-    const vectorField k((I - sqr(n)) & delta);
+    const vectorField k(patchCorrectionVectors(patch()));
 
     return
     (

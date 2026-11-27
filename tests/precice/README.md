@@ -107,7 +107,7 @@ differ between OpenFOAM versions:
 
 ```bash
 docker run --rm -e HOME=/work -v "$PWD:/work/ws" -w /work \
-  philippic/openfoam-v2512:ubuntu-22.04-petsc-no-openmp-system-blas-gmsh \
+  philippic/openfoam-v2512:ubuntu-24.04-petsc-no-openmp-system-blas-gmsh \
   bash -lc '...'   # see .github/workflows/preciceTest.yml for the full steps
 ```
 

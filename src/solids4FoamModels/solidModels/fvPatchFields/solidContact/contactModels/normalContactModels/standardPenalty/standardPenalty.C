@@ -291,7 +291,8 @@ void standardPenalty::correct
 
             FatalErrorIn(type())
                 << "slaveAreaInContact is less than zero!" << nl
-                << "slaveAreaInContact[" << faceI << "] = " << slaveAreaInContact[faceI]
+                << "slaveAreaInContact[" << faceI << "] = "
+                << slaveAreaInContact[faceI]
                 << nl
                 << "vertexValue = " << vertexValue << nl
                 << endl;

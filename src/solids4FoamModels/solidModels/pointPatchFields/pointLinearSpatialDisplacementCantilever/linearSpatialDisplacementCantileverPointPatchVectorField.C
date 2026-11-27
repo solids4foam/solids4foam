@@ -139,13 +139,20 @@ void linearSpatialDisplacementCantileverPointPatchVectorField::updateCoeffs()
         return;
     }
 
-    this->operator==(-patch().pointNormals() * ((v0_*patch().localPoints().component(vector::X)/L_)*t_));
+    this->operator==
+    (
+        -patch().pointNormals()
+       *((v0_*patch().localPoints().component(vector::X)/L_)*t_)
+    );
 
     fixedValuePointPatchField<vector>::updateCoeffs();
 }
 
 
-void linearSpatialDisplacementCantileverPointPatchVectorField::write(Ostream& os) const
+void linearSpatialDisplacementCantileverPointPatchVectorField::write
+(
+    Ostream& os
+) const
 {
     fixedValuePointPatchVectorField::write(os);
 

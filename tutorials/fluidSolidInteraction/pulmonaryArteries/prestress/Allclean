@@ -1,0 +1,39 @@
+#!/bin/bash
+#------------------------------------------------------------------------------
+# Clean the prestress case: results, the solid mesh copied here by
+# ../Allmesh, and the files written by Allrun. Case input dictionaries and the
+# 0 directory are kept
+#------------------------------------------------------------------------------
+
+cd "$(cd "$(dirname "$0")" && pwd)" || exit 1
+
+: "${WM_PROJECT_DIR:?OpenFOAM environment is not sourced}"
+
+. "$WM_PROJECT_DIR/bin/tools/CleanFunctions"
+
+# Time directories other than 0, processor directories and logs
+cleanCase
+
+# The solid mesh copied here by ../Allmesh
+rm -rf constant/polyMesh
+
+rm -rf postProcessing
+rm -f case.foam
+
+# Dictionaries with every default written out, by solids4Foam
+rm -f constant/*.withDefaultValues
+
+# The prestress fields, their backups and the pass history written by Allrun
+rm -f 0/Fpre 0/Fpre.gz 0/FprePass*
+rm -f prestressHistory
+
+# The material file copied in by Allrun from the FSI case
+rm -f constant/mechanicalProperties constant/mechanicalProperties.tmp
+
+# The pressure table copied in by Allrun from timeVsPressure.ramp or .full
+rm -f constant/timeVsPressure
+
+# Logs, e.g. ./Allrun > log.Allrun or a batch job
+rm -f log.* *.log
+
+#------------------------------------------------------------------------------

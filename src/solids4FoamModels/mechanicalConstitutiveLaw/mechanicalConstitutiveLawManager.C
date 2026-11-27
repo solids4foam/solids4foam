@@ -426,6 +426,7 @@ Foam::mechanicalConstitutiveLawManager::topologyFor
 const Foam::integrationPointTopology&
 Foam::mechanicalConstitutiveLawManager::compactCellTopologyFor
 (
+    const compactLayout rows,
     const CompactListList<tensor>& layout
 ) const
 {
@@ -449,17 +450,19 @@ Foam::mechanicalConstitutiveLawManager::compactCellTopologyFor
     const labelList rowSizes(layout.sizes());
 #endif
 
-    // Which entity indexes the rows is decided by the row count, and checked.
-    // A mesh never has as many cells as faces, so the two cases cannot be
-    // confused, and anything else is an error rather than a guess
-    const bool cellBased = (nRows == mesh_.nCells());
-    const bool faceBased = (nRows == mesh_.nFaces());
+    // Which entity indexes the rows is given by the caller, and the row count
+    // is only checked against it. It cannot decide it: a rank with no cells
+    // has no faces either, so there the two counts agree, and that rank would
+    // register a different topology from the others
+    const bool cellBased = (rows == compactLayout::cells);
+    const label nExpected = cellBased ? mesh_.nCells() : mesh_.nFaces();
 
-    if (!cellBased && !faceBased)
+    if (nRows != nExpected)
     {
         FatalErrorInFunction
-            << "A compact integration-point layout must have one row per cell "
-            << "or one row per face." << nl
+            << "A compact integration-point layout of the "
+            << (cellBased ? "cells" : "faces") << " must have one row per "
+            << (cellBased ? "cell." : "face.") << nl
             << "This one has " << nRows << " rows, while the mesh has "
             << mesh_.nCells() << " cells and " << mesh_.nFaces() << " faces."
             << exit(FatalError);
@@ -3462,6 +3465,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
 
 void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
 (
+    const compactLayout rows,
     const CompactListList<tensor>& gradD,
     const CompactListList<tensor>& gradD0,
     const scalar dt,
@@ -3482,8 +3486,8 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
         "updateStressSmallStrain (CompactListList)"
     );
 
-    // Look up the map and state for compact list cell-based topologies
-    const integrationPointTopology& topo = compactCellTopologyFor(gradD);
+    // Look up the map and state for compact list topologies
+    const integrationPointTopology& topo = compactCellTopologyFor(rows, gradD);
 
     // Evaluate on the packed integration-point storage. A compact cell
     // topology maps each cell to its own integration points, so the packed
@@ -3533,6 +3537,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
 
 void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
 (
+    const compactLayout rows,
     const CompactListList<tensor>& F,
     const CompactListList<tensor>& F0,
     const CompactListList<tensor>& Finv,
@@ -3563,8 +3568,8 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
     checkCompactRowSizes(refRows, "the stress", J.sizes(), "J", context);
     checkCompactRowSizes(refRows, "the stress", J0.sizes(), "J0", context);
 
-    // Look up the map and state for compact list cell-based topologies
-    const integrationPointTopology& topo = compactCellTopologyFor(F);
+    // Look up the map and state for compact list topologies
+    const integrationPointTopology& topo = compactCellTopologyFor(rows, F);
 
     // Evaluate on the packed integration-point storage. A compact cell
     // topology maps each cell to its own integration points, so the packed

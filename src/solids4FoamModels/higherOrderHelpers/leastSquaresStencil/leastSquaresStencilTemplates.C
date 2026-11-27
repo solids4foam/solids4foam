@@ -140,7 +140,7 @@ Foam::leastSquaresStencil::remoteCandidatesValues
     // Phase 2: respond with cell centre coordinates
     PstreamBuffers repBufs(Pstream::commsTypes::nonBlocking);
 
-    forAll (procToQuery, i)
+    forAll(procToQuery, i)
     {
         const label fromProc = procToQuery[i];
 

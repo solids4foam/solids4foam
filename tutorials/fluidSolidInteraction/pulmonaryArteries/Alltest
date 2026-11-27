@@ -1,0 +1,50 @@
+#!/bin/bash
+#------------------------------------------------------------------------------
+# Smoke test of the tutorial, run by tutorials/Alltest in place of Allrun
+#
+# tutorials/Alltest stops every run after one time step. Prestress pass 1
+# ramps the pressure up over four time steps, and the later passes apply the
+# full pressure in one step, so after a one-step pass 1 the next run would
+# start from a wall prestressed for only a quarter of the pressure, and fails.
+# This script runs a single prestress pass to its end time, and then one time
+# step of the fluid-solid interaction case, as modified by tutorials/Alltest.
+#
+# It edits prestress/system/controlDict and prestress/Allrun for the run, and
+# restores them when it exits, also on failure.
+#------------------------------------------------------------------------------
+
+set -Eeo pipefail
+IFS=$'\n\t'
+
+cd "$(cd "$(dirname "$0")" && pwd)"
+
+: "${WM_PROJECT_DIR:?OpenFOAM environment is not sourced}"
+
+source solids4FoamScripts.sh
+solids4Foam::requireGnuSed
+
+# Keep copies of the files edited below, and restore them on exit
+backupDir="$(mktemp -d)"
+cp -p prestress/system/controlDict "$backupDir/controlDict"
+cp -p prestress/Allrun "$backupDir/Allrun"
+
+restoreFiles()
+{
+    cp -p "$backupDir/controlDict" prestress/system/controlDict
+    cp -p "$backupDir/Allrun" prestress/Allrun
+    rm -rf "$backupDir"
+}
+
+trap restoreFiles EXIT
+
+# Run the prestress pass to its end time
+"${SOLIDS4FOAM_SED}" -i -E \
+    "s/^([[:space:]]*stopAt[[:space:]]+)[a-zA-Z]+;/\1endTime;/" \
+    prestress/system/controlDict
+
+# One prestress pass
+"${SOLIDS4FOAM_SED}" -i "s/^nPasses=[0-9]\+/nPasses=1/" prestress/Allrun
+
+./Allrun
+
+#------------------------------------------------------------------------------

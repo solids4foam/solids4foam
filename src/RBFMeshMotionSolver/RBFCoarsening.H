@@ -47,9 +47,10 @@ namespace rbf
         public:
             RBFCoarsening();
 
-            explicit RBFCoarsening( std::shared_ptr<RBFInterpolation> rbf );
+            explicit RBFCoarsening(std::shared_ptr<RBFInterpolation> rbf);
 
-            RBFCoarsening(
+            RBFCoarsening
+            (
                 std::shared_ptr<RBFInterpolation> rbf,
                 bool enabled,
                 bool livePointSelection,
@@ -59,9 +60,10 @@ namespace rbf
                 int coarseningMinPoints,
                 int coarseningMaxPoints,
                 bool exportTxt
-                );
+            );
 
-            RBFCoarsening(
+            RBFCoarsening
+            (
                 std::shared_ptr<RBFInterpolation> rbf,
                 bool enabled,
                 bool livePointSelection,
@@ -72,9 +74,10 @@ namespace rbf
                 int coarseningMaxPoints,
                 bool twoPointSelection,
                 bool exportTxt
-                );
+            );
 
-            RBFCoarsening(
+            RBFCoarsening
+            (
                 std::shared_ptr<RBFInterpolation> rbf,
                 bool enabled,
                 bool livePointSelection,
@@ -87,26 +90,29 @@ namespace rbf
                 bool surfaceCorrection,
                 scalar ratioRadiusError,
                 bool exportTxt
-                );
+            );
 
-            void greedySelection( const matrix & values );
+            void greedySelection(const matrix& values);
 
-            void compute(
-                const matrix & positions,
-                const matrix & positionsInterpolation
-                );
+            void compute
+            (
+                const matrix& positions,
+                const matrix& positionsInterpolation
+            );
 
-            void interpolate(
-                const matrix & values,
-                matrix & valuesInterpolation
-                );
+            void interpolate
+            (
+                const matrix& values,
+                matrix& valuesInterpolation
+            );
 
-            void setNbMovingAndStaticFaceCenters(
+            void setNbMovingAndStaticFaceCenters
+            (
                 int nbMovingFaceCenters,
                 int nbStaticFaceCenters
-                );
+            );
 
-            void correctSurface( matrix & valuesInterpolation );
+            void correctSurface(matrix& valuesInterpolation);
 
             std::shared_ptr<RBFInterpolation> rbf;
             std::shared_ptr<RBFInterpolation> rbfCoarse;
