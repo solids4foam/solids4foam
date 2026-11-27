@@ -1965,10 +1965,11 @@ void newtonIcoFluid::storeRhieChowHistory(const bool extrapolatedFlux)
     const volScalarField& p = this->p();
 
     // The state of the residual at the accepted solution: its flux, the
-    // wall pressure gradients and the pressure gradient
+    // wall pressure gradients and the pressure gradient, set as in the
+    // residual (including the leastSquaresS4f boundary normal correction)
     setResidualFlux(extrapolatedFlux);
     updatePressureGradientBoundaries();
-    gradp() = fvc::grad(p);
+    updatePressureGradient();
 
     const surfaceScalarField gamma(rhieChowGamma(this->phi()));
     pressureStabilisation().updateScalar(p, &gradp());
