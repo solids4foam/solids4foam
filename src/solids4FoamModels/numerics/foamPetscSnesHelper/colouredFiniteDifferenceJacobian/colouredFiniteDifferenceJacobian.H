@@ -81,7 +81,7 @@ class colouredFiniteDifferenceJacobian
         //- Number of finite-difference builds performed
         label nBuilds_;
 
-        //- CPU time spent building, summed over the builds
+        //- Wall-clock time spent building, summed over the builds
         scalar buildTime_;
 
 
@@ -152,7 +152,7 @@ public:
             return nColours_;
         }
 
-        //- CPU time spent building, summed over the builds
+        //- Wall-clock time spent building, summed over the builds
         scalar buildTime() const
         {
             return buildTime_;

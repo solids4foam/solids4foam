@@ -21,7 +21,7 @@ License
 
 #include "colouredFiniteDifferenceJacobian.H"
 #include "petscErrorHandling.H"
-#include "cpuTime.H"
+#include "clockTime.H"
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
@@ -160,7 +160,9 @@ void Foam::colouredFiniteDifferenceJacobian::apply
 
     if (rebuild || nBuilds_ == 0)
     {
-        cpuTime timer;
+        // Wall-clock time, as the solve time it is compared with by the
+        // automatic selection of the solid block
+        clockTime timer;
 
         AssertPETSc(MatFDColoringApply(J_, fdc_, x, nullptr));
 
@@ -175,7 +177,7 @@ void Foam::colouredFiniteDifferenceJacobian::apply
         AssertPETSc(VecDestroy(&f));
 
         ++nBuilds_;
-        const scalar t = timer.cpuTimeIncrement();
+        const scalar t = timer.elapsedTime();
         buildTime_ += t;
 
         Info<< "    " << name_ << ": finite-difference Jacobian built ("
