@@ -415,6 +415,11 @@ release. For complete commit-level details and contributor information, see the
 
 ### Changed
 
+- The OpenFOAM-v2512 Docker images, the solids4foam release image and the CI
+  images, are now based on Ubuntu 24.04 (was 22.04, whose standard support
+  ends in April 2027). The Dockerfiles of these base images, with OpenFOAM,
+  PETSc and Gmsh, are now kept in `.docker/base`, with a workflow that builds
+  them (#767).
 - The `beamInCrossFlow` tutorial now follows the stationary 3-D benchmark of
   Richter (2012), section 7.2: the plate moves to x = 0.4-0.5 m, the solid is
   St Venant-Kirchhoff with E = 1.4 MPa (was 10 kPa) and nu = 0.4, and the
@@ -835,13 +840,19 @@ release. For complete commit-level details and contributor information, see the
   mesh flux. **This changes the results of existing Robin-Neumann cases.**
   `viscousTerm no` restores the earlier condition exactly. The terms are
   evaluated for both conditions by the new `wallNormalMomentum`.
+- `cavityFlexibleBottom`: the fluid continuity flux, `flux(HbyA)`, is now
+  skew-corrected. It fell back to `default linear`, and on the strongly
+  deformed mesh at the plate ends its slowly converging error put the
+  extrapolated interface force 0.054% from independent solutions (SU2 with
+  CalculiX, FEniCSx); with skew correction they agree to 0.003%. Other
+  partitioned FSI cases on strongly deformed meshes may need the same entry.
 - A high-order (face-quadrature) parallel run no longer stops at the end of the
   first time step when a processor holds no cells. The constitutive law manager
   decided from the row count whether a compact integration-point layout was
   cell-based or face-based, and a rank with no cells has no faces either, so
   that rank registered a `compactCell` topology while the others registered
   `compactFace`. The caller of the `CompactListList` stress updates now states
-  which kind of layout it passes (#707).  
+  which kind of layout it passes (#707).
 - On OpenFOAM.com and OpenFOAM.org, the non-orthogonal correction of
   `newMovingWallVelocity`, `elasticWallVelocity`, `normalInletVelocity`,
   `paraboloidInletVelocity`, `fixedTemperature`, `normalDisplacement`,

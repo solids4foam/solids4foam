@@ -18,6 +18,11 @@ on:
           - openfoam-9
           - foam-extend-4.1
 
+# The GITHUB_TOKEN is only needed to read the repository; Docker Hub uses its
+# own secrets
+permissions:
+  contents: read
+
 jobs:
   promote:
     runs-on: ubuntu-22.04

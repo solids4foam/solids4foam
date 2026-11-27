@@ -43,6 +43,13 @@ interpolationSchemes
 {
     default            linear;
     interpolate(U)     skewCorrected linear;
+
+    // Continuity flux of the pressure equation. Without this entry it falls
+    // back to the default linear interpolation, with no skew correction,
+    // and on the strongly deformed mesh at the plate ends the steady
+    // interface force then converges slowly to a limit about 0.05% off
+    // independent solutions
+    flux(HbyA)         skewCorrected linear;
 }
 
 snGradSchemes

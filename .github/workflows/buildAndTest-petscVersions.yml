@@ -18,6 +18,10 @@ on:
         default: false
         type: boolean
 
+# The GITHUB_TOKEN is only needed to read the repository
+permissions:
+  contents: read
+
 jobs:
   build-and-test:
     name: PETSc-${{ matrix.petsc-version }} with OpenFOAM-v2512

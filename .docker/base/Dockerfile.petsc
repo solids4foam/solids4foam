@@ -1,0 +1,88 @@
+################################################################################
+# Base image layer: PETSc (with MUMPS and HYPRE) built from source
+#
+# No OpenMP, system OpenBLAS. Added on top of an OpenFOAM base image, e.g.
+#   docker build --build-arg BASE=philippic/openfoam-v2512:ubuntu-24.04 \
+#       -t philippic/openfoam-v2512:ubuntu-24.04-petsc-no-openmp-system-blas \
+#       -f Dockerfile.petsc .
+#
+# Built by .github/workflows/docker-base-images.yml; see .docker/base/README.md
+################################################################################
+
+ARG BASE=philippic/openfoam-v2512:ubuntu-24.04
+FROM ${BASE}
+
+LABEL maintainer="Philip Cardiff <philip.cardiff@ucd.ie>"
+
+SHELL ["/bin/bash", "-c"]
+
+ARG PETSC_VERSION=3.24.0
+
+# Number of parallel make jobs; empty uses every CPU the build can see. Set it
+# when building on a shared machine, where docker build is not confined to a
+# scheduler's CPU allocation
+ARG BUILD_JOBS=
+
+# ---------------------------------------------------------------------
+# System dependencies for PETSc
+# ---------------------------------------------------------------------
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y \
+        build-essential \
+        git \
+        wget \
+        curl \
+        cmake \
+        python3 \
+        python3-pip \
+        gfortran \
+        pkg-config \
+        libopenmpi-dev \
+        openmpi-bin \
+        libhwloc-dev \
+        libopenblas-dev \
+        liblapack-dev && \
+    rm -rf /var/lib/apt/lists/*
+
+# ---------------------------------------------------------------------
+# Build PETSc from source, then remove the source tree in the same layer
+# ---------------------------------------------------------------------
+RUN git clone --depth 1 -b v${PETSC_VERSION} \
+        https://gitlab.com/petsc/petsc.git /opt/petsc-src && \
+    cd /opt/petsc-src && \
+    ./configure \
+      --prefix=/opt/petsc \
+      --with-debugging=0 \
+      --with-shared-libraries=1 \
+      --with-64-bit-indices=0 \
+      --with-mpi=1 \
+      --with-openmp=0 \
+      --with-blas-lib=/usr/lib/x86_64-linux-gnu/libopenblas.so \
+      --with-lapack-lib=/usr/lib/x86_64-linux-gnu/libopenblas.so \
+      --with-mumps=1 --download-mumps \
+      --with-hypre=1 --download-hypre \
+      --download-scalapack \
+      --download-hwloc \
+      --download-cmake \
+      --with-make-np="${BUILD_JOBS:-$(nproc)}" \
+      COPTFLAGS='-O3' \
+      CXXOPTFLAGS='-O3' \
+      FOPTFLAGS='-O3' && \
+    make -j"${BUILD_JOBS:-$(nproc)}" && \
+    make install && \
+    cd / && \
+    rm -rf /opt/petsc-src
+
+# ---------------------------------------------------------------------
+# PETSc environment (used by solids4foam)
+# ---------------------------------------------------------------------
+ENV PETSC_DIR=/opt/petsc
+ENV PETSC_ARCH=
+ENV LD_LIBRARY_PATH=/opt/petsc/lib
+
+# Sanity check
+RUN test -d "${PETSC_DIR}/include" && \
+    test -f "${PETSC_DIR}/lib/libpetsc.so" && \
+    grep -E "MUMPS|HYPRE" "${PETSC_DIR}/lib/petsc/conf/petscvariables"
+
+WORKDIR /
