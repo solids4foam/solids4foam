@@ -72,8 +72,12 @@ else
     echo "Running in check-only mode: skipping Allclean and Allrun"
 fi
 
+# foam-extend prints no "Solving for" line for this equation, so the
+# framework's own message is accepted too; the non-zero damageNonLocal
+# checked below shows it was solved
 if grep -q "nonLocal = classic" "${CASE_DIR}/log.solids4Foam" 2>/dev/null \
- && grep -q "Solving for damageNonLocal" "${CASE_DIR}/log.solids4Foam"
+ && grep -qE "Solving (for|the implicit-gradient field) damageNonLocal" \
+    "${CASE_DIR}/log.solids4Foam"
 then
     echo "PASS: the law is non-local and damageNonLocal is solved"
 else
