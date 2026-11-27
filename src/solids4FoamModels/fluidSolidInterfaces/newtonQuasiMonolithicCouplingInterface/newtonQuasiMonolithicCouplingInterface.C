@@ -45,6 +45,7 @@ License
 #include "labelPairHashes.H"
 #include "compatibilityFunctions.H"
 #include "fvcMeshPhi.H"
+#include "clockTime.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -2420,18 +2421,40 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
     ),
     solidFdJacobianPtr_(),
     solidFdJacobianDeltaT_(-1),
-    solidFdJacobianDeltaT0_(-1)
+    solidFdJacobianDeltaT0_(-1),
+    useFdSolidJacobian_(solidJacobian_ == "colouredFiniteDifference"),
+    solidJacobianSelection_(false),
+    solidJacobianTrialInterval_
+    (
+        fsiProperties().lookupOrDefault<label>("solidJacobianTrialInterval", 20)
+    ),
+    solidJacobianSwitchMargin_
+    (
+        fsiProperties().lookupOrDefault<scalar>("solidJacobianSwitchMargin", 0.1)
+    ),
+    solidJacobianStep_(0),
+    solidJacobianInterval_(solidJacobianTrialInterval_),
+    solidJacobianNextTrial_(2),
+    solidJacobianTrialTime_{-1, -1}
 {
     if
     (
         solidJacobian_ != "compact"
      && solidJacobian_ != "colouredFiniteDifference"
+     && solidJacobian_ != "automatic"
     )
     {
         FatalIOErrorInFunction(fsiProperties())
             << "Unknown solidJacobian " << solidJacobian_
-            << ": valid options are compact and colouredFiniteDifference"
-            << exit(FatalIOError);
+            << ": valid options are compact, colouredFiniteDifference and "
+            << "automatic" << exit(FatalIOError);
+    }
+
+    if (solidJacobianTrialInterval_ < 2 || solidJacobianSwitchMargin_ < 0)
+    {
+        FatalIOErrorInFunction(fsiProperties())
+            << "solidJacobianTrialInterval must be at least 2 and "
+            << "solidJacobianSwitchMargin non-negative" << exit(FatalIOError);
     }
 
     if
@@ -2451,6 +2474,14 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
         Info<< "The solid block of the preconditioning matrix is the coloured "
             << "finite-difference Jacobian of the solid residual (rebuilt: "
             << solidJacobianRebuild_ << ")" << endl;
+    }
+    else if (solidJacobian_ == "automatic")
+    {
+        Info<< "The solid block of the preconditioning matrix is selected "
+            << "automatically between the compact and the coloured "
+            << "finite-difference Jacobian by paired trials of the solve time "
+            << "(first trial interval " << solidJacobianTrialInterval_
+            << " steps, margin " << solidJacobianSwitchMargin_ << ")" << endl;
     }
 
     if (solid().twoD() != fluid().twoD())
@@ -2865,6 +2896,10 @@ bool newtonQuasiMonolithicCouplingInterface::evolve()
         setInterfaceDisplacementOffsets();
     }
 
+    // Choose the solid block of the preconditioning matrix for this step
+    selectSolidJacobian();
+    scalar solveTime = 0;
+
     while (true)
     {
         const dimensionedScalar& deltaT = time.deltaT();
@@ -3054,7 +3089,9 @@ bool newtonQuasiMonolithicCouplingInterface::evolve()
         // selected with this in mind.
         Info<< "Solving the monolithic momentum-continuity system for Up using "
             << "PETSc SNES" << endl;
+        clockTime solveTimer;
         const int solveStatus = solver().solve(true);
+        solveTime += solveTimer.elapsedTime();
 
         if (solveStatus >= 0)
         {
@@ -3116,6 +3153,8 @@ bool newtonQuasiMonolithicCouplingInterface::evolve()
             << time.deltaTValue() << " at Time = "
             << time.timeName() << nl << endl;
     }
+
+    recordSolidJacobianSolveTime(solveTime);
 
     // Retrieve the solution from PETSc and copy into UFluid, p, and USolid
     retrieveSolution
@@ -3621,6 +3660,97 @@ label newtonQuasiMonolithicCouplingInterface::formResidual
 }
 
 
+
+void newtonQuasiMonolithicCouplingInterface::selectSolidJacobian()
+{
+    ++solidJacobianStep_;
+
+    if (solidJacobian_ != "automatic")
+    {
+        return;
+    }
+
+    // Paired trial: the compact block at step solidJacobianNextTrial_, the
+    // finite-difference block at the next step; otherwise keep the current
+    // selection. The first step uses the compact block (start-up)
+    bool useFd = solidJacobianSelection_;
+    if (solidJacobianStep_ == 1 || solidJacobianStep_ == solidJacobianNextTrial_)
+    {
+        useFd = false;
+    }
+    else if (solidJacobianStep_ == solidJacobianNextTrial_ + 1)
+    {
+        useFd = true;
+    }
+
+    if (useFd != useFdSolidJacobian_)
+    {
+        useFdSolidJacobian_ = useFd;
+
+        // The preconditioning matrix changes its sparsity: rebuild the
+        // solver state, so that the Jacobian and the preconditioner are
+        // rebuilt at the first Newton iteration of this step
+        solver().resetSnes();
+    }
+}
+
+
+void newtonQuasiMonolithicCouplingInterface::recordSolidJacobianSolveTime
+(
+    const scalar solveTime
+)
+{
+    if (solidJacobian_ != "automatic")
+    {
+        return;
+    }
+
+    const scalar t = returnReduce(solveTime, maxOp<scalar>());
+
+    if (solidJacobianStep_ == solidJacobianNextTrial_)
+    {
+        solidJacobianTrialTime_[0] = t;
+    }
+    else if (solidJacobianStep_ == solidJacobianNextTrial_ + 1)
+    {
+        solidJacobianTrialTime_[1] = t;
+
+        const scalar tCompact = solidJacobianTrialTime_[0];
+        const scalar tFd = solidJacobianTrialTime_[1];
+        const bool previous = solidJacobianSelection_;
+
+        // Hysteresis: change only if the other block is faster by the margin
+        bool select = previous;
+        if (tFd < (1 - solidJacobianSwitchMargin_)*tCompact)
+        {
+            select = true;
+        }
+        else if (tCompact < (1 - solidJacobianSwitchMargin_)*tFd)
+        {
+            select = false;
+        }
+
+        // Back off while the selection does not change
+        if (select == previous)
+        {
+            solidJacobianInterval_ =
+                min(2*solidJacobianInterval_, 32*solidJacobianTrialInterval_);
+        }
+        else
+        {
+            solidJacobianInterval_ = solidJacobianTrialInterval_;
+        }
+
+        solidJacobianSelection_ = select;
+        solidJacobianNextTrial_ = solidJacobianStep_ + solidJacobianInterval_;
+
+        Info<< "    Solid block trial: compact " << tCompact
+            << " s, colouredFiniteDifference " << tFd << " s: selected "
+            << (select ? "colouredFiniteDifference" : "compact")
+            << "; next trial at step " << solidJacobianNextTrial_ << endl;
+    }
+}
+
 label newtonQuasiMonolithicCouplingInterface::formJacobian
 (
     Mat jac,
@@ -3704,7 +3834,7 @@ label newtonQuasiMonolithicCouplingInterface::formJacobian
             subMats[1][1], xSolid
         );
 
-        if (solidJacobian_ == "colouredFiniteDifference")
+        if (useFdSolidJacobian_)
         {
             // Replace the compact solid block by the Jacobian of the solid
             // residual, with the interface traction held at its current

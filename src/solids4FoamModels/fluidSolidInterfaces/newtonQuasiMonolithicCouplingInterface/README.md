@@ -58,6 +58,14 @@ NewtonQuasiMonolithicCoeffs
     // over the solid)
     //solidSystemScaleFactor 1;
 
+    // Optional: solid block of the preconditioning matrix, compact
+    // (default), colouredFiniteDifference or automatic (see Solid Block)
+    //solidJacobian colouredFiniteDifference;
+    //solidJacobianRebuild deltaTChange;   // or always
+    //solidJacobianCheck no;               // print a directional check
+    //solidJacobianTrialInterval 20;       // automatic only
+    //solidJacobianSwitchMargin 0.1;       // automatic only
+
     // Optional: see Non-conformal Interfaces
     //conservativeTractionTransfer no;
     //interfaceFluxDiagnostics no;
@@ -237,6 +245,49 @@ faster, with the same results to within the solver tolerances:
 Replacing `snes_mf_operator` with the assembled Jacobian is not
 recommended: the assembled Jacobian is approximate, and Newton then
 converges only linearly.
+
+## Solid Block
+
+**Solid block.** By default (`solidJacobian compact`), the solid block of the
+preconditioning matrix is the solid model's compact approximate Jacobian, a
+vector Laplacian of the velocity with the same coefficient for each component
+plus the inertia. It omits the coupling between the displacement components,
+so it represents bending poorly: for a slender solid whose stiffness dominates
+its inertia over one time step, the eigenvalues of the preconditioned solid
+block extend down to the order of (thickness/length)^2, and the Krylov
+iterations per Newton iteration grow with the slenderness and the stiffness
+(on `collapsibleChannel`, wall length/thickness 200: 180-380 Krylov iterations
+per Newton iteration).
+
+`solidJacobian colouredFiniteDifference` replaces the solid block by the
+Jacobian of the solid residual, with the interface traction held at its
+current value, computed by coloured forward differences: the pattern is that
+of the square of the compact block (the two-layer stencil of the residual),
+PETSc colours it so that no two columns of a colour share a row, and the solid
+residual is evaluated once per colour and component (tens of solid-only
+residual evaluations). With `solidJacobianRebuild deltaTChange` (default) it
+is built once and rebuilt only when the time step or the previous time step
+changes, which suffices because the preconditioner needs the linearised
+elastic operator rather than the current tangent; `always` rebuilds it at
+every Jacobian evaluation. Only the preconditioner changes, so the converged
+solution does not. Use it for thin, bending structures; on compact solids it
+neither helps nor costs much (a few per cent). `solidJacobianCheck yes`
+prints the relative difference between J v and a forward difference of the
+residual along a random direction after each build (about 1e-8 expected).
+Serial and parallel; tested with OpenFOAM v2512 and PETSc 3.24.
+
+On compact solids the denser two-layer block can make the solid
+preconditioner more expensive without reducing the Krylov iterations (with
+BoomerAMG on the 3-D tube, about 40 % more time per step). `solidJacobian
+automatic` chooses between the two blocks by timing: the first step uses the
+compact block; then, in a paired trial, one step is solved with the compact
+block and the next with the finite-difference block, and the faster one is
+kept, but only if it is faster by more than `solidJacobianSwitchMargin`
+(default 0.1); the trial is repeated after `solidJacobianTrialInterval` steps
+(default 20), an interval that doubles, up to 32 times, while the selection
+does not change. A change of block rebuilds the solver state, so the
+preconditioner is rebuilt at the next Newton iteration; the residual and the
+convergence tests are not affected.
 
 ## Time-step Adjustment
 

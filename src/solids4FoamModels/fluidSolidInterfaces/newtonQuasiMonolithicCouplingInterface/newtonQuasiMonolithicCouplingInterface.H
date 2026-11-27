@@ -192,8 +192,40 @@ class newtonQuasiMonolithicCouplingInterface
         scalar solidFdJacobianDeltaT_;
         scalar solidFdJacobianDeltaT0_;
 
+        //- Is the finite-difference solid block used in the current time
+        //  step (fixed for compact/colouredFiniteDifference; chosen per step
+        //  for automatic)
+        bool useFdSolidJacobian_;
+
+        //- automatic: the block selected by the last trial (used outside the
+        //  trial steps)
+        bool solidJacobianSelection_;
+
+        //- automatic: initial number of time steps between paired trials;
+        //  the interval doubles while the selection does not change
+        const label solidJacobianTrialInterval_;
+
+        //- automatic: relative margin by which the other block must be
+        //  faster before the selection changes (hysteresis)
+        const scalar solidJacobianSwitchMargin_;
+
+        //- automatic: coupled time steps solved, current trial interval,
+        //  step of the next trial, and the solve times of the last trial
+        label solidJacobianStep_;
+        label solidJacobianInterval_;
+        label solidJacobianNextTrial_;
+        scalar solidJacobianTrialTime_[2];
+
 
     // Private Member Functions
+
+        //- Select the solid block for the coming time step (solidJacobian
+        //  automatic) and rebuild the solver state if it changes
+        void selectSolidJacobian();
+
+        //- Record the solve time of the time step just completed and update
+        //  the automatic selection after a paired trial
+        void recordSolidJacobianSolveTime(const scalar solveTime);
 
         //- Make the isFluid, isFluidVelocity, isFluidPressure and isSolid
         //  index sets (the name is historical: there is no mesh-motion set)
