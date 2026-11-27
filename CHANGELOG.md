@@ -815,14 +815,14 @@ release. For complete commit-level details and contributor information, see the
   destroyed memory. Each bound a `const vectorField&` to the temporary
   `subField` that `polyPatch::faceCentres()` or `polyPatch::faceAreas()`
   returns, so the reference outlived the object it pointed to. They now copy
-  the field. GCC 13 reports this as `-Wdangling-reference` (#779).  
+  the field. GCC 13 reports this as `-Wdangling-reference` (#779).
 - A high-order (face-quadrature) parallel run no longer stops at the end of the
   first time step when a processor holds no cells. The constitutive law manager
   decided from the row count whether a compact integration-point layout was
   cell-based or face-based, and a rank with no cells has no faces either, so
   that rank registered a `compactCell` topology while the others registered
   `compactFace`. The caller of the `CompactListList` stress updates now states
-  which kind of layout it passes (#707).  
+  which kind of layout it passes (#707).
 - On OpenFOAM.com and OpenFOAM.org, the non-orthogonal correction of
   `newMovingWallVelocity`, `elasticWallVelocity`, `normalInletVelocity`,
   `paraboloidInletVelocity`, `fixedTemperature`, `normalDisplacement`,
