@@ -1,0 +1,44 @@
+{
+  "default_levels": [1, 2, 3, 4],
+  "default_variants": ["clampedInner", "clampedInnerCosineLoad", "clampedOuter"],
+  "tutorial_level": 2,
+  "variants": {
+    "clampedInner": {
+      "configuration": "clampedInner",
+      "clamped_patch": "inner",
+      "free_patch": "outer",
+      "load": "uniform"
+    },
+    "clampedInnerCosineLoad": {
+      "configuration": "clampedInnerCosineLoad",
+      "clamped_patch": "inner",
+      "free_patch": "outer",
+      "load": "cosine"
+    },
+    "clampedOuter": {
+      "configuration": "clampedOuter",
+      "clamped_patch": "outer",
+      "free_patch": "inner",
+      "load": "uniform"
+    }
+  },
+  "plate": {
+    "inner_radius_m": 1.0,
+    "outer_radius_m": 2.0,
+    "thickness_m": 0.1,
+    "pressure_Pa": 1000.0,
+    "youngs_modulus_Pa": 2e11,
+    "poissons_ratio": 0.3
+  },
+  "clamped_moment_relaxation": {
+    "comment": "clampedMoment relaxationFactor per level; its loop gain grows with refinement",
+    "1": 0.01,
+    "2": 0.01,
+    "3": 0.005,
+    "4": 0.002
+  },
+  "acceptance": {
+    "free_edge_relative_tolerance": 0.05,
+    "minimum_net_order": 0.7
+  }
+}

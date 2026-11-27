@@ -1,0 +1,46 @@
+{
+  "comment": "The manufactured solution and the plate data are defined in writeManufacturedSolution.py in the case directory, which the driver imports",
+  "default_levels": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "default_variants": [
+    "hex",
+    "distHex",
+    "tri"
+  ],
+  "tutorial_level": 2,
+  "cells_per_side_level_1": 25,
+  "variants": {
+    "hex": {
+      "mesh": "hex",
+      "description": "uniform quadrilateral mesh from blockMesh",
+      "check_orders": true
+    },
+    "distHex": {
+      "mesh": "distHex",
+      "description": "blockMesh mesh with the interior points moved randomly by up to 15% of the local spacing",
+      "check_orders": false
+    },
+    "tri": {
+      "mesh": "tri",
+      "description": "unstructured triangular mesh from Gmsh with the same target spacing",
+      "check_orders": false
+    }
+  },
+  "clamped_moment_relaxation": {
+    "comment": "clampedMoment relaxationFactor per level for the segregated solver; its loop gain grows with refinement",
+    "1": 0.01,
+    "2": 0.01,
+    "3": 0.002,
+    "4": 0.001
+  },
+  "acceptance": {
+    "comment": "applied to the variants with check_orders; the other variants must only complete with finite errors",
+    "minimum_net_order_w_l2": 0.8,
+    "minimum_net_order_M_l2": 0.7,
+    "finest_w_l2_tolerance": 0.005
+  }
+}
