@@ -98,6 +98,23 @@ template<class T> class CompactListList;
 
 class mechanicalConstitutiveLawManager
 {
+public:
+
+    // Public data types
+
+        //- What indexes the rows of a compact integration-point layout.
+        //  It is given by the caller rather than inferred from the row count,
+        //  because a rank with no cells also has no faces, and the two kinds
+        //  would then look the same there
+        enum class compactLayout
+        {
+            cells,          //!< One row per cell
+            faces           //!< One row per face, e.g. a face quadrature
+        };
+
+
+private:
+
     // Private Data
 
         //- Reference to mesh
@@ -536,13 +553,15 @@ class mechanicalConstitutiveLawManager
         //  integration points
         List<symmTensor>& scratchStress(const label nIntegrationPoints) const;
 
-        //- Return (and lazily construct) a compact cell-based integration-point
-        //  topology inferred from a CompactListList layout.
+        //- Return (and lazily construct) the compact integration-point
+        //  topology of a CompactListList layout whose rows index the cells or
+        //  the faces, as the caller states.
         //  The topology is owned and cached by the manager and remains valid
         //  for the lifetime of the manager.
         //  The layout is used only for addressing; the value type is irrelevant
         const integrationPointTopology& compactCellTopologyFor
         (
+            const compactLayout rows,
             const CompactListList<tensor>& layout
         ) const;
 
@@ -1040,8 +1059,10 @@ public:
         //  Requirement:
         //    - All CompactListList inputs must share identical offsets and
         //      total size.
+        //    - rows says whether the rows index the cells or the faces.
         void updateStressSmallStrain
         (
+            const compactLayout rows,
             const CompactListList<tensor>& gradD,
             const CompactListList<tensor>& gradD0,
             const scalar dt,
@@ -1094,8 +1115,10 @@ public:
         //  Requirement:
         //    - All CompactListList inputs must share identical offsets and
         //      total size.
+        //    - rows says whether the rows index the cells or the faces.
         void updateStressFiniteStrain
         (
+            const compactLayout rows,
             const CompactListList<tensor>& F,
             const CompactListList<tensor>& F0,
             const CompactListList<tensor>& Finv,

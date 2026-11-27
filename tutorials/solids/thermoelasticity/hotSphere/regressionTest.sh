@@ -139,9 +139,15 @@ COMPARISON_END_TIME=5
 # max of D by 1.7e-5 relative, and again when the gradient scheme changed from
 # pointCellsLeastSquares to leastSquares (#572), which moved it by 1.4e-2
 # (0.00015702235246175 before). OpenFOAM.com v2412's; OpenFOAM.org 9 agrees
-# to 2e-8. foam-extend is not compared, as below
-REF_D_MAX=0.00015474908009917
-REF_D_MEAN=7.75003220351214e-05
+# to 2e-8. foam-extend is not compared, as below. Re-recorded on
+# OpenFOAM.com v2512 when solidSymmetry and fixedTemperature started to take
+# their non-orthogonal correction from Cf - Cn (#748): on OpenFOAM.com and
+# OpenFOAM.org it had been zero, and this mesh is non-orthogonal on the
+# symmetry planes. The max of D moved by 7.9e-5 relative and the mean by
+# 7.7e-6 (0.00015474908009917 and 7.75003220351214e-05 before, which v2412
+# and v2512 both gave)
+REF_D_MAX=0.0001547612387615
+REF_D_MEAN=7.74997248241152e-05
 
 run_reference_comparison() {
     # Not on foam-extend, where the framework and the legacy model differed by
