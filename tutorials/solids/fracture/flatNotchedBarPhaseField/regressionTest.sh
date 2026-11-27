@@ -72,9 +72,13 @@ else
     echo "Running in check-only mode: skipping Allclean and Allrun"
 fi
 
+# foam-extend prints no "Solving for" line for this equation, so the
+# framework's own message is accepted too; the non-zero phaseField checked
+# below shows it was solved
 if grep -q "Phase field fracture: Gc = 60000" "${CASE_DIR}/log.solids4Foam" \
     2>/dev/null \
- && grep -q "Solving for phaseField" "${CASE_DIR}/log.solids4Foam"
+ && grep -qE "Solving (for|the implicit-gradient field) phaseField" \
+    "${CASE_DIR}/log.solids4Foam"
 then
     echo "PASS: the phase field law is read and phaseField is solved"
 else
