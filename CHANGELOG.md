@@ -415,15 +415,15 @@ release. For complete commit-level details and contributor information, see the
 
 ### Changed
 
-- `movingWallPressure` and `elasticWallPressure` include the viscous term
-  of the wall-normal momentum equation by default (`viscousTerm yes`), which
-  changes the results of existing cases with either condition; set
-  `viscousTerm no` to reproduce earlier results (see Fixed, #721).
 - The OpenFOAM-v2512 Docker images, the solids4foam release image and the CI
   images, are now based on Ubuntu 24.04 (was 22.04, whose standard support
   ends in April 2027). The Dockerfiles of these base images, with OpenFOAM,
   PETSc and Gmsh, are now kept in `.docker/base`, with a workflow that builds
   them (#767).
+- `movingWallPressure` and `elasticWallPressure` include the viscous term
+  of the wall-normal momentum equation by default (`viscousTerm yes`), which
+  changes the results of existing cases with either condition; set
+  `viscousTerm no` to reproduce earlier results (see Fixed, #721).
 - The `beamInCrossFlow` tutorial now follows the stationary 3-D benchmark of
   Richter (2012), section 7.2: the plate moves to x = 0.4-0.5 m, the solid is
   St Venant-Kirchhoff with E = 1.4 MPa (was 10 kPa) and nu = 0.4, and the
