@@ -22,6 +22,10 @@ Description
     Prescribed fixed value velocity condition with boundary non-orthogonal
     correction for the decaying Taylor-Green vortex problem.
 
+    The condition also gives the exact velocity at the face quadrature points
+    of the high-order least-squares schemes (quadratureValuePatchField), so
+    that a k-exact reconstruction of U gets exact boundary data.
+
 SourceFiles
     decayingTaylorGreenVortexFvPatchVectorField.C
 
@@ -37,6 +41,7 @@ Author
 #include "fixedValueFvPatchFields.H"
 #include "interpolationTable.H"
 #include "primitivePatchInterpolation.H"
+#include "quadratureValuePatchField.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -49,12 +54,19 @@ namespace Foam
 
 class decayingTaylorGreenVortexFvPatchVectorField
 :
-    public fixedValueFvPatchVectorField
+    public fixedValueFvPatchVectorField,
+    public quadratureValuePatchField<vector>
 {
     // Private Data
 
         //- Enable non-orthogonal corrections
         const Switch nonOrthogonalCorrections_;
+
+
+    // Private Member Functions
+
+        //- Return the exact velocity at the given points at the current time
+        tmp<vectorField> exactVelocity(const vectorField& points) const;
 
 public:
 
@@ -149,6 +161,12 @@ public:
             //- Return the matrix source coefficients corresponding to the
             //  evaluation of the gradient of this patchField
             virtual tmp<Field<vector> > gradientBoundaryCoeffs() const;
+
+            //- Return the exact velocity at the face quadrature points of quad
+            virtual autoPtr<CompactListList<vector>> quadratureValues
+            (
+                const fvMeshQuadrature& quad
+            ) const;
 
         // Mapping functions
 

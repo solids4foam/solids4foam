@@ -8,6 +8,30 @@ release. For complete commit-level details and contributor information, see the
 
 ### Added
 
+- A high-order residual for `newtonIcoFluid`, for the Stokes equations.
+  With `highOrderCoeffs` (the solid models' format, with `velocity` in place
+  of `displacement`), the viscous stress, the pressure and the volume flux are
+  integrated over the face quadrature points of `kExactLeastSquares`
+  reconstructions of U and p, the `alpha` pressure stabilisation uses its
+  high-order form, and the second-order Jacobian is kept as the
+  preconditioner. It needs `convection no`, a new switch that drops the
+  convection term on static meshes (the default keeps it), a static mesh and a
+  serial run.
+  `newtonIcoFluid` also reads an optional `momentumSource` field, and the
+  `leastSquaresReconstruction` registry gains a `velocity` role. The
+  `decayingTaylorGreenVortex` verification has steady (forced) and unsteady
+  Stokes studies, run with `verification/Allverify stokes`. The results of
+  existing cases are unchanged.
+- A high-order test bench for the `decayingTaylorGreenVortex` tutorial, to
+  verify the boundary data and initial fields that a k-exact fluid scheme
+  needs. `initialiseTaylorGreenVortex -cellAverage` writes the exact cell
+  averages of U and p (the default output is unchanged), the
+  `decayingTaylorGreenVortexVelocity` condition gives the exact velocity at
+  the face quadrature points (`quadratureValuePatchField`), and the new
+  `checkTaylorGreenVortexReconstruction` utility measures the errors of the
+  `kExactLeastSquares` reconstruction of U and p from the exact averages.
+  The opt-in `verification/Allverify` study checks the observed orders on the
+  uniform and graded meshes. The solver results are unchanged.
 - Cardiac elastodynamics benchmark tutorials of Aróstica et al. (2025),
   `tutorials/solids/hyperelasticity/ArosticaEtAl2025`: `benchmark1`, an
   idealised left ventricle (steps 0A, 0B, 1 and the blinded 2A to 2C) on an

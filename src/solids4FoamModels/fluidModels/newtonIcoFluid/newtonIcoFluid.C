@@ -23,6 +23,7 @@ License
 #include "fvm.H"
 #include "findRefCell.H"
 #include "compatibilityFunctions.H"
+#include "hofvc.H"
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -89,6 +90,174 @@ surfaceScalarField& newtonIcoFluid::rAUf()
     return autoPtrRef(rAUfPtr_);
 }
 
+
+template<class Type>
+boolList newtonIcoFluid::fixedValuePatchMask
+(
+    const GeometricField<Type, fvPatchField, volMesh>& field
+)
+{
+    // As in solidModel, the patches that fix the value are in the stencils
+    boolList includePatchInStencils(field.boundaryField().size(), false);
+
+    forAll(includePatchInStencils, patchI)
+    {
+        includePatchInStencils[patchI] =
+            field.boundaryField()[patchI].fixesValue();
+    }
+
+    return includePatchInStencils;
+}
+
+
+const dictionary& newtonIcoFluid::highOrderCoeffs(const word& fieldRole) const
+{
+    if
+    (
+        !fluidProperties().found("highOrderCoeffs")
+     || !fluidProperties().subDict("highOrderCoeffs").found(fieldRole)
+    )
+    {
+        FatalErrorInFunction
+            << "Expected 'highOrderCoeffs." << fieldRole << "' to be defined."
+            << abort(FatalError);
+    }
+
+    return fluidProperties().subDict("highOrderCoeffs").subDict(fieldRole);
+}
+
+
+void newtonIcoFluid::highOrderFaceFluxes
+(
+    const volVectorField& U,
+    const volScalarField& p,
+    surfaceVectorField& traction,
+    surfaceScalarField& flux
+) const
+{
+    const fvMesh& mesh = U.mesh();
+    const leastSquaresScheme& ULs = velocityLeastSquares();
+    const leastSquaresScheme& pLs = pressureLeastSquares();
+
+    // Quadrature points and weights are indexed by global face labels
+    auto& faceQuadPoints =
+        compactListListCRef(ULs.quadrature().faceQuadPoints());
+    auto& faceQuadWeights =
+        compactListListCRef(ULs.quadrature().faceQuadWeights());
+
+    // Velocity gradient at the face quadrature points
+    CompactListList<tensor> gradUQuad(faceQuadPoints.sizes());
+    hofvc::fGrad(ULs, U, gradUQuad);
+
+    // Kinematic viscosity at the faces
+    const surfaceScalarField nuEfff(fvc::interpolate(turbulence_->nuEff()));
+
+    // Kinematic stress at the face quadrature points
+    CompactListList<symmTensor> sigmaQuad(faceQuadPoints.sizes());
+
+    const labelUList& own = mesh.owner();
+    const labelUList& nei = mesh.neighbour();
+
+    // Face area vectors of all faces, internal and boundary
+    const vectorField& faceAreas = mesh.faceAreas();
+
+    flux = dimensionedScalar("0", flux.dimensions(), 0.0);
+
+    // Internal faces: the value is the average of the reconstructions from
+    // the two sides of the face
+    for (label faceI = 0; faceI < mesh.nInternalFaces(); ++faceI)
+    {
+        const vector n(faceAreas[faceI]/mag(faceAreas[faceI]));
+
+        forAll(faceQuadPoints[faceI], qI)
+        {
+            const point& x = faceQuadPoints[faceI][qI];
+
+            const scalar pq =
+                0.5
+               *(
+                    pLs.valueAtPoint(p, own[faceI], x)
+                  + pLs.valueAtPoint(p, nei[faceI], x)
+                );
+
+            const vector Uq =
+                0.5
+               *(
+                    ULs.valueAtPoint(U, own[faceI], x)
+                  + ULs.valueAtPoint(U, nei[faceI], x)
+                );
+
+            sigmaQuad[faceI][qI] =
+                nuEfff[faceI]*twoSymm(gradUQuad[faceI][qI])
+              - pq*symmTensor::I;
+
+            flux[faceI] += faceQuadWeights[faceI][qI]*(Uq & n);
+        }
+    }
+
+    // Boundary faces: the velocity and the pressure are the boundary
+    // condition values on patches that fix them, and the owner reconstruction
+    // elsewhere
+    forAll(mesh.boundary(), patchI)
+    {
+        const fvPatch& patch = mesh.boundary()[patchI];
+
+        if (patch.coupled())
+        {
+            FatalErrorInFunction
+                << "Coupled patch " << patch.name() << " is not supported by "
+                << "the high-order residual" << exit(FatalError);
+        }
+
+        autoPtr<CompactListList<vector>> patchUQuad;
+        autoPtr<CompactListList<scalar>> patchPQuad;
+
+        if (U.boundaryField()[patchI].fixesValue())
+        {
+            patchUQuad = ULs.patchFaceQuadValues(U, patchI);
+        }
+
+        if (p.boundaryField()[patchI].fixesValue())
+        {
+            patchPQuad = pLs.patchFaceQuadValues(p, patchI);
+        }
+
+        const labelUList& faceCells = patch.faceCells();
+        scalarField& patchFlux = boundaryFieldRef(flux)[patchI];
+
+        forAll(faceCells, i)
+        {
+            const label faceI = patch.patch().start() + i;
+            const vector n(faceAreas[faceI]/mag(faceAreas[faceI]));
+
+            forAll(faceQuadPoints[faceI], qI)
+            {
+                const point& x = faceQuadPoints[faceI][qI];
+
+                const scalar pq =
+                    patchPQuad.valid()
+                  ? patchPQuad()[i][qI]
+                  : pLs.valueAtPoint(p, faceCells[i], x);
+
+                const vector Uq =
+                    patchUQuad.valid()
+                  ? patchUQuad()[i][qI]
+                  : ULs.valueAtPoint(U, faceCells[i], x);
+
+                sigmaQuad[faceI][qI] =
+                    nuEfff.boundaryField()[patchI][i]
+                   *twoSymm(gradUQuad[faceI][qI])
+                  - pq*symmTensor::I;
+
+                patchFlux[i] += faceQuadWeights[faceI][qI]*(Uq & n);
+            }
+        }
+    }
+
+    traction = hofvc::surfaceIntegrate(ULs, sigmaQuad, mesh, p.dimensions());
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 newtonIcoFluid::newtonIcoFluid
@@ -133,6 +302,9 @@ newtonIcoFluid::newtonIcoFluid
     momentumStabilisationPtr_(),
     pressureStabilisationPtr_(),
     blockSize_(fluidModel::twoD() ? 3 : 4),
+    convection_(fluidProperties().lookupOrDefault<Switch>("convection", true)),
+    highOrderResidual_(false),
+    momentumSourcePtr_(),
     tsLogPtr_()
 {
     setRefCell(p(), fluidProperties(), pRefCell_, pRefValue_);
@@ -249,6 +421,92 @@ newtonIcoFluid::newtonIcoFluid
             p().dimensions()/dimLength
         );
 
+    if (fluidProperties().found("highOrderCoeffs"))
+    {
+        highOrderResidual_ =
+            fluidProperties().subDict("highOrderCoeffs").lookupOrDefault<Switch>
+            (
+                "highOrderResidual", false
+            );
+    }
+
+    if (!convection_)
+    {
+        Info<< "    The convection term is not included: solving the "
+            << "unsteady Stokes equations" << endl;
+    }
+
+    if (highOrderResidual_)
+    {
+        if (convection_)
+        {
+            FatalErrorInFunction
+                << "The high-order residual does not include the convection "
+                << "term yet. Set 'convection no' to solve the Stokes "
+                << "equations" << exit(FatalError);
+        }
+
+        if (Pstream::parRun())
+        {
+            FatalErrorInFunction
+                << "The high-order residual is only implemented in serial"
+                << exit(FatalError);
+        }
+
+        if (!pressureStabilisation().supportsHighOrderResidual())
+        {
+            FatalErrorInFunction
+                << "The high-order residual needs a pressure stabilisation "
+                << "that supports it, e.g. alpha, but "
+                << pressureStabilisation().type() << " was selected"
+                << exit(FatalError);
+        }
+
+        leastSquaresScheme::checkMeshSupported(mesh());
+
+        // Construct the schemes now, so that their settings are checked
+        // before the first time step
+        velocityLeastSquares();
+        pressureLeastSquares();
+
+        Info<< "    Using the high-order residual" << endl;
+    }
+
+    // Optional momentum source per unit mass, e.g. for a manufactured
+    // solution. newtonIcoFluid does not use fvOptions, so the source is read
+    // as a field (m/s^2) whose cell values are the cell averages of the source
+    {
+        // The field is written with the other fields, so that a restart from
+        // a later time reads it back
+        IOobject sourceIO
+        (
+            "momentumSource",
+            runTime.timeName(),
+            mesh(),
+            IOobject::MUST_READ,
+            IOobject::AUTO_WRITE
+        );
+
+#ifdef OPENFOAM_NOT_EXTEND
+        if (sourceIO.typeHeaderOk<volVectorField>(true))
+#else
+        if (sourceIO.headerOk())
+#endif
+        {
+            Info<< "    Reading momentumSource" << endl;
+            momentumSourcePtr_.reset(new volVectorField(sourceIO, mesh()));
+
+            if (momentumSourcePtr_().dimensions() != dimVelocity/dimTime)
+            {
+                FatalErrorInFunction
+                    << "momentumSource is a body force per unit mass and must "
+                    << "have the dimensions " << dimVelocity/dimTime
+                    << ", not " << momentumSourcePtr_().dimensions()
+                    << exit(FatalError);
+            }
+        }
+    }
+
 #ifdef OPENFOAM_NOT_EXTEND
     turbulence_->validate();
 #endif
@@ -293,6 +551,28 @@ newtonIcoFluid::newtonIcoFluid
 }
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+const leastSquaresScheme& newtonIcoFluid::velocityLeastSquares() const
+{
+    return leastSquaresReconstruction::New(mesh()).scheme
+    (
+        "velocity",
+        fixedValuePatchMask(U()),
+        highOrderCoeffs("velocity")
+    );
+}
+
+
+const leastSquaresScheme& newtonIcoFluid::pressureLeastSquares() const
+{
+    return leastSquaresReconstruction::New(mesh()).scheme
+    (
+        "pressure",
+        fixedValuePatchMask(p()),
+        highOrderCoeffs("pressure")
+    );
+}
+
 
 tmp<vectorField> newtonIcoFluid::patchViscousForce(const label patchID) const
 {
@@ -681,6 +961,15 @@ label newtonIcoFluid::formResidual
     volScalarField& p = const_cast<volScalarField&>(this->p());
     surfaceScalarField& phi = const_cast<surfaceScalarField&>(this->phi());
 
+    // phi is relative to the mesh motion, so dropping div(phi, U) on a moving
+    // mesh would also drop the mesh motion flux
+    if (!convection_ && mesh.moving())
+    {
+        FatalErrorInFunction
+            << "'convection no' is only implemented for static meshes"
+            << exit(FatalError);
+    }
+
     // Copy x into the U field
     vectorField& UI = U;
     foamPetscSnesHelper::ExtractFieldComponents<vector>
@@ -734,8 +1023,23 @@ label newtonIcoFluid::formResidual
     //constrainPressure(p, U, phiHbyA, rAtU());
 
     // Update gradp
-    gradp() = fvc::grad(p);
-    gradU() = fvc::grad(U);
+    if (highOrderResidual_)
+    {
+        if (mesh.moving())
+        {
+            FatalErrorInFunction
+                << "The high-order residual is only implemented for static "
+                << "meshes" << exit(FatalError);
+        }
+
+        gradp() = pressureLeastSquares().grad(p);
+        gradU() = velocityLeastSquares().grad(U);
+    }
+    else
+    {
+        gradp() = fvc::grad(p);
+        gradU() = fvc::grad(U);
+    }
 
     // Correct the transport and turbulence models
     //laminarTransport_.correct();
@@ -753,14 +1057,72 @@ label newtonIcoFluid::formResidual
     //
     // Check: do we want to include div(gradU.T).. it makes the stencil
     // larger and should be zero anyway, although it may increase accuracy
-    vectorField residual
+    vectorField residual(mesh.nCells(), vector::zero);
+
+    // Face volume flux of the continuity equation
+    surfaceScalarField continuityFlux
     (
-        fvc::laplacian(turbulence_->nuEff(), U)
-        //+ fvc::div((turbulence_->nuEff())*dev2(T(fvc::grad(U))))
-      - gradp()
-      - fvc::ddt(U)
-      - fvc::div(phi, U)
+        IOobject
+        (
+            "continuityFlux",
+            mesh.time().timeName(),
+            mesh,
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        mesh,
+        dimensionedScalar("0", phi.dimensions(), 0.0)
     );
+
+    if (highOrderResidual_)
+    {
+        // Face traction from the stress at the face quadrature points
+        surfaceVectorField traction
+        (
+            IOobject
+            (
+                "traction",
+                mesh.time().timeName(),
+                mesh,
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh,
+            dimensionedVector("0", p.dimensions(), vector::zero)
+        );
+
+        highOrderFaceFluxes(U, p, traction, continuityFlux);
+
+        residual =
+            primitiveField
+            (
+                (fvc::div(mesh.magSf()*traction) - fvc::ddt(U))()
+            );
+    }
+    else
+    {
+        residual =
+            primitiveField
+            (
+                (
+                    fvc::laplacian(turbulence_->nuEff(), U)
+                    //+ fvc::div((turbulence_->nuEff())*dev2(T(fvc::grad(U))))
+                  - gradp()
+                  - fvc::ddt(U)
+                )()
+            );
+
+        if (convection_)
+        {
+            residual -= primitiveField(fvc::div(phi, U)());
+        }
+    }
+
+    // Add the optional momentum source
+    if (momentumSourcePtr_.valid())
+    {
+        residual += primitiveField(momentumSourcePtr_());
+    }
 
     // Make residual extensive as fvc operators are intensive (per unit volume)
     residual *= mesh.V();
@@ -780,21 +1142,42 @@ label newtonIcoFluid::formResidual
     // Fp = stabilisation - div(U)
     //    = stabilisation - tr(grad(U))
     // where stabilisation = laplacian(pD, p) - div(pD*grad(p))
-    scalarField pressureResidual
-    (
-      - fvc::div(U)
-    );
+    scalarField pressureResidual(mesh.nCells(), 0.0);
+
+    if (highOrderResidual_)
+    {
+        pressureResidual = -primitiveField(fvc::div(continuityFlux)());
+    }
+    else
+    {
+        pressureResidual = -primitiveField(fvc::div(U)());
+    }
 
     fvVectorMatrix pressureStabUEqn
     (
         fvm::laplacian(turbulence_->nuEff(), U)
       - fvm::ddt(U)
-      - fvm::div(phi, U)
     );
+
+    if (convection_)
+    {
+        pressureStabUEqn -= fvm::div(phi, U);
+    }
 
     rAUf() = -fvc::interpolate(1.0/pressureStabUEqn.A());
 
-    pressureStabilisation().updateScalar(p, &gradp());
+    if (highOrderResidual_)
+    {
+        pressureStabilisation().updateScalarHighOrder
+        (
+            p, pressureLeastSquares()
+        );
+    }
+    else
+    {
+        pressureStabilisation().updateScalar(p, &gradp());
+    }
+
     pressureResidual += pressureStabilisation().cellScalar(&rAUf(), true);
 
     // Make residual extensive
@@ -832,6 +1215,22 @@ label newtonIcoFluid::formResidual
     {
         InfoInFunction
             << "start" << endl;
+    }
+
+    if (highOrderResidual_)
+    {
+        FatalErrorInFunction
+            << "The high-order residual is not implemented for a moving "
+            << "reference configuration" << exit(FatalError);
+    }
+
+    // phi is relative to the motion, so dropping div(phi, U) would also drop
+    // the mesh motion flux
+    if (!convection_)
+    {
+        FatalErrorInFunction
+            << "'convection no' is not implemented for a moving reference "
+            << "configuration" << exit(FatalError);
     }
 
     // Take references
@@ -977,6 +1376,13 @@ label newtonIcoFluid::formResidual
       - fvc::div(phi, U)
       + momentumStabilisation().cellVector(&nuEfff, true)
     );
+
+    // Add the optional momentum source, scaled by the volume ratio of the
+    // reference configuration like the inertia term
+    if (momentumSourcePtr_.valid())
+    {
+        residual += primitiveField(Jm)*primitiveField(momentumSourcePtr_());
+    }
 
     // Make residual extensive as fvc operators are intensive (per unit volume)
     residual *= mesh.V();
@@ -1137,21 +1543,24 @@ label newtonIcoFluid::formJacobian
         UEqn, jac, 0, 0, fluidModel::twoD() ? 2 : 3
     );
 
-    // Insert linearisation of convection term
-    // The linearisation assumes an upwind discretisation
-    foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
-    (
-        U,
-        phi(),
-        jac,
-        0,                         // row offset
-        0,                         // column offset
-        fluidModel::twoD() ? 2 : 3 // number of scalar equations to insert
-    );
+    if (convection_)
+    {
+        // Insert linearisation of convection term
+        // The linearisation assumes an upwind discretisation
+        foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
+        (
+            U,
+            phi(),
+            jac,
+            0,                         // row offset
+            0,                         // column offset
+            fluidModel::twoD() ? 2 : 3 // number of scalar equations to insert
+        );
 
-    // Add advection term to UEqn to allow the correct central coefficient to
-    // be calculated for pressure stabilisation
-    UEqn -= fvm::div(phi(), U);
+        // Add advection term to UEqn to allow the correct central coefficient
+        // to be calculated for pressure stabilisation
+        UEqn -= fvm::div(phi(), U);
+    }
 
     // Record the reciprocal of the central coefficient
     rAUf() = -fvc::interpolate(1.0/UEqn.A());

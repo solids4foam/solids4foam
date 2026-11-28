@@ -531,6 +531,36 @@ The regression test also runs `Test-fvcDdt` on the mesh of the case. It checks
  so the solver results are unaffected, and it must be built and available on
  `PATH`.
 
+## Verification and Convergence Study
+
+The case also provides the data that a high-order (k-exact) finite volume
+ scheme needs. `initialiseTaylorGreenVortex -cellAverage` sets the cell values
+ to the exact cell averages of U and p instead of the cell-centre values, and
+ the `decayingTaylorGreenVortexVelocity` condition gives the exact velocity at
+ the face quadrature points of the high-order least-squares schemes. The
+ default case uses neither the averages nor the quadrature values, so its
+ results are unchanged.
+
+The opt-in `verification/Allverify` study runs the
+ `checkTaylorGreenVortexReconstruction` utility on the uniform and graded
+ meshes. The utility reconstructs U and p from their exact cell averages with
+ `kExactLeastSquares` for polynomial orders 1 to 3, and the study checks that
+ the values converge at order k + 1 and the gradients at order k.
+
+`verification/Allverify stokes` runs `newtonIcoFluid` without convection
+ (`convection no`) and with its high-order residual (`highOrderCoeffs`) on two
+ Stokes problems: a steady forced problem, whose body force
+ (`initialiseTaylorGreenVortex -steadyStokesSource`) gives a non-constant
+ exact pressure, and the unsteady decaying vortex with the time step refined
+ as $$h^2$$. With `polynomialOrder 3`, the velocity and the pressure converge
+ at fourth order (Figure 3). See `verification/README.md` for the method and
+ results.
+
+![High-order Stokes convergence](images/highOrderStokesConvergence.png)
+
+**Figure 3: L2 errors of the cell averages for the second-order and
+ high-order residuals of `newtonIcoFluid` on the Stokes problems.**
+
 ## References
 
 [^erzincanli2013]: [Erzincanli, B. and Sahin, M. (2013). An arbitrary

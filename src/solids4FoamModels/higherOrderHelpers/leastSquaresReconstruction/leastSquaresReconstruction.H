@@ -66,6 +66,9 @@ class leastSquaresReconstruction
         //- Pressure reconstruction scheme pointer
         mutable autoPtr<leastSquaresScheme> pressureSchemePtr_;
 
+        //- Velocity reconstruction scheme pointer
+        mutable autoPtr<leastSquaresScheme> velocitySchemePtr_;
+
 
     // Private Member Functions
 
