@@ -8,6 +8,14 @@ release. For complete commit-level details and contributor information, see the
 
 ### Added
 
+- Coloured finite-difference Jacobian for the cell-centred PETSc SNES solid
+  models (`linearGeometryTotalDisplacement`,
+  `nonLinearGeometryTotalLagrangianTotalDisplacement`,
+  `nonLinearGeometryUpdatedLagrangian`): `jacobian colouredFiniteDifference;`
+  replaces the compact approximate Jacobian by the Jacobian of the residual,
+  computed by coloured finite differences on the two-layer stencil. It
+  reduces the Krylov iterations for slender, bending solids. The default
+  (`jacobian compact`) is unchanged.
 - Cardiac elastodynamics benchmark tutorials of Aróstica et al. (2025),
   `tutorials/solids/hyperelasticity/ArosticaEtAl2025`: `benchmark1`, an
   idealised left ventricle (steps 0A, 0B, 1 and the blinded 2A to 2C) on an

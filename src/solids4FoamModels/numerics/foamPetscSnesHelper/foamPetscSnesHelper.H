@@ -65,6 +65,7 @@ SourceFiles
 namespace Foam
 {
     class foamPetscSnesHelper;
+    class colouredFiniteDifferenceJacobian;
 }
 
 // User data "context" for PETSc functions
@@ -169,6 +170,20 @@ private:
         //- A flag indicating if the solve function has been called
         bool snesHasRun_;
 
+        //- Replace the compact approximate Jacobian by a coloured
+        //  finite-difference Jacobian of the residual
+        Switch fdJacobian_;
+
+        //- Check every finite-difference Jacobian build against a
+        //  directional derivative of the residual, not only the first
+        Switch fdJacobianCheck_;
+
+        //- Largest relative difference accepted by the directional check
+        scalar fdJacobianCheckTolerance_;
+
+        //- Coloured finite-difference Jacobian
+        autoPtr<colouredFiniteDifferenceJacobian> fdJacobianPtr_;
+
 
     // Private Member Functions
 
@@ -216,6 +231,9 @@ public:
         //    stopOnPetscError    - Optional: Give a FatalError when PETSc
         //                          returns an error
         //    initialise          - Optional: Initialise PETSc
+        //    dict                - Optional: Jacobian settings ("jacobian",
+        //                          "jacobianCheck",
+        //                          "jacobianCheckTolerance")
         foamPetscSnesHelper
         (
             const word& fieldName,
@@ -223,7 +241,8 @@ public:
             const fvMesh& mesh,
             const solutionLocation& location = solutionLocation::CELLS,
             const Switch stopOnPetscError = true,
-            const Switch initialise = true
+            const Switch initialise = true,
+            const dictionary& dict = dictionary::null
         );
 
 
@@ -380,6 +399,11 @@ public:
                 Mat jac,       // Jacobian
                 const Vec x    // Solution
             ) = 0;
+
+            //- If the coloured finite-difference Jacobian is selected,
+            //  replace the assembled approximate Jacobian B by it, evaluated
+            //  at x. B must be the matrix assembled by formJacobian
+            void applyFiniteDifferenceJacobian(Mat B, const Vec x);
 
             //- Apply a physics-based preconditioner
             //  This should (approximately) solve y = M^{-1} x, where M is an
@@ -631,7 +655,8 @@ public:
         const fvMesh& /*mesh*/,
         const solutionLocation& /*location*/ = solutionLocation::CELLS,
         const Switch /*stopOnPetscError*/ = true,
-        const Switch /*initialise*/ = true
+        const Switch /*initialise*/ = true,
+        const dictionary& /*dict*/ = dictionary::null
     )
     {}
 
