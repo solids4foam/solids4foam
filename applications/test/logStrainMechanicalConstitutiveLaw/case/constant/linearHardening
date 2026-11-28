@@ -1,0 +1,5 @@
+// Yield stress against equivalent plastic strain: linear hardening, H = 1 GPa
+(
+    ( 0     400e6 )
+    ( 1     1400e6 )
+)

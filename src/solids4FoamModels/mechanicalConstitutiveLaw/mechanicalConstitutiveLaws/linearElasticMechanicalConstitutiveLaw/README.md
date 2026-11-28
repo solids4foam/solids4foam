@@ -33,7 +33,9 @@ sigma = 2*mu*epsilon + lambda*tr(epsilon)*I + sigma0
 where `sigma0` is an optional initial stress (see below). The law is
 small-strain only: it implements the small-strain update and a nonlinear
 geometry solid model, which asks for the finite-strain update, stops with an
-error.
+error. As the sub-law of
+[`logStrain`](../logStrainMechanicalConstitutiveLaw/README.md) it gives
+Hencky's hyperelastic law at finite strain.
 
 The constants are derived from whichever pair of elastic entries was given:
 

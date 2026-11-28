@@ -45,7 +45,9 @@ sigma      = s + K*tr(epsilon)*I
 
 with `mu = E/(2*(1 + nu))` and `K = E/(3*(1 - 2*nu))`. The law is small-strain
 only; a nonlinear geometry solid model stops with an error. For finite strains
-use `neoHookeanElasticMisesPlastic`.
+use `neoHookeanElasticMisesPlastic`, or this law as the sub-law of
+[`logStrain`](../logStrainMechanicalConstitutiveLaw/README.md), which performs
+the same return mapping on the elastic logarithmic strain.
 
 ### Hardening input
 

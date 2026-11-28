@@ -423,6 +423,24 @@ public:
             return wordList();
         }
 
+        //- Can this law be driven by a trial elastic strain, through
+        //  evaluateElasticPredictor?
+        //
+        //  This is what lets the logStrain law use a small-strain law at
+        //  finite strain. It works out the trial elastic logarithmic strain
+        //  itself, from the deformation and its own elastic history, and
+        //  needs the law only for the elastic predictor and the return
+        //  mapping. That is exact only for an isotropic law with
+        //  scalar-valued history, whose return mapping keeps the elastic
+        //  strain coaxial with its trial value; a law with kinematic
+        //  hardening or a preferred direction does not qualify.
+        //
+        //  False by default: logStrain refuses a law that says no, naming it
+        virtual bool providesElasticPredictor() const
+        {
+            return false;
+        }
+
         //- Initialise constitutive state variables
         //  Called once after state allocation.
         //  Default implementation does nothing.
@@ -462,6 +480,35 @@ public:
             FatalErrorInFunction
                 << "Finite-strain evaluation is not implemented for this "
                 << "mechanicalConstitutiveLaw." << exit(FatalError);
+        }
+
+        //- Evaluation from a trial elastic strain, for a law that
+        //  providesElasticPredictor().
+        //
+        //  epsilonETrial is the elastic strain the step would end at if it
+        //  were elastic, measured from the law's own stress-free state: the
+        //  law adds no plastic strain of its own to it. The law performs
+        //  its return mapping from it, updating its scalar history in the
+        //  state, and returns the elastic strain the step ends at in
+        //  epsilonE and the stress conjugate to it in response.stress(),
+        //  together with the scalar tangent if the response asks for one.
+        //  A fourth-order tangent and a volumetric split are not provided.
+        //
+        //  The strain and stress measures are the caller's: logStrain
+        //  passes a logarithmic strain and receives a Kirchhoff stress
+        virtual void evaluateElasticPredictor
+        (
+            const UList<symmTensor>& epsilonETrial,
+            const mechanicalConstitutiveLawInputs& inputs,
+            mechanicalConstitutiveLawState& state,
+            UList<symmTensor>& epsilonE,
+            mechanicalConstitutiveLawResponse& response
+        ) const
+        {
+            FatalErrorInFunction
+                << "Evaluation from a trial elastic strain is not "
+                << "implemented for mechanicalConstitutiveLaw " << type()
+                << "." << exit(FatalError);
         }
 
         //- The scale this law normalises its convergence test by, over the

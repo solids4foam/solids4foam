@@ -253,6 +253,45 @@ neoHookeanElasticMisesPlastic
     }
 }
 
+logStrainLinearElastic
+{
+    finiteStrain    yes;
+    isotropic       yes;
+    linear          no;
+    law
+    {
+        type            logStrain;
+        rho             rho [1 -3 0 0 0 0 0] 7854;
+        mechanicalLaw
+        {
+            type            linearElastic;
+            E               E [1 -1 -2 0 0 0 0] 2e+11;
+            nu              nu [0 0 0 0 0 0 0] 0.3;
+        }
+    }
+}
+
+logStrainMisesPlastic
+{
+    finiteStrain    yes;
+    isotropic       yes;
+    linear          no;
+    yieldBounds     (243e6 600e6);
+    law
+    {
+        type            logStrain;
+        rho             rho [1 -3 0 0 0 0 0] 7800;
+        mechanicalLaw
+        {
+            type            linearElasticMisesPlastic;
+            E               E [1 -1 -2 0 0 0 0] 2.069e10;
+            nu              nu [0 0 0 0 0 0 0] 0.29;
+            "file|fileName" "$FOAM_CASE/constant/plasticStrainVsYieldStress";
+            outOfBounds     clamp;
+        }
+    }
+}
+
 MooneyRivlinElastic
 {
     finiteStrain    yes;
