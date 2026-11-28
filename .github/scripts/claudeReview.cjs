@@ -396,7 +396,7 @@ function formatCoverage(coverage, max = Infinity, listed = Infinity) {
   const full = allFull.slice(0, listed);
   return `**Patch coverage: ${coverage.status.toUpperCase()}** ` +
     (allFull.length ?
-      `(supplied hunks, plus the full post-change text of ${allFull.length} changed ` +
+      `(supplied hunks, plus the full post-change text of ${allFull.length} ` +
         `file${allFull.length === 1 ? '' : 's'} as context; other source and linked evidence ` +
         'are not inspected).\n\n' :
       '(supplied hunks only; surrounding source and linked evidence are not inspected).\n\n') +
@@ -480,8 +480,14 @@ function buildPrompt(pr, files, read = readCheckout, fullFiles = []) {
   }
   if (!selected.length) throw new Error('nothing_reviewable');
   const room = promptBudget - Buffer.byteLength(JSON.stringify(prompt()));
-  // Context only for files whose patch is in the prompt.
+  // Context only for files whose patch is in the prompt, and for the unchanged
+  // header of a reviewed .C file.
   const reviewed = new Set(selected.map(item => item.filename));
+  const listed = new Set(files.map(file => file.filename));
+  for (const item of selected) {
+    const header = matchingHeader(item.filename);
+    if (item.status !== 'removed' && header && !listed.has(header)) reviewed.add(header);
+  }
   for (const file of fullFiles) {
     if (!reviewed.has(file.path) || full.some(item => item.path === file.path)) continue;
     full.push({path: file.path, ref: pr.head.sha, content: file.content});
@@ -499,7 +505,9 @@ function buildPrompt(pr, files, read = readCheckout, fullFiles = []) {
 // patch qualify: an added file's patch already is the whole file, and
 // deletions have no post-change text. C/C++ in src/ and applications/ come
 // first, then other C/C++ and Make lists, then other text; a class's .C and
-// .H stay adjacent. Tutorial mesh/field/CSV data and binaries are skipped, as
+// .H stay adjacent, and the unchanged .H of a changed .C is included too: its
+// declarations, member data and virtual signatures are often what is needed to
+// judge the .C change. Tutorial mesh/field/CSV data and binaries are skipped, as
 // is CHANGELOG.md: about 80 KB, touched by most PRs, and its patch says enough.
 // At most maxFullFiles requests per run, well within the Actions token's
 // 1000 requests per hour.
@@ -512,15 +520,30 @@ function fullFilePriority(path) {
   if (/^(src|applications)\//.test(path) && cxxFile.test(path)) return 0;
   return cxxFile.test(path) || /(^|\/)Make\/(files|options)[^/]*$/.test(path) ? 1 : 2;
 }
+const matchingHeader = path => path.endsWith('.C') ? `${path.slice(0, -2)}.H` : null;
 function fullFileCandidates(files, omitted = []) {
   const skip = new Set(omitted.map(item => item.path));
+  const listed = new Set(files.map(file => file.filename));
   const stem = path => path.replace(/\.[^./]*$/, '');
-  return files.filter(file => file.patch && ['modified', 'renamed', 'changed'].includes(file.status) &&
+  const changed = files.filter(file => file.patch && ['modified', 'renamed', 'changed'].includes(file.status) &&
       !skip.has(file.filename) && fullFilePriority(file.filename) !== null)
-    .map(file => file.filename)
+    .map(file => file.filename);
+  // Headers not in the PR file list are unchanged; fetching a path that does
+  // not exist only leaves it out.
+  const headers = files.filter(file => file.patch && file.status !== 'removed' &&
+      !skip.has(file.filename) && fullFilePriority(file.filename) !== null)
+    .map(file => matchingHeader(file.filename))
+    .filter(header => header && !listed.has(header));
+  return [...changed, ...new Set(headers)]
     .sort((a, b) => fullFilePriority(a) - fullFilePriority(b) ||
       stem(a).localeCompare(stem(b)) || a.localeCompare(b))
     .slice(0, maxFullFiles);
+}
+// Each line starts with its number and `|`, so findings can cite exact lines.
+function numberLines(text) {
+  const lines = text.split('\n');
+  if (lines.length > 1 && lines[lines.length - 1] === '') lines.pop();
+  return lines.map((line, i) => `${i + 1}|${line}`).join('\n');
 }
 // The text of a contents-API response, or null unless it is a regular UTF-8
 // file under 1 MB (the API sends no content for larger files).
@@ -535,8 +558,8 @@ function fileText(data) {
     return null;
   }
 }
-// Fetches candidates in order while their raw size fits in `room`; a file that
-// cannot be fetched or decoded is left out, never failing the review.
+// Fetches candidates in order while their line-numbered text fits in `room`; a
+// file that cannot be fetched or decoded is left out, never failing the review.
 async function fetchFullFiles(paths, getFile, room) {
   const out = [];
   let used = 0;
@@ -544,9 +567,11 @@ async function fetchFullFiles(paths, getFile, room) {
     if (room - used < 1000) break;
     let text = null;
     try { text = fileText(await getFile(path)); } catch { /* Left out. */ }
-    if (text === null || used + Buffer.byteLength(text) > room) continue;
-    used += Buffer.byteLength(text);
-    out.push({path, content: text});
+    if (text === null) continue;
+    const content = numberLines(text);
+    if (used + Buffer.byteLength(content) > room) continue;
+    used += Buffer.byteLength(content);
+    out.push({path, content});
   }
   return out;
 }
@@ -667,6 +692,6 @@ async function publish({github, context, core}, env = process.env) {
   return {status: failed ? 'failed' : 'completed', coverage: failed ? 'incomplete' : coverage.status};
 }
 module.exports = {promptBudget, maxFullFiles, maxFullFileBytes, fullFileCandidates, fileText,
-  fetchFullFiles, buildReviewPrompt, riskLabels, incompleteLabel, setRiskLabels, secondMarker,
+  numberLines, fetchFullFiles, buildReviewPrompt, riskLabels, incompleteLabel, setRiskLabels, secondMarker,
   secondReviewRisk, risks, schema, apiSchema, analyse, inputFile, replayContent, addUsage, retryDelay, clientOptions, maxRequests, analysisReasons, httpStatus, limits, maxReportChars, maxReportBytes, commentLimit, fitComment, validate, classifyRisk, pathRisk, riskFloor, buildPrompt,
   formatAssessment, formatCoverage, secondReviewNotice, plain, prepare, publish};

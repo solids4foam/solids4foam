@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const {prepare, publish, validate, classifyRisk, formatAssessment, pathRisk, riskFloor, buildPrompt, schema,
   limits, maxReportBytes, commentLimit, promptBudget, setRiskLabels, secondReviewRisk,
-  secondMarker, fullFileCandidates, fileText, fetchFullFiles, buildReviewPrompt, formatCoverage,
+  secondMarker, fullFileCandidates, fileText, fetchFullFiles, buildReviewPrompt, formatCoverage, numberLines,
   maxFullFiles, maxFullFileBytes, fitComment} = require('./claudeReview.cjs');
 
 // prepare() hands the prompt to analyse() in a file under RUNNER_TEMP.
@@ -828,9 +828,12 @@ test('full files: changed sources first, .C next to .H, data, added and removed 
     {filename: 'applications/solvers/s/s.C', status: 'renamed', patch: p},
     {filename: 'src/b/image.png', status: 'modified'},
     {filename: 'src/b/skipped.C', status: 'modified', patch: p}];
+  // The unchanged .H of a changed or added .C follows it; a changed .H is not
+  // repeated, and removed or budget-omitted .C files bring no header.
   assert.deepEqual(fullFileCandidates(files, [{path: 'src/b/skipped.C'}]), [
-    'applications/solvers/s/s.C', 'src/b/alpha.C', 'src/b/zeta.C', 'src/b/zeta.H',
-    'src/b/Make/files', 'tests/unit/testA.C', 'README.md']);
+    'applications/solvers/s/s.C', 'applications/solvers/s/s.H', 'src/b/alpha.C',
+    'src/b/alpha.H', 'src/b/new.H', 'src/b/zeta.C', 'src/b/zeta.H', 'src/b/Make/files',
+    'tests/unit/testA.C', 'tests/unit/testA.H', 'README.md']);
   const many = Array.from({length: 100}, (_, i) =>
     ({filename: `src/m/f${String(i).padStart(3, '0')}.C`, status: 'modified', patch: p}));
   assert.equal(fullFileCandidates(many).length, maxFullFiles);
@@ -858,6 +861,32 @@ test('full files: only small UTF-8 regular files are used', async () => {
   assert.deepEqual(calls, ['bad', 'a', 'b', 'c']);
 });
 
+test('full files: lines are numbered, and an unchanged header of a .C is context', async () => {
+  assert.equal(numberLines('a\nb\n'), '1|a\n2|b');
+  assert.equal(numberLines('a\n\nb'), '1|a\n2|\n3|b');
+  assert.equal(numberLines(''), '1|');
+  const f = fixture();
+  const patch = '@@ -1 +1 @@\n-a\n+b';
+  const files = [{filename: 'src/a.C', status: 'modified', patch},
+    {filename: 'src/b.C', status: 'removed', patch}];
+  const contents = {'src/a.C': 'int a();\n', 'src/a.H': 'class a\n{\n};\n',
+    'src/b.H': 'class b;\n'};
+  const fetched = [];
+  const getFile = async path => {
+    fetched.push(path);
+    if (!(path in contents)) throw new Error('Not Found');
+    return contentsResponse(contents[path]);
+  };
+  const result = await buildReviewPrompt(f.current, files, getFile);
+  assert.deepEqual(fetched, ['src/a.C', 'src/a.H']);
+  assert.deepEqual(result.coverage.full_files, ['src/a.C', 'src/a.H']);
+  assert.equal(untrusted(result.data).full_files[1].content, '1|class a\n2|{\n3|};');
+  // A header not matching a reviewed .C is never added, even if supplied.
+  const extra = buildPrompt(f.current, files, undefined,
+    [{path: 'src/b.H', content: '1|class b;'}, {path: 'src/x.H', content: '1|x'}]);
+  assert.deepEqual(extra.coverage.full_files, []);
+});
+
 test('full files: patches keep priority and full files only fill the remaining budget', async () => {
   const f = fixture();
   const big = {filename: 'src/big.C', status: 'modified', patch: '+'.repeat(promptBudget - 60000)};
@@ -871,7 +900,7 @@ test('full files: patches keep priority and full files only fill the remaining b
   const data = untrusted(result.data);
   assert.deepEqual(data.files.map(x => x.filename), ['src/big.C', 'src/small.C']);
   assert.deepEqual(data.full_files, [{path: 'src/small.C', ref: f.current.head.sha,
-    content: contents['src/small.C']}]);
+    content: `1|${contents['src/small.C']}`}]);
   // With the budget used by patches, the prompt is the patch-only prompt.
   const full = {filename: 'src/full.C', status: 'modified', patch: '+'.repeat(promptBudget - 25000)};
   const patchOnly = buildPrompt(f.current, [full]);
@@ -896,7 +925,7 @@ test('prepare fetches full files at the head SHA as data and reports them in cov
   const coverage = JSON.parse(f.outputs.coverage);
   assert.deepEqual(coverage.full_files, ['src/solids4FoamModels/numerics/a.C']);
   await publish(f, env({REVIEW_COVERAGE: f.outputs.coverage}));
-  assert.match(f.comments[0].body, /full post-change text of 1 changed file as context/);
+  assert.match(f.comments[0].body, /full post-change text of 1 file as context/);
   assert.match(f.comments[0].body, /Seen in full:\n- src\/solids4FoamModels\/numerics\/a\\\.C/);
 });
 
@@ -905,7 +934,7 @@ test('coverage wording: hunks only without full files; malformed full-file lists
   assert.match(formatCoverage({status: 'complete', omitted: [], full_files: []}), /supplied hunks only/);
   const text = formatCoverage({status: 'partial', omitted: [{path: 'x.png', reason: 'no_patch'}],
     full_files: ['a.C', 'b.C', 'c.C']}, Infinity, 2);
-  assert.match(text, /of 3 changed files as context/);
+  assert.match(text, /of 3 files as context/);
   assert.match(text, /- and 1 more files\n\nNot reviewed:/);
   const f = fixture();
   await publish(f, env({REVIEW_COVERAGE: JSON.stringify({status: 'complete', omitted: [],
