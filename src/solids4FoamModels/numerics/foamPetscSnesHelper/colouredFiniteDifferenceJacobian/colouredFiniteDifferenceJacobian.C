@@ -40,7 +40,8 @@ PetscErrorCode Foam::colouredFiniteDifferenceJacobian::residual
         return PETSC_ERR_LIB;
     }
 
-    return PETSC_SUCCESS;
+    // Zero is success in all PETSc versions (PETSC_SUCCESS needs >= 3.19)
+    return 0;
 }
 
 
@@ -71,7 +72,24 @@ void Foam::colouredFiniteDifferenceJacobian::setUp(Mat compact)
     AssertPETSc(MatColoringDestroy(&mc));
 
     AssertPETSc(MatFDColoringCreate(J_, isColouring, &fdc_));
+#if PETSC_VERSION_GE(3, 24, 0)
     AssertPETSc(MatFDColoringSetFunction(fdc_, residual, &system_));
+#else
+    // Before PETSc 3.24 the function argument is declared without arguments;
+    // the cast through void (*)(void) avoids -Wcast-function-type warnings
+    AssertPETSc
+    (
+        MatFDColoringSetFunction
+        (
+            fdc_,
+            reinterpret_cast<PetscErrorCode (*)(void)>
+            (
+                reinterpret_cast<void (*)(void)>(residual)
+            ),
+            &system_
+        )
+    );
+#endif
     AssertPETSc
     (
         PetscObjectSetOptionsPrefix(PetscObject(fdc_), "solid_fd_")

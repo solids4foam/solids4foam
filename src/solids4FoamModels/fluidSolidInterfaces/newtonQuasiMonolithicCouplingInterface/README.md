@@ -286,13 +286,14 @@ its first trough, however, the Krylov iterations per Newton iteration rise from
 about 27 to 42. With `solidJacobianRebuild adaptive` (default), the block is
 also rebuilt when the Krylov iterations per Newton iteration of a time step
 exceed `solidJacobianRebuildKrylovRatio` (default 1.5) times those of the first
-step after the last build; `always` rebuilds it at
-every Jacobian evaluation. Only the preconditioner changes, so the converged
-solution does not. Use it for thin, bending structures; on compact solids it does not reduce the
-Krylov iterations and can cost more (`blobInTreacle`, 4 ranks: +2 %; `3dTube` with
-BoomerAMG on the solid block: about +30 %), for which `automatic` is intended. `solidJacobianCheck yes`
-prints the relative difference between J v and a forward difference of the
-residual along a random direction after each build (about 1e-8 expected).
+step after the last build; `always` rebuilds it at every Jacobian evaluation.
+Only the preconditioner changes, so the converged solution does not. Use it for
+thin, bending structures; on compact solids it does not reduce the Krylov
+iterations and can cost more (`blobInTreacle`, 4 ranks: +2 %; `3dTube` with
+BoomerAMG on the solid block: about +30 %), for which `automatic` is intended.
+`solidJacobianCheck yes` prints the relative difference between J v and a
+forward difference of the residual along a random direction after each build
+(about 1e-8 expected).
 Serial and parallel; tested with OpenFOAM v2512 and PETSc 3.24.
 
 On compact solids the denser two-layer block can make the solid
@@ -307,6 +308,24 @@ kept, but only if it is faster by more than `solidJacobianSwitchMargin`
 does not change. A change of block rebuilds the solver state, so the
 preconditioner is rebuilt at the next Newton iteration; the residual and the
 convergence tests are not affected.
+
+Limitations of the finite-difference block:
+
+- The pattern is the squared cell-adjacency graph in full 2x2 or 3x3
+  component blocks. Residuals that reach further (cells where
+  `leastSquaresS4f` falls back to the point-cell stencil,
+  `tractionPatchSurfaceGradient`, high-order discretisations) fail the
+  directional check and stop the run.
+- Boundary conditions that keep their own relaxed state (e.g. `solidTraction`
+  relaxing against its previous gradient) may keep values from the last
+  perturbed evaluation; the directional checks on the tested cases (2e-8 to
+  9e-8) show no effect.
+- Memory: in 3-D a hexahedral cell has 25 cells in its two-layer stencil,
+  i.e. 225 entries per row instead of 63, held in the cached Jacobian, the
+  solid block and its preconditioner.
+- The selection of `automatic`, its trial schedule and the `adaptive`
+  reference are not written for restart: a restarted run starts again with
+  the compact block and repeats the trials.
 
 ## Residual Scaling
 
@@ -337,6 +356,10 @@ of 4e-6. Do not combine it with `fluidSystemScaleFactor` or
 (`ksp_pc_side right`, `ksp_norm_type unpreconditioned`) appears faster with
 the default factors only because its Krylov test then ignores the solid rows;
 with `forceBalanced` it is slower than left preconditioning.
+
+The density factor of `forceBalanced` also multiplies the continuity rows,
+which then have units of mass per unit time rather than force. The choice of
+default factors is discussed in #717.
 
 ## Time-step Adjustment
 

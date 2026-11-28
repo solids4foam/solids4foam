@@ -2465,7 +2465,10 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
     ),
     solidJacobianSwitchMargin_
     (
-        fsiProperties().lookupOrDefault<scalar>("solidJacobianSwitchMargin", 0.1)
+        fsiProperties().lookupOrDefault<scalar>
+        (
+            "solidJacobianSwitchMargin", 0.1
+        )
     ),
     solidJacobianStep_(0),
     solidJacobianInterval_(solidJacobianTrialInterval_),
@@ -3763,7 +3766,11 @@ void newtonQuasiMonolithicCouplingInterface::selectSolidJacobian()
     // finite-difference block at the next step; otherwise keep the current
     // selection. The first step uses the compact block (start-up)
     bool useFd = solidJacobianSelection_;
-    if (solidJacobianStep_ == 1 || solidJacobianStep_ == solidJacobianNextTrial_)
+    if
+    (
+        solidJacobianStep_ == 1
+     || solidJacobianStep_ == solidJacobianNextTrial_
+    )
     {
         useFd = false;
     }
@@ -3892,7 +3899,10 @@ void newtonQuasiMonolithicCouplingInterface::checkSolidJacobianQuality()
     {
         solidFdKrylovRef_ = krylovPerNewton;
     }
-    else if (krylovPerNewton > solidJacobianRebuildKrylovRatio_*solidFdKrylovRef_)
+    else if
+    (
+        krylovPerNewton > solidJacobianRebuildKrylovRatio_*solidFdKrylovRef_
+    )
     {
         solidFdRebuildRequest_ = true;
 
