@@ -167,6 +167,7 @@ REGRESSION_TESTS=(
     "fluids/decayingTaylorGreenVortex"
     "fluids/cylinderInChannel"
     "fluids/poiseuilleChannel"
+    "fluids/stagnationPointFlow"
     "fluids/immersedBoundary/staticCylinderInChannel"
     "fluids/immersedBoundary/oscillatingCylinderInChannel"
     "fluids/immersedBoundary/translatingCylinderInChannel"

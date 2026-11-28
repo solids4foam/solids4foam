@@ -1,0 +1,69 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    location    "0";
+    object      U;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 1 -1 0 0 0 0];
+
+internalField   uniform (0 0 0);
+
+boundaryField
+{
+    // Exact inflow, u = a x and v = -a y
+    top
+    {
+        type            uniformFixedValue;
+        uniformValue
+        {
+            type            expression;
+            variables
+            (
+                "a = 1 + 0.5*sin(2*pi()*arg())"
+            );
+            expression      #{ vector(a*pos().x(), -a*pos().y(), 0) #};
+        }
+        value           $internalField;
+    }
+
+    // Exact normal gradient, dU/dx = (a 0 0): a fixedGradient condition,
+    // which fluxConsistentPatches supports
+    outlet
+    {
+        type            uniformFixedGradient;
+        uniformGradient
+        {
+            type        sine;
+            amplitude   0.5;
+            frequency   1;
+            scale       (1 0 0);
+            level       (1 0 0);
+        }
+        value           $internalField;
+    }
+
+    "left|bottom"
+    {
+        type            symmetry;
+    }
+
+    frontAndBack
+    {
+        type            empty;
+    }
+}
+
+// ************************************************************************* //

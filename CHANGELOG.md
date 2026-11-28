@@ -422,6 +422,18 @@ release. For complete commit-level details and contributor information, see the
 
 ### Changed
 
+- `pimpleFluid` (OpenFOAM.com) `fluxConsistentPatches` also accepts
+  fixed-pressure patches with a `fixedGradient` velocity condition, or one
+  derived from it, such as `uniformFixedGradient`. There the boundary flux
+  was that of the boundary-cell velocity, an O(h) flux error that the
+  pressure equation turned into an O(h²/Δt) pressure error in the boundary
+  cells (first order with Δt ∝ h, and growing as Δt falls). The added
+  increment is taken from the current gradient, so it also holds without a
+  momentum predictor. Other velocity conditions that do not fix the value,
+  e.g. `inletOutlet`, are rejected. In the manufactured-solution FSI case,
+  the outlet layer goes and the fluid velocity and pressure converge at
+  second order (#750). A new tutorial, `fluids/stagnationPointFlow`, checks
+  it against an exact unsteady solution. Patches not listed are unchanged.
 - `womersleyTube` verification (`verification/Allverify --reuse`): a stored
   run is now reused only if, in addition to the case and tutorial files, the
   time schedule, the case inputs as the driver writes them and the content of

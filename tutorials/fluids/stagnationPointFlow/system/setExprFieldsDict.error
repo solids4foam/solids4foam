@@ -1,0 +1,59 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      setExprFieldsDict.error;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Error fields: the computed minus the exact solution
+//
+// Exact solution: u = a x, v = -a y and
+// p = -(a^2 + da/dt) x^2/2 - (a^2 - da/dt) y^2/2, with a = 1 + sin(2 pi t)/2
+
+_exact
+{
+    variables
+    (
+        "a = 1 + 0.5*sin(2*pi()*time())"
+        "dadt = pi()*cos(2*pi()*time())"
+        "Uexact = vector(a*pos().x(), -a*pos().y(), 0)"
+        "pExact = -0.5*(a*a + dadt)*sqr(pos().x()) - 0.5*(a*a - dadt)*sqr(pos().y())"
+    );
+}
+
+readFields      ( U p );
+
+expressions
+(
+    UError
+    {
+        field       UError;
+        create      yes;
+        $_exact;
+        expression  #{ mag(U - Uexact) #};
+        dimensions  [0 1 -1 0 0 0 0];
+    }
+
+    pError
+    {
+        field       pError;
+        create      yes;
+        $_exact;
+        expression  #{ p - pExact #};
+        dimensions  [0 2 -2 0 0 0 0];
+    }
+);
+
+// ************************************************************************* //
