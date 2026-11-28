@@ -120,7 +120,7 @@ womersleyPatchDisplacement
         FatalErrorInFunction << "No patch " << dict.dictName()
             << exit(FatalError);
     }
-    const vectorField& Cf = mesh.boundaryMesh()[patchI].faceCentres();
+    const vectorField Cf(mesh.boundaryMesh()[patchI].faceCentres());
     vectorField value(Cf.size());
     forAll(Cf, faceI)
     {
