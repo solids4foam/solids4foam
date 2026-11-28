@@ -13,7 +13,7 @@ source "${SCRIPT_DIR}/../../../../applications/scripts/solids4FoamScripts.sh"
 #
 # The full case is three cardiac cycles (30,000 steps), so the test runs the
 # first 0.01 s (100 steps, the wall moving from about t = 0.003 s) on the
-# coarsest mesh of the study (M1, 39,433 cells) on 4 ranks, for
+# coarsest mesh of the study (M1, 39,433 cells) on 2 ranks, for
 # 1. the implicit coupling of order 2 (the tutorial's set-up), and
 # 2. the explicit coupling of order 2,
 # and checks for each:
@@ -28,7 +28,7 @@ source "${SCRIPT_DIR}/../../../../applications/scripts/solids4FoamScripts.sh"
 # ------------------------------------------------------------
 
 END_TIME=0.01
-NPROCS=4
+NPROCS=2
 
 # Mesh M1 (system/meshDict)
 MAX_CELL_SIZE=1.96e-3
@@ -39,13 +39,14 @@ FIRST_LAYER=2.94e-4
 # reaches 3e-5 mL over three cycles
 VOLUME_TOL=1e-5
 
-# Patch pressures at t = END_TIME (Pa) and their tolerance. The scatter with
-# another platform is about 1e-3 Pa (OpenFOAM-v2412 on macOS/clang against
-# Linux/GCC, 32 ranks); the two couplings differ by about 0.1 Pa
-REF_I2_PMV=4977.79361832
-REF_I2_PAV=5012.03396212
-REF_E2_PMV=4977.88299068
-REF_E2_PAV=5012.16045415
+# Patch pressures at t = END_TIME (Pa) and their tolerance. On 4 ranks they
+# agree to 1e-6 Pa; the scatter with another platform is about 1e-3 Pa
+# (OpenFOAM-v2412 on macOS/clang against Linux/GCC, 32 ranks); the two
+# couplings differ by about 0.1 Pa
+REF_I2_PMV=4977.79361745
+REF_I2_PAV=5012.03396222
+REF_E2_PMV=4977.88299085
+REF_E2_PAV=5012.16045432
 PRESSURE_TOL=0.02
 
 # Log files
@@ -54,6 +55,18 @@ ALLRUN_LOGFILE="log.Allrun"
 # Data files
 COUPLING_FILE="postProcessing/circulationCoupling/0/coupling.dat"
 VOLUME_FILE="volumeConservation.dat"
+
+# As its Allrun, the case needs OpenFOAM.com with cfMesh; skip before the case
+# set-up, which uses foamDictionary
+solids4Foam::caseDoesNotRunWithFoamExtend
+solids4Foam::caseDoesNotRunWithOpenFOAMOrg
+if ! command -v cartesianMesh &> /dev/null
+then
+    echo
+    echo "cartesianMesh command not found, which is required for this case"
+    echo
+    exit 0
+fi
 
 echo "============================================================"
 echo "leftVentricle regression test (M1, t <= ${END_TIME} s, ${NPROCS} ranks)"
