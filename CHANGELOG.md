@@ -824,6 +824,11 @@ release. For complete commit-level details and contributor information, see the
 
 ### Fixed
 
+- `womersleyTube`: the initial solid displacement on the `interface` and
+  `outer` patches read the face centres through a dangling reference to a
+  temporary, which intermittently gave NaN or wrong values and stopped the
+  run at start-up with a floating-point exception (seen with Clang on
+  macOS) (#765).
 - `womersleyTube`: `Allrun` now exits with the failing step's status when
   meshing, decomposition, the solver or reconstruction fails. It returned 0
   before, because the final optional plotting step set the status.
