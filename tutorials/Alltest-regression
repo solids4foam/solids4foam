@@ -192,6 +192,7 @@ REGRESSION_TESTS=(
     "fluidSolidInteraction/membraneRoof"
     "fluidSolidInteraction/ringAddedMass"
     "fluidSolidInteraction/womersleyTube"
+    "fluidSolidInteraction/radialTorsionalRing"
     "fluids/circulationModels/pipeWindkessel"
     "fluids/circulationModels/healthyHuman"
     # Not tutorials: test applications' cases, run the same way
