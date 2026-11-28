@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Opt-in numerical verification driver for hessenthalerFsi.
+set -euo pipefail
+
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "ERROR: python3 is required for the hessenthalerFsi verification." >&2
+    exit 2
+fi
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec python3 -u "${SCRIPT_DIR}/scripts/hessenthaler_fsi_verification.py" "$@"
