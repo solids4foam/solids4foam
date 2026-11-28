@@ -1,0 +1,116 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      circulationProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// The left ventricle (the CFD domain, coupledDomain LV) in the closed-loop
+// circulation of Healy (2024), after Korakianitis and Shi (2006):
+//
+//   LV -> SAS -> SAT -> SAR -> SCP -> SVN -> RA -> TV -> RV -> PV
+//      -> PAS -> PAT -> PAR -> PCP -> PVN -> LA -> LV
+//
+// The mitral and aortic valves sit between the CFD patches and the lumped
+// nodes (LA and the aortic sinus SAS), as the inverse valve law of each
+// port: the CFD gives the flow through the patch and the circuit returns the
+// pressure on the ventricular side of the valve. Every value is the SI value
+// of the original mmHg/mL parameter (1 mmHg = 133.322 Pa).
+
+units       SI;
+Tcycle      1.0;
+
+components
+{
+    // ---- The CFD ventricle: mitral (INLET) and aortic (OUTLET) planes -------
+    LV
+    {
+        type        coupledDomain;
+        provider    external;
+        // Q >= 0: dP = (Q/CQ)^2. Q < 0 (a leaking shut valve): a reverse
+        // orifice reverseFraction*CQ, its adverse pressure bounded by
+        // reverseDPmax (150 mmHg)
+        inlet
+        {
+            patch   INLET;
+            valve { CQ 3.46425e-05; reverseFraction 0.005; reverseDPmax 2.0e4; }
+        }
+        outlet
+        {
+            patch   OUTLET;
+            valve { CQ 3.03122e-05; reverseFraction 0.005; reverseDPmax 2.0e4; }
+        }
+    }
+
+    // ---- Systemic circulation -----------------------------------------------
+    SAS { type CRL; C 6.00050e-10; R 3.99966e+05; L 8.26596e+03; initialPressure 1.33322e+04; }
+    SAT { type CRL; C 1.20010e-08; R 6.66610e+06; L 2.26647e+05; initialPressure 1.33322e+04; }
+    SAR { type resistor; R 6.66610e+07; }
+    SCP { type resistor; R 6.93274e+07; }
+    SVN { type CR; C 1.53763e-07; R 9.99915e+06; initialPressure 6.66610e+02; }
+
+    // ---- Right heart: P = (V - V0) E(t) + P0, half-cosine activation --------
+    RA
+    {
+        type elastanceChamber;
+        V0 4.0e-06; P0 133.322; Emin 1.99983e+07; Emax 3.33305e+07;
+        Tes 0.045; Ted 0.09; Eshift 0.92;       // atrial contraction 0.92-1.01 s
+        initialVolume 4.0e-06;
+    }
+    TV  { type orificeValve; CQ 3.46425e-05; epsilon 1; }   // smooth switch, 1 Pa
+    RV
+    {
+        type elastanceChamber;
+        V0 1.0e-05; P0 133.322; Emin 1.33322e+07; Emax 1.53320e+08;
+        Tes 0.30; Ted 0.45; Eshift 0;
+        initialVolume 1.4e-04;
+    }
+    PV  { type orificeValve; CQ 3.03122e-05; epsilon 1; }
+
+    // ---- Pulmonary circulation ----------------------------------------------
+    PAS { type CRL; C 1.35011e-09; R 2.66644e+05; L 6.93274e+03; initialPressure 1.99983e+03; }
+    PAT { type CRL; C 2.85023e-08; R 1.33322e+06; L 2.26647e+05; initialPressure 1.99983e+03; }
+    PAR { type resistor; R 6.66610e+06; }
+    PCP { type resistor; R 3.33305e+07; }
+    PVN { type CR; C 1.53763e-07; R 7.99932e+05; initialPressure 1.06658e+03; }
+
+    // ---- Left atrium ----------------------------------------------------------
+    LA
+    {
+        type elastanceChamber;
+        V0 4.0e-06; P0 133.322; Emin 1.99983e+07; Emax 3.33305e+07;
+        Tes 0.045; Ted 0.09; Eshift 0.92;
+        initialVolume 4.0e-06;
+    }
+}
+
+connections
+(
+    (LV SAS SAT SAR SCP SVN RA TV RV PV PAS PAT PAR PCP PVN LA LV)
+);
+
+// The compliance states are volumes: absTol is in m3 and m3/s
+solver { type RKDP45; absTol 1e-20; relTol 1e-12; maxSteps 100000000; }
+
+// How the CFD and the circuit exchange flow and pressure. With another order,
+// set the BDF scheme of system/fvSchemes to the same order.
+coupling
+{
+    scheme      implicit;       // explicit | implicit
+    order       2;              // 1 .. 4
+    rho         1060;           // kg/m3: the CFD solves p/rho
+}
+
+// ************************************************************************* //

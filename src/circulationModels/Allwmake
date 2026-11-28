@@ -9,5 +9,6 @@ fi
 
 wmake $targetType libso circulation0D
 wmake $targetType libso circulationCoupling
+wmake $targetType libso circulationMeshMotion
 
 #------------------------------------------------------------------------------

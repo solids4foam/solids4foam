@@ -24,6 +24,7 @@ License
 #include "surfaceFields.H"
 #include "fvcMeshPhi.H"
 #include "backwardDdtScheme.H"
+#include "bdfFsiCheck.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -206,6 +207,13 @@ void newMovingWallVelocityFvPatchVectorField::updateCoeffs()
 #else
         mesh.schemesDict().ddtScheme("ddt(" + U.name() +')')
 #endif
+    );
+
+    bdfFsiCheck
+    (
+        ddtScheme,
+        "ddt(" + U.name() + ')',
+        "newMovingWallVelocityFvPatchVectorField::updateCoeffs"
     );
 
     if (ddtScheme == fv::backwardDdtScheme<vector>::typeName)

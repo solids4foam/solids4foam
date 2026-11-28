@@ -76,8 +76,12 @@ Description
     convergence study either supply the history - write the old-time fields
     (U_0, U_0_0, ...) into the start time, which OpenFOAM reads back with
     distinct time indices - or start from a solution whose low derivatives
-    vanish at t = 0. A restart finds the old-time fields the previous run
-    wrote and resumes at full order.
+    vanish at t = 0. On a static mesh a restart finds the old-time fields
+    the previous run wrote and resumes at full order, also when that run was
+    itself restarted; on a moving mesh it does not (see Moving meshes).
+    OpenFOAM (v2412, for example) does not register again the old levels
+    below the first that it reads back, which would then not be written
+    again, so the scheme registers them.
 
     Fields without stored history. A field may have fewer stored old levels
     than U, e.g. a rho derived rather than read on restart. Its copied levels
@@ -103,7 +107,10 @@ Description
     corrections, therefore keep q old levels in memory from the first step,
     q + 1 copies of the field in all. At each write time q - 1 of them are
     written as well, which is all a restart needs: BDF 3 writes U_0 and
-    U_0_0, and BDF 6 writes U_0 to U_0_0_0_0_0.
+    U_0_0, and BDF 6 writes U_0 to U_0_0_0_0_0. On a moving mesh the cell
+    volumes and the mesh flux meshPhi keep q old levels as well; the volumes
+    are not written, and the old mesh fluxes (meshPhi_0, meshPhi_0_0, ...)
+    are written at each write time where OpenFOAM registers the mesh flux.
 
     Time step. BDF 1 and BDF 2 support a variable time step, including
     adjustTimeStep yes. BDF 2 then uses the variable-step coefficients
@@ -131,13 +138,88 @@ Description
     relative tolerance of 1e-5, as uniform/time holds deltaT to writePrecision
     digits only.
 
-    Moving meshes are not supported: fvMesh keeps only V0 and V00, fewer old
-    volumes than a third- or higher-order formula needs, so construction on a
-    moving mesh is fatal.
+    Moving meshes. On a moving mesh the formula is applied to the cell
+    integral, as backward applies it with V0 and V00:
+
+    \verbatim
+        ddt(phi)^(n+1) = (1/(dt V^(n+1))) sum_{k=0..q} a_k V^(n+1-k) phi^(n+1-k)
+    \endverbatim
+
+    fvMesh keeps only two old volumes, so the scheme keeps its own: a
+    registered field of cell volumes ("bdfDdt:V") that is set to the current
+    volumes at every call and whose old-time levels are shifted with the
+    fields'. Once the mesh has moved on a step, level 1 is set from fvMesh's
+    V0, so the levels hold the volumes the previous steps ended with,
+    however many times the mesh moves within a step and whether or not it
+    moves again after the last ddt call of a step (as the FSI interfaces'
+    additionalMeshCorrection does). The order on a moving mesh is also
+    limited by the number of volume levels available. The mesh flux of
+    order q, returned by meshPhi, is the combination of the stored mesh
+    fluxes whose divergence is the same formula applied to the volumes
+    themselves,
+
+    \verbatim
+        meshPhi^(n+1) = sum_j b_j (dt^(n+1-j)/dt^(n+1)) meshPhi^(n+1-j),
+        b_j = sum_{i=0..j} a_i,  j = 0..q-1
+    \endverbatim
+
+    which satisfies the geometric conservation law exactly, as the mesh flux
+    of each step integrates to that step's change of volume, and is
+    backward's 3/2 meshPhi - 1/2 meshPhi^0 at order 2 (its variable-step
+    form too). The old levels of the mesh flux are created with the volume
+    history, on the first ddt call after the mesh has moved, so meshPhi has
+    them even if it is first called on a later step. Its order is also
+    limited by the genuine old mesh fluxes, so a copied level is never
+    weighted as an older flux. The test application Test-bdfDdtMovingMesh
+    checks the orders, the conservation law and the implicit form on a
+    prescribed mesh motion, also with the mesh moved again after the last
+    ddt call of each step and with meshPhi first called late in the run.
+
+    fvc::ddt of a constant has no history of its own, so it takes its order
+    from the volume levels alone. While a field's own history is shorter
+    than the volumes' (its first steps, if it is created after the mesh
+    starts moving), that order can be above the field's. The conservation
+    law a solver relies on holds between fvm::ddt(vf) and meshPhi(vf),
+    which share the field's order.
+
+    Topology changes. On a static mesh that changes topology (e.g.
+    dynamicRefineFvMesh, which does not move the points) the scheme uses no
+    volume history and, like backward, works on the old levels of the
+    fields as OpenFOAM maps them. On a moving mesh that also changes
+    topology, bdfDdt:V and its old levels are mapped like any registered
+    field, so the volumes of split or merged cells are not their true old
+    volumes, and the order and the conservation law are not guaranteed on
+    the steps after a change (backward has the same issue with fvMesh's
+    V0 and V00, which are mapped by cell label). This combination has not
+    been tested.
 
     The flux corrections used by the pressure-velocity coupling (ddtCorr) are
     the same q-th order combination applied to the old fluxes and the old
-    interpolated velocities, the direct generalisation of backward's.
+    interpolated velocities, the direct generalisation of backward's. On a
+    moving mesh the Uf form projects the old face velocities on the current
+    face areas and uses the default ddtCouplingCoeff, as backward does.
+    Whether this term limits the order of the pressure on a moving mesh has
+    not been checked in a flow.
+
+    Restart on a moving mesh. The volume history is not written, and fvMesh
+    writes the mesh flux but, in OpenFOAM-v2412 for example, not its old
+    levels, so after a restart the order on a moving mesh ramps up from
+    Euler again over the first steps, as on a fresh start, although the old
+    levels of the fields and of the fluxes (U_0, Uf_0, ...) are read back
+    and used as the order ramps up.
+
+    FSI. Parts of the fluid models and FSI boundary conditions choose their
+    form by the name of the ddt scheme, "Euler" or "backward": the Robin
+    interface updates of pimpleFluid, fluidModel and interFluid,
+    elasticWallVelocity, elasticSlipWallVelocity, newMovingWallVelocity and
+    the Robin coefficient of elasticWallPressure. With BDF they would take
+    their Euler form or skip the update, so they stop with a fatal error
+    instead (bdfFsiCheck.H) and BDF cannot yet be used for the fluid of an
+    FSI case. They can take the weights of the scheme from fieldWeights,
+    which would make BDF usable there. Fluid-only cases, on static or moving
+    meshes, do not reach them unless they use newMovingWallVelocity;
+    OpenFOAM's movingWallVelocity, whose normal wall velocity comes from
+    meshPhi, can be used with BDF.
 
 Author
     David Kelly, UCD.
@@ -153,6 +235,7 @@ SourceFiles
 
 #include "ddtScheme.H"
 #include "scalarList.H"
+#include "volFields.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -200,10 +283,32 @@ class bdfDdtScheme
         template<class GeoField>
         void touch(const GeoField& vf) const;
 
+        //- Number of consecutive old levels of vf holding distinct time
+        //  indices, up to order_
+        template<class GeoField>
+        label levels(const GeoField& vf) const;
+
         //- Order usable on this step for vf: one more than the number of
-        //  consecutive old levels holding distinct time indices
+        //  consecutive old levels holding distinct time indices and, on a
+        //  moving mesh, than the volume levels available
         template<class GeoField>
         label order(const GeoField& vf) const;
+
+        //- The registered field of cell volumes, set to the current volumes,
+        //  with its old levels: V^(n+1-k) is level(cellVolumes(), k). Level
+        //  1 is set from fvMesh's V0 once the mesh has moved on this step,
+        //  and the old levels of the mesh flux are created then as well.
+        const volScalarField& cellVolumes() const;
+
+        //- Whether the mesh has moved on this time step, i.e. the mesh flux
+        //  has been set on it. Checked without the side effects of
+        //  fvMesh::phi().
+        bool meshMoved() const;
+
+        //- Number of genuine old levels of the mesh flux, up to order_. On
+        //  the step the mesh flux is created on, its level 1 is a copy of
+        //  the current flux, not the previous step's, so there are none.
+        label meshFluxLevels() const;
 
         //- Order usable on this step for a formula involving two fields:
         //  the lower of their orders
@@ -230,16 +335,25 @@ class bdfDdtScheme
         //  has changed.
         scalarList weights(const label q) const;
 
-        //- The old-time part of the formula, sum_{k=1..q} (-a_k) vf^(n+1-k)
+        //- The old-time part of the formula, sum_{k=1..q} (-a_k) vf^(n+1-k).
+        //  With weighted (a moving mesh, vf a volume field) each level of
+        //  the internal field is multiplied by V^(n+1-k)/V^(n+1); the
+        //  boundary values are never weighted, as for backward.
         template<class GeoField>
-        tmp<GeoField> history(const GeoField& vf, const scalarList& a) const;
+        tmp<GeoField> history
+        (
+            const GeoField& vf,
+            const scalarList& a,
+            const bool weighted = false
+        ) const;
 
         //- As history(vf), for the product rho*vf
         tmp<GeometricField<Type, fvPatchField, volMesh>> history
         (
             const volScalarField& rho,
             const GeometricField<Type, fvPatchField, volMesh>& vf,
-            const scalarList& a
+            const scalarList& a,
+            const bool weighted = false
         ) const;
 
         //- As history(vf), for the product alpha*rho*vf
@@ -248,7 +362,8 @@ class bdfDdtScheme
             const volScalarField& alpha,
             const volScalarField& rho,
             const GeometricField<Type, fvPatchField, volMesh>& vf,
-            const scalarList& a
+            const scalarList& a,
+            const bool weighted = false
         ) const;
 
         //- As history(flux), for the old fluxes phi or Uf of the flux
@@ -262,9 +377,6 @@ class bdfDdtScheme
             const scalarList& a,
             const Reconstruct& reconstruct
         ) const;
-
-        //- Fail on a moving mesh
-        void checkStaticMesh() const;
 
         //- IOobject for a returned ddt field
         IOobject ddtIOobject(const word& name) const;
@@ -301,6 +413,20 @@ public:
         {
             return fv::ddtScheme<Type>::mesh();
         }
+
+        //- The difference weights a_0..a_q that fvm::ddt(vf) and
+        //  fvc::ddt(vf) apply on this step, for code that must use the same
+        //  weights as the scheme, e.g. a time history of a flux correction.
+        //  The order q is that of the step: it ramps up during start-up and
+        //  is limited by the old levels of vf and, on a moving mesh, by the
+        //  volume levels. On a moving mesh level k of the internal field is
+        //  also weighted by V^(n+1-k)/V^(n+1), which is not included. Like
+        //  the ddt terms, it creates the old levels of vf up to the order
+        //  of the scheme.
+        scalarList fieldWeights
+        (
+            const GeometricField<Type, fvPatchField, volMesh>& vf
+        ) const;
 
         tmp<GeometricField<Type, fvPatchField, volMesh>> fvcDdt
         (

@@ -194,10 +194,12 @@ REGRESSION_TESTS=(
     "fluidSolidInteraction/womersleyTube"
     "fluids/circulationModels/pipeWindkessel"
     "fluids/circulationModels/healthyHuman"
+    "fluids/circulationModels/leftVentricle"
     # Not tutorials: test applications' cases, run the same way
     "../applications/test/mechanicalConstitutiveLawChecks/case"
     "../applications/test/immersedSurfaceTraction/case"
     "../applications/test/circulationNetworkChecks/case"
+    "../applications/test/bdfDdtMovingMesh/case"
 )
 
 failures=0

@@ -29,6 +29,7 @@ Description
 #include "fluidSolidInterface.H"
 #include "compatibilityFunctions.H"
 #include "backwardDdtScheme.H"
+#include "bdfFsiCheck.H"
 #include "emptyPolyPatch.H"
 #include "wedgePolyPatch.H"
 #include "processorPolyPatch.H"
@@ -236,6 +237,13 @@ scalar elasticWallPressureFvPatchScalarField::effectiveDeltaT() const
 #else
         mesh.schemesDict().ddtScheme("ddt(U)");
 #endif
+
+    bdfFsiCheck
+    (
+        ddtScheme,
+        "ddt(U)",
+        "elasticWallPressureFvPatchScalarField::effectiveDeltaT"
+    );
 
     if
     (

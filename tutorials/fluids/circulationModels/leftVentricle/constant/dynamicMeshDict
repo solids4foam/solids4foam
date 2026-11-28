@@ -1,0 +1,49 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      dynamicMeshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// The wall moves so that the ventricle volume follows the integral of the
+// prescribed wall flux in constant/timeVsFlow (m3/s against s, five cycles);
+// the valve planes are fixed
+dynamicFvMesh       dynamicMotionSolverFvMesh;
+
+motionSolverLibs    ("libfvMotionSolvers.so" "libcirculationMeshMotion.so");
+
+motionSolver        movingVentricle;
+
+movingVentricleCoeffs
+{
+    patchName       WALL;
+
+    // Tolerance on the volume, as a fraction of the target volume
+    relTol          1e-12;
+
+    // Wall flux as a cubic spline of the samples (a C3 volume), not
+    // piecewise constant: needed for any coupling order above one
+    smoothFlow      true;
+
+    timeVsFlowSeries
+    {
+        file        "$FOAM_CASE/constant/timeVsFlow";
+        outOfBounds clamp;
+    }
+
+    diffusivity     quadratic inverseDistance (WALL);
+}
+
+// ************************************************************************* //

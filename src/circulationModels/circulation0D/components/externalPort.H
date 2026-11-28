@@ -36,8 +36,8 @@ Description
         outlet  Ppatch = Pnode + dP(Q)
         inlet   Ppatch = Pnode - dP(Q)
 
-    with dP = orificeValve::dPfromQ, the same bounded bidirectional law the
-    left-ventricle coupling uses.
+    with dP = orificeValve::dPfromQ. The optional reverseDPmax (a pressure)
+    bounds the adverse pressure a shut, leaking valve is asked to hold.
 
     Where Q comes from is the provider:
 
@@ -50,7 +50,8 @@ Description
         direction inlet;                   // or outlet
         patch     outlet;                  // the CFD patch it is coupled to
         provider  external;                // or table
-        valve { CQ 400; reverseFraction 0.005; }    // optional
+        valve { CQ 400; reverseFraction 0.005; }    // optional; add
+                                           // reverseDPmax 150; to bound it
         waveform { type table; file "..."; column 1; }  // provider table
 
     Ports are normally created by a coupledDomain, not written by hand.
@@ -109,6 +110,9 @@ private:
 
         //- Regurgitant orifice fraction CQ_r/CQ of the valve
         scalar reverseFraction_;
+
+        //- Bound of the reverse pressure drop of the valve [Pa]; 0 = none
+        scalar reverseDPmax_;
 
         //- Flow waveform, for provider table
         autoPtr<circulationWaveform> table_;

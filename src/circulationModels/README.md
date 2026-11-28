@@ -14,7 +14,12 @@ with solids4foam. 1D vessel models are planned and will live here too.
   [circulation0D/README.md](circulation0D/README.md)
 - `circulationCoupling` (library `libcirculationCoupling`): Coupling of a
   circulation network to a CFD domain: the `circulationPressure` boundary
-  condition and the coupler (explicit/implicit, orders 1 to 4)
+  condition and the coupler (explicit/implicit, orders 1 to 4), and the
+  `pressureInletOutletDdtCorrVelocity` velocity condition for coupled valve
+  planes
+- `circulationMeshMotion` (library `libcirculationMeshMotion`): The
+  `movingVentricle` mesh motion solver, which moves a ventricle wall so that
+  the cavity volume follows a prescribed flow curve
 - `tools` (no library): `circulationPlot` (plots result columns, needs
   gnuplot)
 
@@ -90,7 +95,8 @@ The CFD coupling tutorials in `tutorials/fluids/circulationModels`
 (`pipeWindkessel` and `pipeClosedLoop`, solved by `solids4Foam` with the
 `pimpleFluid` fluid model or, with `./Allrun pimpleFoam`, by stock `pimpleFoam`)
 use the simplest case of this, an `externalPort` attached to a circuit, bound
-to a patch by name.
+to a patch by name. `leftVentricle` couples a moving-wall CFD ventricle as the
+`coupledDomain` above.
 
 ### What crosses the interface
 
@@ -109,6 +115,11 @@ dP(Q) =  (Q/CQ)^2          Q >= 0
       = -(|Q|/(fr CQ))^2   Q <  0
 fr = reverseFraction, clamped to [1e-3, 1]
 ```
+
+With `reverseDPmax` (a pressure, optional) in the `valve` dictionary, the
+reverse branch is bounded, `dP = -x dPmax/(x + dPmax)` with
+`x = (|Q|/(fr CQ))^2`, the largest adverse pressure a shut valve is asked to
+hold.
 
 C++ interface of `circulationNetwork` (all SI):
 
