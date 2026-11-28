@@ -22,7 +22,9 @@ FoamFile
 // powers of two; each requested size is set just above the intended level so
 // that rounding does not select the next finer level.
 
-surfaceFile     "constant/triSurface/fluidDomain.stl.gz";
+// Surface with feature edges, written by Allrun from fluidDomain.stl.gz,
+// so that the edges and corners of the flap are captured
+surfaceFile     "constant/triSurface/fluidDomain.fms";
 
 // Bulk cell size, used in the outlet extension away from the wall
 maxCellSize     0.004;

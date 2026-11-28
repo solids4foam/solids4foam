@@ -99,10 +99,15 @@ motion solver and a quadratic inverse-distance diffusivity.
 
 `Allrun` builds the meshes:
 
-1. `cartesianMesh` builds the fluid mesh from `system/meshDict.coarse` or
-   `system/meshDict.medium` and the surface
-   `constant/triSurface/fluidDomain.stl.gz`.
-2. `blockMesh` builds the solid mesh (`system/solid/blockMeshDict`).
+1. `surfaceFeatureEdges -angle 45` writes `constant/triSurface/fluidDomain.fms`,
+   the surface `constant/triSurface/fluidDomain.stl.gz` with its feature edges.
+2. `cartesianMesh` builds the fluid mesh from `system/meshDict.coarse` or
+   `system/meshDict.medium` and that surface. Without the feature edges it
+   chamfers the edges of the 2 mm thick flap and shrinks its faces by 1–3 %
+   in area, and the interpolated fluid traction then gives the solid a net
+   load that differs from the fluid force by 5–150 % (#665); with them the
+   flap surface is reproduced to 0.01 % in area.
+3. `blockMesh` builds the solid mesh (`system/solid/blockMeshDict`).
 
 The fluid surface is the published surface split into the patches
 `upperInlet`, `lowerInlet`, `outlet`, `wall` and `interface` (the five faces
@@ -237,6 +242,11 @@ several runs at once, so they are only roughly comparable):
   deflection.
 
 ## Phase I results
+
+The results in this section were computed on the earlier fluid meshes, built
+without feature edges, on which the transferred load had a spurious net
+component (#665; see [Meshes](#meshes)). They will be updated when the
+Phase I runs are repeated on the feature-edge meshes.
 
 The buoyancy and the inflow are ramped in together over 0.5 s from the
 straight flap, as in [3]. The flap rises to about 18.5 mm at about 1 s and
