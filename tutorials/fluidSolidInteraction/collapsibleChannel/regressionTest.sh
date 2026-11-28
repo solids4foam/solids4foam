@@ -155,6 +155,83 @@ END {
     exit failed ? 1 : 0
 }' "${CASE_DIR}/${DISP_FILE}" || failures=1
 
+# ------------------------------------------------------------
+# Quasi-monolithic coupling with the coloured finite-difference solid block
+# ------------------------------------------------------------
+# A short run (t = 0.15 s, 24 steps of 0.00625 s) of the quasi-monolithic
+# coupling with "solidJacobian colouredFiniteDifference": the wall-midpoint
+# displacement must match the reference (the converged solution does not
+# depend on the solid block), and the mean number of Krylov iterations per
+# Newton iteration of the coupled system must stay small (about 20 with the
+# finite-difference block, more than 300 with the compact block)
+QM_CASE_DIR="${REGRESSION_ROOT}/monolithicColouredFD"
+QM_END_TIME=0.15
+QM_DELTA_T=0.00625
+QM_REF_DISP=-0.0084436
+QM_DISP_TOL=2e-6
+QM_MAX_KRYLOV=60
+
+if [ "$CHECK_ONLY" = false ]; then
+    rm -rf "${QM_CASE_DIR}"
+    mkdir -p "${QM_CASE_DIR}"
+    for item in "${SCRIPT_DIR}"/*; do
+        base_item=$(basename "${item}")
+        if [[ "${base_item}" == "regressionTests" \
+           || "${base_item}" == "verification" ]]; then
+            continue
+        fi
+        cp -a "${item}" "${QM_CASE_DIR}/"
+    done
+    sed -i.bak \
+        -e "s/^endTime .*/endTime         ${QM_END_TIME};/" \
+        -e "s/^deltaT .*/deltaT          ${QM_DELTA_T};/" \
+        -e "s/^writeInterval .*/writeInterval   ${QM_END_TIME};/" \
+        "${QM_CASE_DIR}/system/controlDict"
+    sed -i.bak \
+        "s/^\([[:space:]]*coupled[[:space:]]*yes;\)/\1\n    solidJacobian colouredFiniteDifference;/" \
+        "${QM_CASE_DIR}/constant/fsiProperties.monolithic"
+    ( cd "${QM_CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
+    ( cd "${QM_CASE_DIR}" && ./Allrun monolithic > "${ALLRUN_LOGFILE}" 2>&1 ) || true
+fi
+
+if solids4Foam::regressionCaseSkipped "${QM_CASE_DIR}/${ALLRUN_LOGFILE}"; then
+    echo "Skipping the quasi-monolithic checks: the tutorial skipped in this environment"
+elif ! grep -q "^End[[:space:]]*$" "${QM_CASE_DIR}/log.solids4Foam" 2>/dev/null; then
+    echo "FAIL: quasi-monolithic solids4Foam did not finish (see ${QM_CASE_DIR}/log.solids4Foam)"
+    failures=1
+else
+    awk \
+        -v endTime="${QM_END_TIME}" \
+        -v ref="${QM_REF_DISP}" \
+        -v tol="${QM_DISP_TOL}" '
+    /^#/ { next }
+    { t = $1; v = $3 }
+    END {
+        d = v - ref; if (d < 0) d = -d
+        if ((t - endTime)^2 > 1e-12 || d >= tol) {
+            printf "FAIL: QM wall displacement at t = %g s = %.7g (reference %.7g)\n", t, v, ref
+            exit 1
+        }
+        printf "PASS: QM wall displacement at t = %g s = %.7g (reference %.7g, diff %.3g)\n", t, v, ref, d
+    }' "${QM_CASE_DIR}/${DISP_FILE}" || failures=1
+
+    awk -v maxK="${QM_MAX_KRYLOV}" '
+    /Solving the monolithic momentum-continuity system/ { coupled = 1; next }
+    /Solving the momentum equation for D/ { coupled = 0 }
+    coupled && /Linear solve (converged|did not converge) due to/ {
+        sum += $NF; n++
+    }
+    END {
+        if (n == 0) { print "FAIL: no coupled linear solves found"; exit 1 }
+        mean = sum/n
+        if (mean > maxK) {
+            printf "FAIL: mean Krylov iterations per Newton iteration %.1f > %g\n", mean, maxK
+            exit 1
+        }
+        printf "PASS: mean Krylov iterations per Newton iteration %.1f (limit %g)\n", mean, maxK
+    }' "${QM_CASE_DIR}/log.solids4Foam" || failures=1
+fi
+
 echo
 if (( failures == 0 )); then
     echo "============================================================"

@@ -223,6 +223,7 @@ numerics/dynamicFvMesh/newSubsetMotionSolverFvMesh/newSubsetMotionSolverFvMesh.C
 numerics/foamPetscSnesHelper/foamPetscMeshAssembly.C
 numerics/foamPetscSnesHelper/foamPetscSnesSolver.C
 numerics/foamPetscSnesHelper/foamPetscSnesHelper.C
+numerics/foamPetscSnesHelper/colouredFiniteDifferenceJacobian/colouredFiniteDifferenceJacobian.C
 numerics/foamPetscSnesHelper/foamPetscSnesHelperEnums.C
 numerics/foamPetscSnesHelper/petscUtils.C
 numerics/foamPetscSnesHelper/petscErrorHandling.C

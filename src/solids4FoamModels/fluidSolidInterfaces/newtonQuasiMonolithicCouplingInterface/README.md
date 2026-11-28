@@ -58,6 +58,20 @@ NewtonQuasiMonolithicCoeffs
     // over the solid)
     //solidSystemScaleFactor 1;
 
+    // Optional: userDefined (default; the two factors above) or
+    // forceBalanced (fluid rows times the fluid density, solid rows
+    // unscaled; see Residual Scaling)
+    //systemScaling forceBalanced;
+
+    // Optional: solid block of the preconditioning matrix, compact
+    // (default), colouredFiniteDifference or automatic (see Solid Block)
+    //solidJacobian colouredFiniteDifference;
+    //solidJacobianRebuild adaptive;       // or deltaTChange, always
+    //solidJacobianRebuildKrylovRatio 1.5; // adaptive only
+    //solidJacobianCheck no;               // print a directional check
+    //solidJacobianTrialInterval 20;       // automatic only
+    //solidJacobianSwitchMargin 0.1;       // automatic only
+
     // Optional: see Non-conformal Interfaces
     //conservativeTractionTransfer no;
     //interfaceFluxDiagnostics no;
@@ -238,6 +252,115 @@ Replacing `snes_mf_operator` with the assembled Jacobian is not
 recommended: the assembled Jacobian is approximate, and Newton then
 converges only linearly.
 
+## Solid Block
+
+**Solid block.** By default (`solidJacobian compact`), the solid block of the
+preconditioning matrix is the solid model's compact approximate Jacobian, a
+vector Laplacian of the velocity with the same coefficient for each component
+plus the inertia. It omits the coupling between the displacement components,
+so it represents bending poorly: for a slender solid whose stiffness dominates
+its inertia over one time step, the eigenvalues of the preconditioned solid
+block extend down to the order of (thickness/length)^2, and the Krylov
+iterations per Newton iteration grow with the slenderness and the stiffness
+(on `collapsibleChannel`, wall length/thickness 200: 180-380 Krylov iterations
+per Newton iteration).
+
+`solidJacobian colouredFiniteDifference` replaces the solid block by the
+Jacobian of the solid residual, with the interface traction held at its
+current value, computed by coloured forward differences: the pattern is that
+of the square of the compact block (the two-layer stencil of the residual),
+PETSc colours it so that no two columns of a colour share a row, and the solid
+residual is evaluated once per colour (about 40 colours in 2-D, 126 on the
+`3dTube` solid). After the first build the block is compared with a forward
+difference of the residual along a random direction; a relative difference
+above `solidJacobianCheckTolerance` (default 1e-4; typically about 1e-8) stops
+the run, as it would mean that the residual depends on cells beyond two layers
+or is not differentiable. With `solidJacobianRebuild deltaTChange` it is built
+once, again at the second time step if it was built in the first, and then only
+when the time step or the previous time step changes by more than
+`solidJacobianRebuildTolerance` (default 0.05): the preconditioner needs the
+linearised elastic operator rather than the current tangent, and on
+`collapsibleChannel` a block built at the first step is as effective as one
+rebuilt at every Newton iteration until the wall has deflected strongly. Near
+its first trough, however, the Krylov iterations per Newton iteration rise from
+about 27 to 42. With `solidJacobianRebuild adaptive` (default), the block is
+also rebuilt when the Krylov iterations per Newton iteration of a time step
+exceed `solidJacobianRebuildKrylovRatio` (default 1.5) times those of the first
+step after the last build; `always` rebuilds it at every Jacobian evaluation.
+Only the preconditioner changes, so the converged solution does not. Use it for
+thin, bending structures; on compact solids it does not reduce the Krylov
+iterations and can cost more (`blobInTreacle`, 4 ranks: +2 %; `3dTube` with
+BoomerAMG on the solid block: about +30 %), for which `automatic` is intended.
+`solidJacobianCheck yes` prints the relative difference between J v and a
+forward difference of the residual along a random direction after each build
+(about 1e-8 expected).
+Serial and parallel; tested with OpenFOAM v2512 and PETSc 3.24.
+
+On compact solids the denser two-layer block can make the solid
+preconditioner more expensive without reducing the Krylov iterations (with
+BoomerAMG on the 3-D tube, about 30 % more time). `solidJacobian
+automatic` chooses between the two blocks by timing: the first step uses the
+compact block; then, in a paired trial, one step is solved with the compact
+block and the next with the finite-difference block, and the faster one is
+kept, but only if it is faster by more than `solidJacobianSwitchMargin`
+(default 0.1); the trial is repeated after `solidJacobianTrialInterval` steps
+(default 20), an interval that doubles, up to 32 times, while the selection
+does not change. A change of block rebuilds the solver state, so the
+preconditioner is rebuilt at the next Newton iteration; the residual and the
+convergence tests are not affected.
+
+Limitations of the finite-difference block:
+
+- The pattern is the squared cell-adjacency graph in full 2x2 or 3x3
+  component blocks. Residuals that reach further (cells where
+  `leastSquaresS4f` falls back to the point-cell stencil,
+  `tractionPatchSurfaceGradient`, high-order discretisations) fail the
+  directional check and stop the run.
+- Boundary conditions that keep their own relaxed state (e.g. `solidTraction`
+  relaxing against its previous gradient) may keep values from the last
+  perturbed evaluation; the directional checks on the tested cases (2e-8 to
+  9e-8) show no effect.
+- Memory: in 3-D a hexahedral cell has 25 cells in its two-layer stencil,
+  i.e. 225 entries per row instead of 63, held in the cached Jacobian, the
+  solid block and its preconditioner.
+- The selection of `automatic`, its trial schedule and the `adaptive`
+  reference are not written for restart: a restarted run starts again with
+  the compact block and repeats the trials.
+
+## Residual Scaling
+
+The fluid rows of the residual are kinematic (per unit density) and the solid
+rows are forces, scaled by `fluidSystemScaleFactor` and
+`solidSystemScaleFactor`. The Newton test acts on the norm of the scaled
+residual, so these factors decide how much each region counts in it. With left
+preconditioning they do not change the Krylov iterations (the preconditioner
+is built from the scaled rows, and row scaling cancels in it); they change only
+the stopping tests, and the unpreconditioned norm used with right
+preconditioning.
+
+`systemScaling forceBalanced` multiplies the fluid rows by the fluid density
+and leaves the solid rows unscaled, so that the momentum residuals of both
+regions count as forces. With the factors of the tutorials on
+`collapsibleChannel` (1e8 and 1/(mu*deltaT)), the solid rows are 1e-14 to
+1e-12 of the fluid rows in the norm, although in force units the solid residual
+is the larger at the start of a step: the Newton test is then met by the fluid
+rows, and the solid residual is reduced in a time step by a factor between 1.4
+and 5e4 (median 3e2) instead of 1e6. With `forceBalanced` the reduction is
+between 3e3 and 4e7 (median 2e6; the step-norm test `snes_stol` stops some
+steps first), at the cost of 1-1.5 more Newton iterations per step (on the coarse
+tutorial about 70 % more time with the compact solid block, 35 % with the
+finite-difference one); the wall displacement then agrees with a
+tightly converged solution to the output precision (1e-8 of its peak) instead
+of 4e-6. Do not combine it with `fluidSystemScaleFactor` or
+`solidSystemScaleFactor`. Right preconditioning
+(`ksp_pc_side right`, `ksp_norm_type unpreconditioned`) appears faster with
+the default factors only because its Krylov test then ignores the solid rows;
+with `forceBalanced` it is slower than left preconditioning.
+
+The density factor of `forceBalanced` also multiplies the continuity rows,
+which then have units of mass per unit time rather than force. The choice of
+default factors is discussed in #717.
+
 ## Time-step Adjustment
 
 With `adjustTimeStep yes` in `system/controlDict`, which then also needs
@@ -258,6 +381,20 @@ of them in parallel with `./Allrun monolithic parallel`.
 In parallel, the fluid and solid regions can be decomposed independently with
 `decomposePar`, or together with `decomposeParMonolithic`, which can give some
 ranks no cells of one region.
+
+## Boundary Conditions and the Matrix-free Jacobian
+
+With `snes_mf_operator`, the Jacobian action is a finite difference of the
+residual, so the residual must be a function of the unknowns only: evaluated
+twice at the same unknowns, it must give the same result. A boundary condition
+that reads a field stored by a previous residual evaluation breaks this. For
+example, `inletOutlet` on the fluid velocity switches between a fixed value and
+a zero gradient according to the sign of the stored face flux `phi`; on an
+outlet with locally reversed flow, the residual then depends on the order of
+the evaluations and jumps when a flux changes sign, the Jacobian action is
+wrong, and Newton stalls in the first time step. Use conditions that depend on
+the unknowns only, e.g. `zeroGradient` velocity with a fixed pressure on an
+outlet that is long enough for backflow not to matter.
 
 ## Files
 

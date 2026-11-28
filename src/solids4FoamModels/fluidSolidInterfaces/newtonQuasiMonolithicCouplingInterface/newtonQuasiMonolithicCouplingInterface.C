@@ -45,6 +45,8 @@ License
 #include "labelPairHashes.H"
 #include "compatibilityFunctions.H"
 #include "fvcMeshPhi.H"
+#include "petscErrorHandling.H"
+#include "clockTime.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -2342,7 +2344,10 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
     fluidSolidInterface(typeName, runTime, region),
     fluidSystemScaleFactor_
     (
-        fsiProperties().lookupOrDefault<scalar>
+        fsiProperties().lookupOrDefault<word>("systemScaling", "userDefined")
+     == "forceBalanced"
+      ? refCast<const fluidModels::newtonIcoFluid>(fluid()).rho().value()
+      : fsiProperties().lookupOrDefault<scalar>
         (
             "fluidSystemScaleFactor",
             1.0 //gAverage(1.0/fluid().nf().primitiveField())
@@ -2350,7 +2355,10 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
     ),
     solidSystemScaleFactor_
     (
-        fsiProperties().lookupOrDefault<scalar>
+        fsiProperties().lookupOrDefault<word>("systemScaling", "userDefined")
+     == "forceBalanced"
+      ? 1.0
+      : fsiProperties().lookupOrDefault<scalar>
         (
             "solidSystemScaleFactor",
             gAverage
@@ -2401,8 +2409,169 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
     configuredNestedFluidSplit_(false),
     solverPtr_(),
     Pmat_(nullptr),
-    tsLogPtr_()
+    tsLogPtr_(),
+    solidJacobian_
+    (
+        fsiProperties().lookupOrDefault<word>("solidJacobian", "compact")
+    ),
+    solidJacobianRebuild_
+    (
+        fsiProperties().lookupOrDefault<word>
+        (
+            "solidJacobianRebuild",
+            "adaptive"
+        )
+    ),
+    solidJacobianRebuildKrylovRatio_
+    (
+        fsiProperties().lookupOrDefault<scalar>
+        (
+            "solidJacobianRebuildKrylovRatio",
+            1.5
+        )
+    ),
+    solidFdKrylovRef_(-1),
+    solidFdRebuildRequest_(false),
+    solidJacobianCheck_
+    (
+        fsiProperties().lookupOrDefault<Switch>("solidJacobianCheck", false)
+    ),
+    solidFdJacobianPtr_(),
+    solidFdJacobianDeltaT_(-1),
+    solidFdJacobianDeltaT0_(-1),
+    solidFdJacobianTimeIndex_(-1),
+    solidJacobianRebuildTolerance_
+    (
+        fsiProperties().lookupOrDefault<scalar>
+        (
+            "solidJacobianRebuildTolerance",
+            0.05
+        )
+    ),
+    solidJacobianCheckTolerance_
+    (
+        fsiProperties().lookupOrDefault<scalar>
+        (
+            "solidJacobianCheckTolerance",
+            1e-4
+        )
+    ),
+    solidFdBuildTimeStepStart_(0),
+    useFdSolidJacobian_(solidJacobian_ == "colouredFiniteDifference"),
+    solidJacobianSelection_(false),
+    solidJacobianTrialInterval_
+    (
+        fsiProperties().lookupOrDefault<label>("solidJacobianTrialInterval", 20)
+    ),
+    solidJacobianSwitchMargin_
+    (
+        fsiProperties().lookupOrDefault<scalar>
+        (
+            "solidJacobianSwitchMargin", 0.1
+        )
+    ),
+    solidJacobianStep_(0),
+    solidJacobianInterval_(solidJacobianTrialInterval_),
+    solidJacobianNextTrial_(2),
+    solidJacobianTrialTime_{-1, -1}
 {
+    if
+    (
+        solidJacobian_ != "compact"
+     && solidJacobian_ != "colouredFiniteDifference"
+     && solidJacobian_ != "automatic"
+    )
+    {
+        FatalIOErrorInFunction(fsiProperties())
+            << "Unknown solidJacobian " << solidJacobian_
+            << ": valid options are compact, colouredFiniteDifference and "
+            << "automatic" << exit(FatalIOError);
+    }
+
+    if (solidJacobianTrialInterval_ < 2 || solidJacobianSwitchMargin_ < 0)
+    {
+        FatalIOErrorInFunction(fsiProperties())
+            << "solidJacobianTrialInterval must be at least 2 and "
+            << "solidJacobianSwitchMargin non-negative" << exit(FatalIOError);
+    }
+
+    if
+    (
+        solidJacobianRebuild_ != "adaptive"
+     && solidJacobianRebuild_ != "deltaTChange"
+     && solidJacobianRebuild_ != "always"
+    )
+    {
+        FatalIOErrorInFunction(fsiProperties())
+            << "Unknown solidJacobianRebuild " << solidJacobianRebuild_
+            << ": valid options are adaptive, deltaTChange and always"
+            << exit(FatalIOError);
+    }
+
+    if (solidJacobianRebuildKrylovRatio_ <= 1)
+    {
+        FatalIOErrorInFunction(fsiProperties())
+            << "solidJacobianRebuildKrylovRatio must be greater than 1"
+            << exit(FatalIOError);
+    }
+
+    {
+        // Row scaling of the coupled residual. "forceBalanced" multiplies the
+        // fluid rows (kinematic, per unit density) by the fluid density and
+        // leaves the solid rows (forces) unscaled, so that the momentum
+        // residuals of both regions enter the residual norm, and hence the
+        // nonlinear convergence test, as forces. With left preconditioning
+        // the row scaling does not change the Krylov iterates (the
+        // preconditioner is built from the scaled rows); it changes the
+        // stopping tests only
+        const word systemScaling
+        (
+            fsiProperties().lookupOrDefault<word>
+            (
+                "systemScaling",
+                "userDefined"
+            )
+        );
+
+        if (systemScaling != "userDefined" && systemScaling != "forceBalanced")
+        {
+            FatalIOErrorInFunction(fsiProperties())
+                << "Unknown systemScaling " << systemScaling
+                << ": valid options are userDefined and forceBalanced"
+                << exit(FatalIOError);
+        }
+
+        if
+        (
+            systemScaling == "forceBalanced"
+         && (
+                fsiProperties().found("fluidSystemScaleFactor")
+             || fsiProperties().found("solidSystemScaleFactor")
+            )
+        )
+        {
+            FatalIOErrorInFunction(fsiProperties())
+                << "systemScaling forceBalanced sets the fluid and solid "
+                << "scale factors: remove fluidSystemScaleFactor and "
+                << "solidSystemScaleFactor" << exit(FatalIOError);
+        }
+    }
+
+    if (solidJacobian_ == "colouredFiniteDifference")
+    {
+        Info<< "The solid block of the preconditioning matrix is the coloured "
+            << "finite-difference Jacobian of the solid residual (rebuilt: "
+            << solidJacobianRebuild_ << ")" << endl;
+    }
+    else if (solidJacobian_ == "automatic")
+    {
+        Info<< "The solid block of the preconditioning matrix is selected "
+            << "automatically between the compact and the coloured "
+            << "finite-difference Jacobian by paired trials of the solve time "
+            << "(first trial interval " << solidJacobianTrialInterval_
+            << " steps, margin " << solidJacobianSwitchMargin_ << ")" << endl;
+    }
+
     if (solid().twoD() != fluid().twoD())
     {
         FatalErrorInFunction
@@ -2815,6 +2984,10 @@ bool newtonQuasiMonolithicCouplingInterface::evolve()
         setInterfaceDisplacementOffsets();
     }
 
+    // Choose the solid block of the preconditioning matrix for this step
+    selectSolidJacobian();
+    scalar solveTime = 0;
+
     while (true)
     {
         const dimensionedScalar& deltaT = time.deltaT();
@@ -3004,7 +3177,9 @@ bool newtonQuasiMonolithicCouplingInterface::evolve()
         // selected with this in mind.
         Info<< "Solving the monolithic momentum-continuity system for Up using "
             << "PETSc SNES" << endl;
+        clockTime solveTimer;
         const int solveStatus = solver().solve(true);
+        solveTime += solveTimer.elapsedTime();
 
         if (solveStatus >= 0)
         {
@@ -3066,6 +3241,9 @@ bool newtonQuasiMonolithicCouplingInterface::evolve()
             << time.deltaTValue() << " at Time = "
             << time.timeName() << nl << endl;
     }
+
+    recordSolidJacobianSolveTime(solveTime);
+    checkSolidJacobianQuality();
 
     // Retrieve the solution from PETSc and copy into UFluid, p, and USolid
     retrieveSolution
@@ -3571,6 +3749,170 @@ label newtonQuasiMonolithicCouplingInterface::formResidual
 }
 
 
+
+void newtonQuasiMonolithicCouplingInterface::selectSolidJacobian()
+{
+    ++solidJacobianStep_;
+
+    if (solidJacobian_ != "automatic")
+    {
+        return;
+    }
+
+    solidFdBuildTimeStepStart_ =
+        solidFdJacobianPtr_.valid() ? solidFdJacobianPtr_->buildTime() : 0;
+
+    // Paired trial: the compact block at step solidJacobianNextTrial_, the
+    // finite-difference block at the next step; otherwise keep the current
+    // selection. The first step uses the compact block (start-up)
+    bool useFd = solidJacobianSelection_;
+    if
+    (
+        solidJacobianStep_ == 1
+     || solidJacobianStep_ == solidJacobianNextTrial_
+    )
+    {
+        useFd = false;
+    }
+    else if (solidJacobianStep_ == solidJacobianNextTrial_ + 1)
+    {
+        useFd = true;
+    }
+
+    if (useFd != useFdSolidJacobian_)
+    {
+        useFdSolidJacobian_ = useFd;
+
+        // The Krylov reference of the adaptive rebuild belongs to the block
+        // used before
+        solidFdKrylovRef_ = -1;
+
+        // A finite-difference block kept from an earlier selection may be
+        // stale: rebuild it, so that the trial and the adaptive reference
+        // reflect the current state
+        if (useFd)
+        {
+            solidFdRebuildRequest_ = true;
+        }
+
+        // The preconditioning matrix changes its sparsity: rebuild the
+        // solver state, so that the Jacobian and the preconditioner are
+        // rebuilt at the first Newton iteration of this step
+        solver().resetSnes();
+    }
+}
+
+
+void newtonQuasiMonolithicCouplingInterface::recordSolidJacobianSolveTime
+(
+    const scalar solveTime
+)
+{
+    if (solidJacobian_ != "automatic")
+    {
+        return;
+    }
+
+    // The one-off build of the finite-difference block is not charged to the
+    // trial: with deltaTChange it is not repeated
+    const scalar buildTime =
+        solidFdJacobianPtr_.valid()
+      ? solidFdJacobianPtr_->buildTime() - solidFdBuildTimeStepStart_
+      : 0;
+
+    const scalar t =
+        returnReduce(max(solveTime - buildTime, scalar(0)), maxOp<scalar>());
+
+    if (solidJacobianStep_ == solidJacobianNextTrial_)
+    {
+        solidJacobianTrialTime_[0] = t;
+    }
+    else if (solidJacobianStep_ == solidJacobianNextTrial_ + 1)
+    {
+        solidJacobianTrialTime_[1] = t;
+
+        const scalar tCompact = solidJacobianTrialTime_[0];
+        const scalar tFd = solidJacobianTrialTime_[1];
+        const bool previous = solidJacobianSelection_;
+
+        // Hysteresis: change only if the other block is faster by the margin
+        bool select = previous;
+        if (tFd < (1 - solidJacobianSwitchMargin_)*tCompact)
+        {
+            select = true;
+        }
+        else if (tCompact < (1 - solidJacobianSwitchMargin_)*tFd)
+        {
+            select = false;
+        }
+
+        // Back off while the selection does not change
+        if (select == previous)
+        {
+            solidJacobianInterval_ =
+                min(2*solidJacobianInterval_, 32*solidJacobianTrialInterval_);
+        }
+        else
+        {
+            solidJacobianInterval_ = solidJacobianTrialInterval_;
+        }
+
+        solidJacobianSelection_ = select;
+        solidJacobianNextTrial_ = solidJacobianStep_ + solidJacobianInterval_;
+
+        Info<< "    Solid block trial: compact " << tCompact
+            << " s, colouredFiniteDifference " << tFd << " s: selected "
+            << (select ? "colouredFiniteDifference" : "compact")
+            << "; next trial at step " << solidJacobianNextTrial_ << endl;
+    }
+}
+
+
+void newtonQuasiMonolithicCouplingInterface::checkSolidJacobianQuality()
+{
+    if
+    (
+        solidJacobianRebuild_ != "adaptive"
+     || !useFdSolidJacobian_
+     || !solidFdJacobianPtr_.valid()
+     || !solidFdJacobianPtr_->built()
+    )
+    {
+        return;
+    }
+
+    PetscInt newtonIts = 0;
+    PetscInt linearIts = 0;
+    AssertPETSc(SNESGetIterationNumber(solver().snes(), &newtonIts));
+    AssertPETSc(SNESGetLinearSolveIterations(solver().snes(), &linearIts));
+    if (newtonIts < 1)
+    {
+        return;
+    }
+    const scalar krylovPerNewton = scalar(linearIts)/scalar(newtonIts);
+
+    // The first step solved after a build sets the reference; a later step
+    // that needs solidJacobianRebuildKrylovRatio times as many Krylov
+    // iterations per Newton iteration requests a rebuild (e.g. after a large
+    // change of configuration)
+    if (solidFdKrylovRef_ < 0)
+    {
+        solidFdKrylovRef_ = krylovPerNewton;
+    }
+    else if
+    (
+        krylovPerNewton > solidJacobianRebuildKrylovRatio_*solidFdKrylovRef_
+    )
+    {
+        solidFdRebuildRequest_ = true;
+
+        Info<< "    solidJacobian: " << krylovPerNewton
+            << " Krylov iterations per Newton iteration against "
+            << solidFdKrylovRef_ << " after the last build: rebuild requested"
+            << endl;
+    }
+}
+
 label newtonQuasiMonolithicCouplingInterface::formJacobian
 (
     Mat jac,
@@ -3653,6 +3995,86 @@ label newtonQuasiMonolithicCouplingInterface::formJacobian
         (
             subMats[1][1], xSolid
         );
+
+        if (useFdSolidJacobian_)
+        {
+            // Replace the compact solid block by the Jacobian of the solid
+            // residual, with the interface traction held at its current
+            // value. The compact block misrepresents bending of slender
+            // solids (it omits the coupling between the displacement
+            // components); the Jacobian is computed by coloured forward
+            // differences of the solid residual and, by default, reused
+            // until the time step changes
+            if (!solidFdJacobianPtr_.valid())
+            {
+                solidFdJacobianPtr_.reset
+                (
+                    new colouredFiniteDifferenceJacobian
+                    (
+                        "solidJacobian",
+                        refCast<foamPetscSnesHelper>(solid())
+                    )
+                );
+            }
+
+            const Time& runTime = physicsModel::runTime();
+            const scalar deltaT = runTime.deltaTValue();
+            const scalar deltaT0 = runTime.deltaT0Value();
+            const label timeIndex = runTime.timeIndex();
+            const scalar tol = solidJacobianRebuildTolerance_*deltaT;
+
+            // Rebuild: always; on the first use; at the second step of a run
+            // if built in the first (whose time scheme may differ); when the
+            // time step or the previous time step has changed
+            const bool rebuild =
+                solidJacobianRebuild_ == "always"
+             || !solidFdJacobianPtr_->built()
+             || (
+                    solidFdJacobianTimeIndex_ == runTime.startTimeIndex() + 1
+                 && timeIndex > solidFdJacobianTimeIndex_
+                )
+             || mag(deltaT - solidFdJacobianDeltaT_) > tol
+             || mag(deltaT0 - solidFdJacobianDeltaT0_) > tol
+             || solidFdRebuildRequest_;
+
+            const bool firstBuild = !solidFdJacobianPtr_->built();
+
+            solidFdJacobianPtr_->apply(subMats[1][1], xSolid, rebuild);
+
+            if (rebuild)
+            {
+                solidFdJacobianDeltaT_ = deltaT;
+                solidFdJacobianDeltaT0_ = deltaT0;
+                solidFdJacobianTimeIndex_ = timeIndex;
+                solidFdRebuildRequest_ = false;
+                solidFdKrylovRef_ = -1;
+
+                // The pattern assumes that the solid residual of a cell
+                // depends on the cells within two layers only; a wider
+                // dependence (or a residual that is not differentiable)
+                // would give a wrong block without any error, so the block is
+                // checked against a directional derivative of the residual
+                // after its first build
+                if (firstBuild || solidJacobianCheck_)
+                {
+                    const scalar relErr = solidFdJacobianPtr_->check(xSolid);
+
+                    if (firstBuild && relErr > solidJacobianCheckTolerance_)
+                    {
+                        FatalErrorInFunction
+                            << "The coloured finite-difference solid block "
+                            << "differs from a directional derivative of the "
+                            << "solid residual by " << relErr << " (> "
+                            << "solidJacobianCheckTolerance "
+                            << solidJacobianCheckTolerance_ << "): the solid "
+                            << "residual depends on cells beyond two layers, "
+                            << "or is not differentiable. Use "
+                            << "solidJacobian compact" << exit(FatalError);
+                    }
+                }
+            }
+        }
+
         VecRestoreSubVector(x, isSolid(), &xSolid);
     }
 

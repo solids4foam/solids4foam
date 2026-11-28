@@ -46,6 +46,7 @@ SourceFiles
 #include "foamPetscSnesHelper.H"
 #include "foamPetscSnesSolver.H"
 #include "labelPairHashes.H"
+#include "colouredFiniteDifferenceJacobian.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -167,8 +168,97 @@ class newtonQuasiMonolithicCouplingInterface
         //  nonlinear iterations
         autoPtr<OFstream> tsLogPtr_;
 
+        //- Solid block of the preconditioning matrix: "compact" (default,
+        //  the solid model's component-wise approximation) or
+        //  "colouredFiniteDifference" (the Jacobian of the solid residual,
+        //  with the interface traction held fixed)
+        const word solidJacobian_;
+
+        //- When to recompute the coloured finite-difference solid block:
+        //  "adaptive" (default: as deltaTChange, and also when the Krylov
+        //  iterations per Newton iteration of a time step exceed
+        //  solidJacobianRebuildKrylovRatio times those of the first step after
+        //  the last build), "deltaTChange" (once, again at the second step,
+        //  and when the time step or the previous time step changes) or
+        //  "always" (at every Jacobian evaluation)
+        const word solidJacobianRebuild_;
+
+        //- adaptive: ratio of Krylov iterations per Newton iteration to the
+        //  reference that triggers a rebuild
+        const scalar solidJacobianRebuildKrylovRatio_;
+
+        //- adaptive: reference Krylov iterations per Newton iteration (first
+        //  step after the last build; negative: not yet set)
+        scalar solidFdKrylovRef_;
+
+        //- adaptive: rebuild requested at the next Jacobian evaluation
+        bool solidFdRebuildRequest_;
+
+        //- Print a directional-derivative check of the finite-difference
+        //  solid block after each build
+        const Switch solidJacobianCheck_;
+
+        //- Coloured finite-difference solid block, created on first use
+        autoPtr<colouredFiniteDifferenceJacobian> solidFdJacobianPtr_;
+
+        //- Time step and previous time step at the last build of the
+        //  finite-difference solid block
+        scalar solidFdJacobianDeltaT_;
+        scalar solidFdJacobianDeltaT0_;
+
+        //- Time index at the last build of the finite-difference solid block
+        label solidFdJacobianTimeIndex_;
+
+        //- Relative change of the time step or the previous time step that
+        //  triggers a rebuild with solidJacobianRebuild deltaTChange
+        const scalar solidJacobianRebuildTolerance_;
+
+        //- Largest accepted relative difference of the directional check
+        //  made after the first build (a larger one stops the run)
+        const scalar solidJacobianCheckTolerance_;
+
+        //- Build time of the finite-difference solid block at the start of
+        //  the current time step (automatic: excluded from the trial time)
+        scalar solidFdBuildTimeStepStart_;
+
+        //- Is the finite-difference solid block used in the current time
+        //  step (fixed for compact/colouredFiniteDifference; chosen per step
+        //  for automatic)
+        bool useFdSolidJacobian_;
+
+        //- automatic: the block selected by the last trial (used outside the
+        //  trial steps)
+        bool solidJacobianSelection_;
+
+        //- automatic: initial number of time steps between paired trials;
+        //  the interval doubles while the selection does not change
+        const label solidJacobianTrialInterval_;
+
+        //- automatic: relative margin by which the other block must be
+        //  faster before the selection changes (hysteresis)
+        const scalar solidJacobianSwitchMargin_;
+
+        //- automatic: coupled time steps solved, current trial interval,
+        //  step of the next trial, and the solve times of the last trial
+        label solidJacobianStep_;
+        label solidJacobianInterval_;
+        label solidJacobianNextTrial_;
+        scalar solidJacobianTrialTime_[2];
+
 
     // Private Member Functions
+
+        //- Select the solid block for the coming time step (solidJacobian
+        //  automatic) and rebuild the solver state if it changes
+        void selectSolidJacobian();
+
+        //- Record the solve time of the time step just completed and update
+        //  the automatic selection after a paired trial
+        void recordSolidJacobianSolveTime(const scalar solveTime);
+
+        //- adaptive rebuild: compare the Krylov iterations per Newton
+        //  iteration of the time step just solved with the reference
+        void checkSolidJacobianQuality();
 
         //- Make the isFluid, isFluidVelocity, isFluidPressure and isSolid
         //  index sets (the name is historical: there is no mesh-motion set)
