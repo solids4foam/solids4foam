@@ -30,7 +30,7 @@ REG_END_TIME=0.01
 # transferred load was dominated by a spurious net force (#665)
 REF_TIP_DY=4.65246e-09
 REF_TIP_DZ=3.17309e-08
-TIP_TOL=3e-09
+TIP_TOL=1e-10
 
 ALLRUN_LOGFILE="log.Allrun"
 TIP_FILE="postProcessing/0/solidPointDisplacement_flapTip.dat"

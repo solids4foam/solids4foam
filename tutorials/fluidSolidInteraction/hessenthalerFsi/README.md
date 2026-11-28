@@ -243,6 +243,11 @@ several runs at once, so they are only roughly comparable):
 
 ## Phase I results
 
+The results in this section were computed on the earlier fluid meshes, built
+without feature edges, on which the transferred load had a spurious net
+component (#665; see [Meshes](#meshes)). They will be updated when the
+Phase I runs are repeated on the feature-edge meshes.
+
 The buoyancy and the inflow are ramped in together over 0.5 s from the
 straight flap, as in [3]. The flap rises to about 18.5 mm at about 1 s and
 then settles to a steady deflection within about 2 s, with a residual
