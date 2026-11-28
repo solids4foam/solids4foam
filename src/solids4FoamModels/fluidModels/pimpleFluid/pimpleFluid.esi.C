@@ -32,6 +32,7 @@ License
 #include "movingWallPressureFvPatchScalarField.H"
 #include "EulerDdtScheme.H"
 #include "backwardDdtScheme.H"
+#include "bdfFsiCheck.H"
 #include "thermalRobinFvPatchScalarField.H"
 
 
@@ -91,6 +92,13 @@ void pimpleFluid::updateRobinFsiInterface
             word ddtScheme
             (
                 mesh().ddtScheme("ddt(" + U().name() +')')
+            );
+
+            bdfFsiCheck
+            (
+                ddtScheme,
+                "ddt(" + U().name() + ')',
+                "pimpleFluid::updateRobinFsiInterface"
             );
 
             // The interface flux is the old interface velocity plus the

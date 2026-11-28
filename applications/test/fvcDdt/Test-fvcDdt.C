@@ -28,7 +28,8 @@ Description
     - Convergence: dy/dt = lambda y, integrated with fvm::ddt from a supplied
       history, has an observed order of q as the step is halved.
     - Restart: stopping, writing and reading back the old-time fields
-      reproduces an uninterrupted run.
+      reproduces an uninterrupted run, also when the run is restarted
+      again from a time written after the first restart.
     - A rho without stored history: fvc::ddt(rho, U) is exact for a rho
       linear in time, rather than weighting its copied levels.
     - Fluxes without stored history: the ddtCorr flux corrections keep the
@@ -348,9 +349,12 @@ void testRestart(Time& runTime, const fvMesh& mesh)
     prescribeDecay(runTime, yCont, scheme.ref(), lambda, q);
     advanceDecay(runTime, yCont, scheme.ref(), lambda, t0 + 1);
 
+    // Write to full precision, so that the restarts can be exact
+    IOstream::defaultPrecision(17);
+
     // Stopped and written half way
     startRun(runTime, t0 - (q - 1)*dt, dt);
-    fileName writeDir;
+    fileName writeDir1;
     {
         volScalarField y
         (
@@ -368,13 +372,34 @@ void testRestart(Time& runTime, const fvMesh& mesh)
         prescribeDecay(runTime, y, scheme.ref(), lambda, q);
         advanceDecay(runTime, y, scheme.ref(), lambda, t0 + 0.5);
 
-        // Write to full precision, so that the restart can be exact
-        IOstream::defaultPrecision(17);
         runTime.writeNow();
-        writeDir = runTime.timePath();
+        writeDir1 = runTime.timePath();
     }
 
-    // Read back, with the old-time fields, and continue
+    // Read back, with the old-time fields, continued and written again. The
+    // old levels read back must be written again too, for a restart from
+    // this later time to be exact as well.
+    fileName writeDir2;
+    {
+        volScalarField y
+        (
+            IOobject
+            (
+                "yRestart",
+                runTime.timeName(),
+                mesh,
+                IOobject::MUST_READ,
+                IOobject::AUTO_WRITE
+            ),
+            mesh
+        );
+        advanceDecay(runTime, y, scheme.ref(), lambda, t0 + 0.75);
+
+        runTime.writeNow();
+        writeDir2 = runTime.timePath();
+    }
+
+    // Read back from the second write time and continue
     volScalarField y
     (
         IOobject
@@ -391,8 +416,14 @@ void testRestart(Time& runTime, const fvMesh& mesh)
 
     check
     (
-        isFile(writeDir/"yRestart_0") && isFile(writeDir/"yRestart_0_0"),
+        isFile(writeDir1/"yRestart_0") && isFile(writeDir1/"yRestart_0_0"),
         "BDF 3 writes the old-time fields yRestart_0 and yRestart_0_0"
+    );
+
+    check
+    (
+        isFile(writeDir2/"yRestart_0") && isFile(writeDir2/"yRestart_0_0"),
+        "BDF 3 writes them again after a restart"
     );
 
     const scalar error =
@@ -400,11 +431,12 @@ void testRestart(Time& runTime, const fvMesh& mesh)
     check
     (
         error < 1e-12,
-        "BDF 3 restart reproduces the uninterrupted run, relative "
+        "BDF 3 restarted twice reproduces the uninterrupted run, relative "
         "difference " + Foam::name(error)
     );
 
-    rmDir(writeDir);
+    rmDir(writeDir1);
+    rmDir(writeDir2);
 }
 
 

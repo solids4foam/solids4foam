@@ -101,26 +101,10 @@ bdfDdtScheme<Type>::bdfDdtScheme(const fvMesh& mesh, Istream& is)
             << "and BDF 5 and 6 are not recommended for it"
             << endl;
     }
-
-    checkStaticMesh();
 }
 
 
 // * * * * * * * * * * * * * * * Private Functions * * * * * * * * * * * * * //
-
-template<class Type>
-void bdfDdtScheme<Type>::checkStaticMesh() const
-{
-    if (mesh().moving())
-    {
-        FatalErrorInFunction
-            << "BDF " << order_ << " ddt is implemented for static meshes"
-            << " only: fvMesh stores V0 and V00, fewer old cell volumes than"
-            << " an order-" << order_ << " formula needs."
-            << exit(FatalError);
-    }
-}
-
 
 template<class Type>
 template<class GeoField>
@@ -142,12 +126,27 @@ template<class GeoField>
 void bdfDdtScheme<Type>::touch(const GeoField& vf) const
 {
     level(vf, order_);
+
+    // On a restart OpenFOAM (v2412, for example) reads the old levels
+    // recursively and constructs each level below the first more than once.
+    // The copy it keeps cannot register under the name an earlier copy still
+    // holds, so it would not be written again, and a restart from a later
+    // write time would lose that level. Register such levels again.
+    for (label k = 1; k <= order_; ++k)
+    {
+        const GeoField& f = level(vf, k);
+
+        if (f.registerObject() && !f.registered())
+        {
+            const_cast<GeoField&>(f).checkIn();
+        }
+    }
 }
 
 
 template<class Type>
 template<class GeoField>
-label bdfDdtScheme<Type>::order(const GeoField& vf) const
+label bdfDdtScheme<Type>::levels(const GeoField& vf) const
 {
     // Create the whole chain first. Accessing level 1 also shifts the old
     // times when this is a new time step, so the indices compared below are
@@ -166,6 +165,112 @@ label bdfDdtScheme<Type>::order(const GeoField& vf) const
     }
 
     return q;
+}
+
+
+template<class Type>
+template<class GeoField>
+label bdfDdtScheme<Type>::order(const GeoField& vf) const
+{
+    const label q = levels(vf);
+
+    if (mesh().moving())
+    {
+        // The volumes may have fewer genuine old levels than the field, if
+        // the mesh started moving after the field's history was built
+        return min(q, levels(cellVolumes()));
+    }
+
+    return q;
+}
+
+
+template<class Type>
+const volScalarField& bdfDdtScheme<Type>::cellVolumes() const
+{
+    const word name("bdfDdt:V");
+
+    volScalarField* ptr =
+        mesh().thisDb().template getObjectPtr<volScalarField>(name);
+
+    if (!ptr)
+    {
+        // Created on the first call of a step on which the mesh has moved,
+        // so fvMesh's V0 holds the volumes the previous step ended with.
+        // Start the field from them, stamped with the previous step, so that
+        // its history is one level deeper than a field created now would
+        // be, like the fields', whose old levels were copied before this
+        // step's update.
+        ptr = new volScalarField
+        (
+            IOobject
+            (
+                name,
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE,
+                IOobject::REGISTER
+            ),
+            mesh(),
+            dimensionedScalar(dimVolume, Zero)
+        );
+        ptr->primitiveFieldRef() = mesh().V0();
+        ptr->timeIndex() = mesh().time().timeIndex() - 1;
+        regIOobject::store(ptr);
+    }
+
+    // Shift the old levels if this is a new step, and record the current
+    // volumes: the mesh may have moved again since the last call within
+    // this step
+    touch(*ptr);
+    ptr->primitiveFieldRef() = mesh().V();
+
+    // After the shift, level 1 holds the volumes of the last call of the
+    // previous step, which are not those that step ended with if the mesh
+    // moved after that call (e.g. a final mesh correction after the FSI
+    // loop). Once the mesh has moved on this step, fvMesh's V0 holds them.
+    if (meshMoved())
+    {
+        ptr->oldTime().primitiveFieldRef() = mesh().V0();
+
+        // Start the history of the mesh flux with that of the volumes, so
+        // that meshPhi finds the old mesh fluxes it needs even if it is
+        // first called on a later step. fvMesh shifts the levels once they
+        // exist. The flux has been set on this step, so fvMesh::phi() has
+        // no side effect here.
+        touch(mesh().phi());
+    }
+
+    return *ptr;
+}
+
+
+template<class Type>
+bool bdfDdtScheme<Type>::meshMoved() const
+{
+    // fvMesh::phi() would zero the mesh flux and shift its old levels if it
+    // has not been set on this step, so its time index is read through
+    // setPhi(), which has no side effect
+    const refPtr<surfaceScalarField> tmeshPhi
+    (
+        const_cast<fvMesh&>(mesh()).setPhi()
+    );
+
+    return
+        tmeshPhi.get()
+     && tmeshPhi.get()->timeIndex() == mesh().time().timeIndex();
+}
+
+
+template<class Type>
+label bdfDdtScheme<Type>::meshFluxLevels() const
+{
+    const surfaceScalarField& phi = mesh().phi();
+
+    const label n = levels(phi);
+
+    return level(phi, 1).timeIndex() == phi.timeIndex() ? 0 : n;
 }
 
 
@@ -322,16 +427,43 @@ template<class GeoField>
 tmp<GeoField> bdfDdtScheme<Type>::history
 (
     const GeoField& vf,
-    const scalarList& a
+    const scalarList& a,
+    const bool weighted
 ) const
 {
     touch(vf);
 
     tmp<GeoField> tsum(-a[1]*level(vf, 1));
+    GeoField& sum = tsum.ref();
+
+    if (!weighted)
+    {
+        for (label k = 2; k < a.size(); ++k)
+        {
+            sum -= a[k]*level(vf, k);
+        }
+
+        return tsum;
+    }
+
+    // The internal field is weighted level by level, the boundary values
+    // are summed unweighted
+    const volScalarField& V = cellVolumes();
+    const scalarField& Vn = mesh().V();
+    auto& bsum = sum.boundaryFieldRef();
+
+    sum.primitiveFieldRef() *= level(V, 1).primitiveField()/Vn;
 
     for (label k = 2; k < a.size(); ++k)
     {
-        tsum.ref() -= a[k]*level(vf, k);
+        sum.primitiveFieldRef() -=
+            a[k]*(level(V, k).primitiveField()/Vn)
+           *level(vf, k).primitiveField();
+
+        forAll(bsum, patchi)
+        {
+            bsum[patchi] -= a[k]*level(vf, k).boundaryField()[patchi];
+        }
     }
 
     return tsum;
@@ -343,7 +475,8 @@ tmp<GeometricField<Type, fvPatchField, volMesh>> bdfDdtScheme<Type>::history
 (
     const volScalarField& rho,
     const GeometricField<Type, fvPatchField, volMesh>& vf,
-    const scalarList& a
+    const scalarList& a,
+    const bool weighted
 ) const
 {
     touch(rho);
@@ -353,10 +486,36 @@ tmp<GeometricField<Type, fvPatchField, volMesh>> bdfDdtScheme<Type>::history
     (
         -a[1]*level(rho, 1)*level(vf, 1)
     );
+    GeometricField<Type, fvPatchField, volMesh>& sum = tsum.ref();
+
+    if (!weighted)
+    {
+        for (label k = 2; k < a.size(); ++k)
+        {
+            sum -= a[k]*level(rho, k)*level(vf, k);
+        }
+
+        return tsum;
+    }
+
+    const volScalarField& V = cellVolumes();
+    const scalarField& Vn = mesh().V();
+    auto& bsum = sum.boundaryFieldRef();
+
+    sum.primitiveFieldRef() *= level(V, 1).primitiveField()/Vn;
 
     for (label k = 2; k < a.size(); ++k)
     {
-        tsum.ref() -= a[k]*level(rho, k)*level(vf, k);
+        sum.primitiveFieldRef() -=
+            a[k]*(level(V, k).primitiveField()/Vn)
+           *level(rho, k).primitiveField()*level(vf, k).primitiveField();
+
+        forAll(bsum, patchi)
+        {
+            bsum[patchi] -=
+                a[k]*level(rho, k).boundaryField()[patchi]
+               *level(vf, k).boundaryField()[patchi];
+        }
     }
 
     return tsum;
@@ -369,7 +528,8 @@ tmp<GeometricField<Type, fvPatchField, volMesh>> bdfDdtScheme<Type>::history
     const volScalarField& alpha,
     const volScalarField& rho,
     const GeometricField<Type, fvPatchField, volMesh>& vf,
-    const scalarList& a
+    const scalarList& a,
+    const bool weighted
 ) const
 {
     touch(alpha);
@@ -380,10 +540,38 @@ tmp<GeometricField<Type, fvPatchField, volMesh>> bdfDdtScheme<Type>::history
     (
         -a[1]*level(alpha, 1)*level(rho, 1)*level(vf, 1)
     );
+    GeometricField<Type, fvPatchField, volMesh>& sum = tsum.ref();
+
+    if (!weighted)
+    {
+        for (label k = 2; k < a.size(); ++k)
+        {
+            sum -= a[k]*level(alpha, k)*level(rho, k)*level(vf, k);
+        }
+
+        return tsum;
+    }
+
+    const volScalarField& V = cellVolumes();
+    const scalarField& Vn = mesh().V();
+    auto& bsum = sum.boundaryFieldRef();
+
+    sum.primitiveFieldRef() *= level(V, 1).primitiveField()/Vn;
 
     for (label k = 2; k < a.size(); ++k)
     {
-        tsum.ref() -= a[k]*level(alpha, k)*level(rho, k)*level(vf, k);
+        sum.primitiveFieldRef() -=
+            a[k]*(level(V, k).primitiveField()/Vn)
+           *level(alpha, k).primitiveField()*level(rho, k).primitiveField()
+           *level(vf, k).primitiveField();
+
+        forAll(bsum, patchi)
+        {
+            bsum[patchi] -=
+                a[k]*level(alpha, k).boundaryField()[patchi]
+               *level(rho, k).boundaryField()[patchi]
+               *level(vf, k).boundaryField()[patchi];
+        }
     }
 
     return tsum;
@@ -436,20 +624,52 @@ IOobject bdfDdtScheme<Type>::ddtIOobject(const word& name) const
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
 template<class Type>
+scalarList bdfDdtScheme<Type>::fieldWeights
+(
+    const GeometricField<Type, fvPatchField, volMesh>& vf
+) const
+{
+    return weights(order(vf));
+}
+
+
+template<class Type>
 tmp<GeometricField<Type, fvPatchField, volMesh>>
 bdfDdtScheme<Type>::fvcDdt
 (
     const dimensioned<Type>& dt
 )
 {
-    // The mesh is static, so the time derivative of a constant is zero.
-    return tmp<GeometricField<Type, fvPatchField, volMesh>>::New
+    tmp<GeometricField<Type, fvPatchField, volMesh>> tdtdt
     (
-        ddtIOobject(dt.name()),
-        mesh(),
-        dimensioned<Type>(dt.dimensions()/dimTime, Zero),
-        calculatedFvPatchField<Type>::typeName
+        tmp<GeometricField<Type, fvPatchField, volMesh>>::New
+        (
+            ddtIOobject(dt.name()),
+            mesh(),
+            dimensioned<Type>(dt.dimensions()/dimTime, Zero),
+            calculatedFvPatchField<Type>::typeName
+        )
     );
+
+    if (mesh().moving())
+    {
+        // The rate of change of the cell integral of a constant:
+        // sum_k a_k V^(n+1-k) / (dt V^(n+1))
+        const volScalarField& V = cellVolumes();
+        const scalarList a(weights(order(V)));
+        const scalar rDeltaT = 1.0/mesh().time().deltaTValue();
+
+        scalarField c(a[0]*mesh().V());
+
+        for (label k = 1; k < a.size(); ++k)
+        {
+            c += a[k]*level(V, k).primitiveField();
+        }
+
+        tdtdt.ref().primitiveFieldRef() = (rDeltaT*dt.value())*c/mesh().V();
+    }
+
+    return tdtdt;
 }
 
 
@@ -468,7 +688,7 @@ bdfDdtScheme<Type>::fvcDdt
         new GeometricField<Type, fvPatchField, volMesh>
         (
             ddtIOobject(vf.name()),
-            rDeltaT*(a[0]*vf - history(vf, a))
+            rDeltaT*(a[0]*vf - history(vf, a, mesh().moving()))
         )
     );
 }
@@ -490,7 +710,7 @@ bdfDdtScheme<Type>::fvcDdt
         new GeometricField<Type, fvPatchField, volMesh>
         (
             ddtIOobject(rho.name() + ',' + vf.name()),
-            rDeltaT*rho*(a[0]*vf - history(vf, a))
+            rDeltaT*rho*(a[0]*vf - history(vf, a, mesh().moving()))
         )
     );
 }
@@ -512,7 +732,7 @@ bdfDdtScheme<Type>::fvcDdt
         new GeometricField<Type, fvPatchField, volMesh>
         (
             ddtIOobject(rho.name() + ',' + vf.name()),
-            rDeltaT*(a[0]*rho*vf - history(rho, vf, a))
+            rDeltaT*(a[0]*rho*vf - history(rho, vf, a, mesh().moving()))
         )
     );
 }
@@ -535,7 +755,8 @@ bdfDdtScheme<Type>::fvcDdt
         new GeometricField<Type, fvPatchField, volMesh>
         (
             ddtIOobject(alpha.name() + ',' + rho.name() + ',' + vf.name()),
-            rDeltaT*(a[0]*alpha*rho*vf - history(alpha, rho, vf, a))
+            rDeltaT
+           *(a[0]*alpha*rho*vf - history(alpha, rho, vf, a, mesh().moving()))
         )
     );
 }
@@ -564,7 +785,10 @@ bdfDdtScheme<Type>::fvmDdt
 
     fvm.diag() = (a[0]*rDeltaT)*mesh().V();
 
-    fvm.source() = rDeltaT*mesh().V()*history(vf, a)().primitiveField();
+    // On a moving mesh the weighted history gives
+    // sum_k (-a_k) V^(n+1-k) vf^(n+1-k)
+    fvm.source() =
+        rDeltaT*mesh().V()*history(vf, a, mesh().moving())().primitiveField();
 
     return tfvm;
 }
@@ -595,7 +819,8 @@ bdfDdtScheme<Type>::fvmDdt
     fvm.diag() = (a[0]*rDeltaT*rho.value())*mesh().V();
 
     fvm.source() =
-        rDeltaT*rho.value()*mesh().V()*history(vf, a)().primitiveField();
+        rDeltaT*rho.value()*mesh().V()
+       *history(vf, a, mesh().moving())().primitiveField();
 
     return tfvm;
 }
@@ -626,7 +851,8 @@ bdfDdtScheme<Type>::fvmDdt
     fvm.diag() = (a[0]*rDeltaT)*rho.primitiveField()*mesh().V();
 
     fvm.source() =
-        rDeltaT*mesh().V()*history(rho, vf, a)().primitiveField();
+        rDeltaT*mesh().V()
+       *history(rho, vf, a, mesh().moving())().primitiveField();
 
     return tfvm;
 }
@@ -659,7 +885,8 @@ bdfDdtScheme<Type>::fvmDdt
         (a[0]*rDeltaT)*alpha.primitiveField()*rho.primitiveField()*mesh().V();
 
     fvm.source() =
-        rDeltaT*mesh().V()*history(alpha, rho, vf, a)().primitiveField();
+        rDeltaT*mesh().V()
+       *history(alpha, rho, vf, a, mesh().moving())().primitiveField();
 
     return tfvm;
 }
@@ -954,21 +1181,69 @@ bdfDdtScheme<Type>::fvcDdtPhiCorr
 template<class Type>
 tmp<surfaceScalarField> bdfDdtScheme<Type>::meshPhi
 (
-    const GeometricField<Type, fvPatchField, volMesh>&
+    const GeometricField<Type, fvPatchField, volMesh>& vf
 )
 {
-    // Unreachable in practice: construction already fails on a moving mesh,
-    // the only case in which the mesh flux is asked for. The name is given
-    // literally, as mesh().phi() is fatal on a static mesh.
-    checkStaticMesh();
+    if (!mesh().moving())
+    {
+        // The name is given literally, as mesh().phi() is fatal on a static
+        // mesh
+        return surfaceScalarField::New
+        (
+            "meshPhi",
+            IOobject::NO_REGISTER,
+            mesh(),
+            dimensionedScalar(dimVolume/dimTime, Zero)
+        );
+    }
 
-    return surfaceScalarField::New
+    // The mesh flux whose divergence is the formula applied to the volumes:
+    // sum_k a_k V^(n+1-k) = sum_j b_j (V^(n+1-j) - V^(n-j)),
+    // b_j = a_0 + .. + a_j,
+    // and the mesh flux of step n+1-j integrates to that step's change of
+    // volume over its own dt, so meshPhi = sum_j b_j (dt_j/dt) meshPhi^(n+1-j)
+    // over the q steps used. Only BDF 2 may have dt_1 != dt.
+    //
+    // Order q uses the mesh fluxes of q - 1 old steps, so the order is also
+    // limited by the genuine old levels of the mesh flux: a copied level
+    // must not be weighted as an older flux. The history of the mesh flux
+    // starts with that of the volumes (see cellVolumes), so this limit only
+    // acts if the mesh flux has fewer levels, e.g. if no ddt term saw the
+    // moved mesh before meshPhi was first called.
+    const label q = order(vf);
+    const surfaceScalarField& phi = mesh().phi();
+    const scalarList a(weights(min(q, meshFluxLevels() + 1)));
+
+    scalar b = a[0];
+
+    tmp<surfaceScalarField> tmeshPhi
     (
-        "meshPhi",
-        IOobject::NO_REGISTER,
-        mesh(),
-        dimensionedScalar(dimVolume/dimTime, Zero)
+        new surfaceScalarField
+        (
+            IOobject
+            (
+                phi.name(),
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE,
+                false
+            ),
+            b*phi
+        )
     );
+
+    for (label j = 1; j < a.size() - 1; ++j)
+    {
+        b += a[j];
+
+        const scalar dtRatio =
+            j == 1 ? deltaT0()/mesh().time().deltaTValue() : 1;
+
+        tmeshPhi.ref() += (b*dtRatio)*level(phi, j);
+    }
+
+    return tmeshPhi;
 }
 
 

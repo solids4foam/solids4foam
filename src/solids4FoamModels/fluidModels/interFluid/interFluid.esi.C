@@ -32,6 +32,7 @@ License
 #include "movingWallPressureFvPatchScalarField.H"
 #include "EulerDdtScheme.H"
 #include "backwardDdtScheme.H"
+#include "bdfFsiCheck.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -98,6 +99,13 @@ void interFluid::updateRobinFsiInterfacePhi
             const word ddtScheme
             (
                 mesh().ddtScheme("ddt(" + U.name() +')')
+            );
+
+            bdfFsiCheck
+            (
+                ddtScheme,
+                "ddt(" + U.name() + ')',
+                "interFluid::updateRobinFsiInterfacePhi"
             );
 
             if (ddtScheme == fv::EulerDdtScheme<vector>::typeName)
@@ -209,6 +217,13 @@ void interFluid::updateRobinFsiInterfaceRAU
             const word ddtScheme
             (
                 mesh().ddtScheme("ddt(" + U.name() +')')
+            );
+
+            bdfFsiCheck
+            (
+                ddtScheme,
+                "ddt(" + U.name() + ')',
+                "interFluid::updateRobinFsiInterfaceRAU"
             );
 
             if (ddtScheme == fv::EulerDdtScheme<vector>::typeName)
