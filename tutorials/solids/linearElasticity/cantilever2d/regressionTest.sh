@@ -79,11 +79,24 @@ UNSCOUPLED_REL_TOL=1e-4
 # change in E makes
 VERTEX_CENTRED_DISP_REL_TOL=1e-6
 
+# The coloured finite-difference Jacobian changes only the Jacobian, so its
+# final D must equal that of the petscSnes arm, which uses the compact one.
+# Both are converged far below the six written figures; the tolerance, 1e-5
+# of the largest component, is a few units in the last of them. The Jacobian
+# is exact for this linear problem, so Newton converges in one iteration with
+# a few Krylov iterations; the compact Jacobian needs three Newton iterations
+# and about 80 Krylov iterations each, so the limits below also show that the
+# finite-difference Jacobian was used
+FD_JACOBIAN_DISP_REL_TOL=1e-5
+FD_JACOBIAN_MAX_NEWTON=2
+FD_JACOBIAN_MAX_KRYLOV_PER_NEWTON=10
+
 SOLVER_LOGFILE="log.solids4Foam"
 ALLRUN_LOGFILE="log.Allrun"
 
 APPROACHES=(
     petscSnes
+    petscSnes-colouredFiniteDifference
     unsCoupled
     highOrder-movingLeastSquares
     highOrder-kExactLeastSquares
@@ -108,6 +121,7 @@ prepare_case() {
     # A result kept from the vertex-centred arm of an earlier run would let
     # this run's comparison pass without the arm having produced anything
     rm -f "${REGRESSION_ROOT}"/pointD.vertexCentred*
+    rm -f "${REGRESSION_ROOT}/D.petscSnes"
 
     for item in "${SCRIPT_DIR}"/*; do
         base_item=$(basename "${item}")
@@ -499,10 +513,75 @@ select_run_approach() {
             rm -f "${CASE_DIR}/constant/solidProperties.highOrder.bak"
             RUN_APPROACH=highOrder
             ;;
+        petscSnes-colouredFiniteDifference)
+            if ! grep -q "jacobian *colouredFiniteDifference" \
+                "${CASE_DIR}/constant/solidProperties.petscSnes"
+            then
+                "${SOLIDS4FOAM_SED}" -i \
+                    's|^\( *\)solutionAlgorithm .*|&\n\1jacobian colouredFiniteDifference;|' \
+                    "${CASE_DIR}/constant/solidProperties.petscSnes"
+            fi
+            RUN_APPROACH=petscSnes
+            ;;
         *)
             RUN_APPROACH="${requested}"
             ;;
     esac
+}
+
+# The petscSnes arm with the coloured finite-difference Jacobian: the same
+# solution as the compact Jacobian, with the iterations of an exact Jacobian
+check_fd_jacobian() {
+    local log="${CASE_DIR}/${SOLVER_LOGFILE}"
+    local failures=0
+    local t norms refMax refMean stats
+
+    if ! grep -q "directional check" "${log}"; then
+        echo "FAIL: petscSnes-colouredFiniteDifference did not build the" \
+            "finite-difference Jacobian"
+        return 1
+    fi
+
+    t=$(solids4Foam::latestTime "${CASE_DIR}")
+
+    if ! norms=$(solids4Foam::internalFieldNorms \
+        "${REGRESSION_ROOT}/D.petscSnes")
+    then
+        echo "FAIL: no petscSnes D field to compare the finite-difference" \
+            "Jacobian with"
+        return 1
+    fi
+    read -r refMax refMean <<< "${norms}"
+
+    if ! solids4Foam::checkFieldNorms "colouredFiniteDifference D" \
+        "${CASE_DIR}/${t}/D" "${refMax}" "${refMean}" \
+        "${FD_JACOBIAN_DISP_REL_TOL}"
+    then
+        failures=$((failures + 1))
+    fi
+
+    # "<n> Newton iterations, <m> Krylov iterations"
+    stats=$(awk '
+        /Linear solve converged/ { k += $NF }
+        /Nonlinear solve converged/ { n += $NF }
+        END { printf "%d\t%d\n", n, k }
+    ' "${log}")
+    local nNewton nKrylov
+    read -r nNewton nKrylov <<< "${stats}"
+
+    if awk "BEGIN {exit !(${nNewton} >= 1 \
+        && ${nNewton} <= ${FD_JACOBIAN_MAX_NEWTON} \
+        && ${nKrylov} <= ${FD_JACOBIAN_MAX_KRYLOV_PER_NEWTON}*${nNewton})}"
+    then
+        printf "PASS: colouredFiniteDifference: %d Newton, %d Krylov iterations\n" \
+            "${nNewton}" "${nKrylov}"
+    else
+        printf "FAIL: colouredFiniteDifference: %d Newton, %d Krylov iterations\n" \
+            "${nNewton}" "${nKrylov}"
+        failures=$((failures + 1))
+    fi
+
+    return "${failures}"
 }
 
 # The case directory is cleaned between approaches, so the unsCoupled result
@@ -694,6 +773,20 @@ if [ "$CHECK_ONLY" = false ]; then
         fi
 
         if [[ "${RUN_APPROACH}" == highOrder* ]] && ! check_high_order_errors; then
+            failures=$((failures + 1))
+        fi
+
+        # Keep the petscSnes result for the finite-difference Jacobian arm
+        if [[ "${approach}" == petscSnes ]]; then
+            t=$(solids4Foam::latestTime "${CASE_DIR}")
+            if [[ -n "${t}" && -f "${CASE_DIR}/${t}/D" ]]; then
+                cp "${CASE_DIR}/${t}/D" "${REGRESSION_ROOT}/D.petscSnes"
+            fi
+        fi
+
+        if [[ "${approach}" == petscSnes-colouredFiniteDifference ]] \
+            && ! check_fd_jacobian
+        then
             failures=$((failures + 1))
         fi
 

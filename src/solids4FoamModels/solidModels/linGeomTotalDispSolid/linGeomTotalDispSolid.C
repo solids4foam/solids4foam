@@ -755,7 +755,8 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
         mesh(),
         solutionLocation::CELLS,
         solidModelDict().lookupOrDefault<Switch>("stopOnPetscError", true),
-        bool(solutionAlg() == solutionAlgorithm::PETSC_SNES)
+        bool(solutionAlg() == solutionAlgorithm::PETSC_SNES),
+        solidModelDict()
     ),
     impK_(makeImpK()),
     impKf_(fvc::interpolate(impK_)),

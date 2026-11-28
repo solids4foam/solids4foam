@@ -906,7 +906,8 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
         mesh(),
         solutionLocation::CELLS,
         solidModelDict().lookupOrDefault<Switch>("stopOnPetscError", true),
-        bool(solutionAlg() == solutionAlgorithm::PETSC_SNES)
+        bool(solutionAlg() == solutionAlgorithm::PETSC_SNES),
+        solidModelDict()
     ),
     F_
     (

@@ -27,6 +27,7 @@ License
 #include "IFstream.H"
 #include "petscUtils.H"
 #include "petscErrorHandling.H"
+#include "colouredFiniteDifferenceJacobian.H"
 #include <petsc/private/pcimpl.h>
 #include "petscdmshell.h"
 #ifdef OPENFOAM_NOT_EXTEND
@@ -123,6 +124,9 @@ PetscErrorCode formJacobianFoamPetscSnesHelper
     // Complete matrix assembly
     CHKERRQ(MatAssemblyBegin(B, MAT_FINAL_ASSEMBLY));
     CHKERRQ(MatAssemblyEnd(B, MAT_FINAL_ASSEMBLY));
+
+    // Optionally replace B by a coloured finite-difference Jacobian
+    user->solMod_.applyFiniteDifferenceJacobian(B, x);
 
     if (jac != B)
     {
@@ -561,7 +565,8 @@ foamPetscSnesHelper::foamPetscSnesHelper
     const fvMesh& mesh,
     const solutionLocation& location,
     const Switch stopOnPetscError,
-    const Switch initialise
+    const Switch initialise,
+    const dictionary& dict
 )
 :
     location_(location),
@@ -588,8 +593,38 @@ foamPetscSnesHelper::foamPetscSnesHelper
     ),
     neiProcGlobalIDs_(),
     neiProcVolumes_(),
-    snesHasRun_(false)
+    snesHasRun_(false),
+    fdJacobian_(false),
+    fdJacobianCheck_(dict.lookupOrDefault<Switch>("jacobianCheck", false)),
+    fdJacobianCheckTolerance_
+    (
+        dict.lookupOrDefault<scalar>("jacobianCheckTolerance", 1e-4)
+    ),
+    fdJacobianPtr_()
 {
+    const word jacobian(dict.lookupOrDefault<word>("jacobian", "compact"));
+
+    if (jacobian == "colouredFiniteDifference")
+    {
+        fdJacobian_ = true;
+
+        if (location != solutionLocation::CELLS)
+        {
+            FatalIOErrorInFunction(dict)
+                << "jacobian colouredFiniteDifference is implemented for "
+                << "cell-centred unknowns only" << exit(FatalIOError);
+        }
+
+        Info<< "Jacobian: coloured finite differences of the residual"
+            << endl;
+    }
+    else if (jacobian != "compact")
+    {
+        FatalIOErrorInFunction(dict)
+            << "Unknown jacobian " << jacobian << ": valid options are "
+            << "compact and colouredFiniteDifference" << exit(FatalIOError);
+    }
+
     if (initialise)
     {
         // Initialise PETSc without any options file
@@ -699,6 +734,47 @@ foamPetscSnesHelper::~foamPetscSnesHelper()
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
+void foamPetscSnesHelper::applyFiniteDifferenceJacobian(Mat B, const Vec x)
+{
+    if (!fdJacobian_)
+    {
+        return;
+    }
+
+    if (fdJacobianPtr_.empty())
+    {
+        fdJacobianPtr_.reset
+        (
+            new colouredFiniteDifferenceJacobian("jacobian", *this)
+        );
+    }
+
+    // Rebuild at every Jacobian evaluation: how often the Jacobian is
+    // evaluated is controlled by the SNES options (-snes_lag_jacobian and
+    // -snes_lag_jacobian_persists)
+    colouredFiniteDifferenceJacobian& fdJacobian = fdJacobianPtr_();
+    fdJacobian.apply(B, x, true);
+
+    // The first build is always checked: a residual that depends on cells
+    // beyond two layers, or is not differentiable, gives a wrong Jacobian
+    if (fdJacobian.nBuilds() == 1 || fdJacobianCheck_)
+    {
+        const scalar relErr = fdJacobian.check(x);
+
+        if (relErr > fdJacobianCheckTolerance_)
+        {
+            FatalErrorInFunction
+                << "The finite-difference Jacobian differs from a directional "
+                << "derivative of the residual by " << relErr
+                << " (jacobianCheckTolerance " << fdJacobianCheckTolerance_
+                << "). The residual depends on cells beyond the two-layer "
+                << "stencil or is not differentiable: use jacobian compact"
+                << exit(FatalError);
+        }
+    }
+}
+
+
 void foamPetscSnesHelper::resetSnes()
 {
     Info<< "Resetting SNES" << endl;
@@ -707,6 +783,7 @@ void foamPetscSnesHelper::resetSnes()
     x_.reset();
     A_.reset();
     snesUserPtr_.clear();
+    fdJacobianPtr_.clear();
 
     if (initialiseSnes() != 0)
     {

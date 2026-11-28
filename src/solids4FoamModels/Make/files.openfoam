@@ -215,6 +215,7 @@ numerics/boolIOList/boolIOList.C
 numerics/cellPointLeastSquaresVectors/cellPointLeastSquaresVectors.C
 numerics/deltaVectors/deltaVectors.C
 numerics/foamPetscSnesHelper/foamPetscSnesHelper.C
+numerics/foamPetscSnesHelper/colouredFiniteDifferenceJacobian/colouredFiniteDifferenceJacobian.C
 numerics/foamPetscSnesHelper/foamPetscSnesHelperEnums.C
 numerics/foamPetscSnesHelper/petscUtils.C
 numerics/foamPetscSnesHelper/petscErrorHandling.C

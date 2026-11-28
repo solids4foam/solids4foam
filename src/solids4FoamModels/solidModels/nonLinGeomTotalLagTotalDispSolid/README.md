@@ -69,6 +69,9 @@ The following `solidModel` options are particularly relevant here:
 | `predictor` | `false` | Linear predictor for `D` at new time steps |
 | `optionsFile` | `petscOptions` | PETSc options file |
 | `stopOnPetscError` | `true` | Stop if PETSc reports an error |
+| `jacobian` | `compact` | SNES Jacobian (see the note below) |
+| `jacobianCheck` | `false` | Check every finite-difference build |
+| `jacobianCheckTolerance` | `1e-4` | Finite-difference check tolerance |
 | `relaxationMethod` | `fixed` | Under-relaxation method |
 | `nCorrectors` | `10000` | Maximum number of outer correctors |
 | `solutionTolerance` | `1e-06` | Primary convergence tolerance |
@@ -80,6 +83,11 @@ The following `solidModel` options are particularly relevant here:
 | `stabilisation` | auto-created if absent | Has `momentum` and `pressure` |
 | `cellDisplacements` | optional | Internal-cell displacement constraints |
 | `solvePressure` | `false` | Pressure unknown, only with `PETScSNES` |
+
+`jacobian colouredFiniteDifference` replaces the compact approximate Jacobian
+of the PETSc SNES path by a coloured finite-difference Jacobian of the
+residual; see
+`numerics/foamPetscSnesHelper/colouredFiniteDifferenceJacobian/README.md`.
 
 For `stabilisation`, the code creates a default dictionary if none is
 provided. The default sub-model is `diffStencilLaplacian` with
