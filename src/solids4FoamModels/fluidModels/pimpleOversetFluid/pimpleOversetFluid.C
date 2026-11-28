@@ -87,7 +87,10 @@ pimpleOversetFluid::pimpleOversetFluid
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-tmp<vectorField> pimpleOversetFluid::patchViscousForce(const label patchID) const
+tmp<vectorField> pimpleOversetFluid::patchViscousForce
+(
+    const label patchID
+) const
 {
     tmp<vectorField> tvF
     (
@@ -110,7 +113,10 @@ tmp<vectorField> pimpleOversetFluid::patchViscousForce(const label patchID) cons
 }
 
 
-tmp<scalarField> pimpleOversetFluid::patchPressureForce(const label patchID) const
+tmp<scalarField> pimpleOversetFluid::patchPressureForce
+(
+    const label patchID
+) const
 {
     tmp<scalarField> tpF
     (

@@ -38,7 +38,11 @@ label orient3d(const point& a, const point& b, const point& c, const point& d)
 }
 
 
-bool checkIntersectionOfLineAndTriangle(const Pair<vector>& S, const triPointRef& t)
+bool checkIntersectionOfLineAndTriangle
+(
+    const Pair<vector>& S,
+    const triPointRef& t
+)
 {
     // Intersect([q1,q2],(t1,t2,t3))
     //   s1 = orient3d(q1,t1,t2,t3)
@@ -82,7 +86,12 @@ bool checkIntersectionOfLineAndTriangle(const Pair<vector>& S, const triPointRef
 }
 
 
-bool pointInNonConvexCell(const polyMesh& mesh, const point& p, const label cellI)
+bool pointInNonConvexCell
+(
+    const polyMesh& mesh,
+    const point& p,
+    const label cellI
+)
 {
     // Algorithm taken from https://stackoverflow.com/questions/44513525/
     // testing-whether-a-3d-point-is-inside-a-3d-polyhedron

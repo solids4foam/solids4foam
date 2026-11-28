@@ -18,6 +18,7 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "tractionPressureDisplacementFvPatchVectorField.H"
+#include "patchCorrectionVectors.H"
 #include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
 #include "fixedGradientFvPatchFields.H"
@@ -118,14 +119,8 @@ dispCorr(const bool refConfig) const
     );
     vectorField& DispCorr = tDispCorr();
 
-    // Normal vector
-    const vectorField n = patch().nf();
-
-    // Delta vectors
-    const vectorField delta = patch().delta();
-
     // Non-orthogonal correction vectors
-    vectorField k = ((I - sqr(n)) & delta);
+    const vectorField k(patchCorrectionVectors(patch()));
 
     word DDName =
         this->dimensionedInternalField().name();

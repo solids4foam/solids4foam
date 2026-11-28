@@ -1,6 +1,6 @@
-# HronTurek verification studies
+# TurekHron2006 verification studies
 
-This directory contains opt-in verification studies for the `HronTurek`
+This directory contains opt-in verification studies for the `TurekHron2006`
 tutorial. By default they compare the periodic response of the Turek-Hron FSI3
 benchmark, computed with the partitioned Dirichlet-Neumann IQN-ILS and
 Robin-Neumann couplings, with the published reference values of Turek and
@@ -14,7 +14,7 @@ Source a supported OpenFOAM environment, build solids4foam with PETSc, and run
 from this directory:
 
 ```bash
-cd tutorials/fluidSolidInteraction/HronTurek/verification
+cd tutorials/fluidSolidInteraction/TurekHron2006/verification
 ./Allverify                            # IQN-ILS mesh study, levels 1x and 2x
 ./Allverify --coupling robin           # the same sweep with Robin-Neumann coupling
 ./Allverify --levels 1,2,4             # add the 4x mesh (expensive)

@@ -313,8 +313,8 @@ Description
     }
     \endverbatim
 
-    The fields lambda, Ui, kappa and f are written with the name of the option as a
-    prefix, e.g. immersedBoundary:lambda. With the incremental method, f is
+    The fields lambda, Ui, kappa and f are written with the name of the option
+    as a prefix, e.g. immersedBoundary:lambda. With the incremental method, f is
     read on restart.
 
 Author

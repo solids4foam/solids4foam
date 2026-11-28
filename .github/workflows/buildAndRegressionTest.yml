@@ -5,6 +5,10 @@ on:
   workflow_dispatch:
   pull_request:
 
+# The GITHUB_TOKEN is only needed to read the repository
+permissions:
+  contents: read
+
 jobs:
   build-and-regression-test:
     name: Build and regression test on ${{ matrix.container-image.name }}
@@ -14,7 +18,7 @@ jobs:
       matrix:
         container-image:
           - name: "OpenFOAM-v2512-PETSc"
-            image: "philippic/openfoam-v2512:ubuntu-22.04-petsc-no-openmp-system-blas-gmsh"
+            image: "philippic/openfoam-v2512:ubuntu-24.04-petsc-no-openmp-system-blas-gmsh"
             source: "/usr/lib/openfoam/openfoam2512/etc/bashrc"
             buildflags: "-j"
 
@@ -65,7 +69,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: regression-test-logs.${{ matrix.container-image.name }}
-          path: tutorialsTest-regression
+          # Only the logs: some cases write fields whose names contain ':'
+          # (e.g. sigma:Transformed), which upload-artifact rejects
+          path: tutorialsTest-regression/**/log.*
           retention-days: 10
 
       - name: Set job status

@@ -29,10 +29,10 @@ Description
     constant/solidProperties, and therefore applies to movingLeastSquares and
     kExactLeastSquares.
 
-    This initial utility tests serial assembly. Parallel execution is skipped
-    until processor-face assembly is implemented in
-    hofvm::insertAlphaStabIntoPETScMatrix(). A fixed-value-boundary check is
-    reported as skipped when the case has no fixed-value displacement patch.
+    In parallel, processor faces are included in the internal-face check,
+    since they are internal faces split between two processors. A
+    fixed-value-boundary check is reported as skipped when the case has no
+    fixed-value displacement patch.
 
 Author
     Ivan Batistic, UCD.
@@ -66,6 +66,7 @@ int main(int argc, char *argv[])
 #include "leastSquaresScheme.H"
 #include "petscErrorHandling.H"
 #include "solidModel.H"
+#include "processorFvPatch.H"
 
 using namespace Foam;
 
@@ -95,7 +96,7 @@ vectorField explicitStabilisationResidual
 (
     const stabilisationModel& stabilisation,
     volVectorField& displacement,
-    const volTensorField& dummyGrad,
+    const leastSquaresScheme& reconstruction,
     const surfaceScalarField& diffusivity,
     const vectorField& values
 )
@@ -103,7 +104,7 @@ vectorField explicitStabilisationResidual
     Foam::primitiveFieldRef(displacement) = values;
     displacement.correctBoundaryConditions();
 
-    stabilisation.updateVector(displacement, &dummyGrad);
+    stabilisation.updateVectorHighOrder(displacement, reconstruction);
 
     const volVectorField& cellStabilisation =
         stabilisation.cellVector(&diffusivity, true);
@@ -123,7 +124,7 @@ vectorField finiteDifferenceJacobianVectorProduct
 (
     const stabilisationModel& stabilisation,
     volVectorField& displacement,
-    const volTensorField& dummyGrad,
+    const leastSquaresScheme& reconstruction,
     const surfaceScalarField& diffusivity,
     const vectorField& direction,
     const scalar epsilon
@@ -140,7 +141,7 @@ vectorField finiteDifferenceJacobianVectorProduct
     (
         stabilisation,
         displacement,
-        dummyGrad,
+        reconstruction,
         diffusivity,
         plusValues
     );
@@ -148,7 +149,7 @@ vectorField finiteDifferenceJacobianVectorProduct
     (
         stabilisation,
         displacement,
-        dummyGrad,
+        reconstruction,
         diffusivity,
         minusValues
     );
@@ -257,7 +258,6 @@ jacobianError runCheck
 (
     const stabilisationModel& stabilisation,
     volVectorField& displacement,
-    const volTensorField& dummyGrad,
     const leastSquaresScheme& reconstruction,
     const foamPetscSnesHelper& petscHelper,
     Mat jacobian,
@@ -274,7 +274,7 @@ jacobianError runCheck
         (
             stabilisation,
             displacement,
-            dummyGrad,
+            reconstruction,
             diffusivity,
             direction,
             epsilon
@@ -320,15 +320,6 @@ int main(int argc, char *argv[])
 {
     #include "setRootCase.H"
     #include "createTime.H"
-
-    if (Pstream::parRun())
-    {
-        Info<< "Test-alphaStabJacobian: SKIPPED in parallel until "
-            << "processor-face matrix assembly is implemented"
-            << nl << endl;
-
-        return 0;
-    }
 
     autoPtr<solidModel> solidPtr = solidModel::New
     (
@@ -418,25 +409,6 @@ int main(int argc, char *argv[])
         );
     }
 
-    volTensorField dummyGrad
-    (
-        IOobject
-        (
-            "alphaStabJacobianDummyGrad",
-            runTime.timeName(),
-            mesh,
-            IOobject::NO_READ,
-            IOobject::NO_WRITE
-        ),
-        mesh,
-        dimensionedTensor
-        (
-            "zero",
-            displacement.dimensions()/dimLength,
-            tensor::zero
-        )
-    );
-
     surfaceScalarField internalDiffusivity
     (
         IOobject
@@ -452,6 +424,24 @@ int main(int argc, char *argv[])
     );
     Foam::primitiveFieldRef(internalDiffusivity) = 1.0;
     Foam::boundaryFieldRef(internalDiffusivity) = 0.0;
+
+    // Processor faces are internal faces split between two processors
+    label nProcessorFaces = 0;
+    forAll(mesh.boundary(), patchI)
+    {
+        if (isA<processorFvPatch>(mesh.boundary()[patchI]))
+        {
+            Foam::boundaryFieldRef(internalDiffusivity)[patchI] = 1.0;
+            nProcessorFaces += mesh.boundary()[patchI].size();
+        }
+    }
+    reduce(nProcessorFaces, sumOp<label>());
+
+    if (Pstream::parRun())
+    {
+        Info<< "Processor faces in the internal-face check: "
+            << nProcessorFaces << nl << endl;
+    }
 
     surfaceScalarField boundaryDiffusivity
     (
@@ -509,7 +499,6 @@ int main(int argc, char *argv[])
     (
         stabilisation,
         displacement,
-        dummyGrad,
         reconstruction,
         petscHelper,
         internalJacobian.get(),
@@ -523,7 +512,9 @@ int main(int argc, char *argv[])
     printResult("Internal-face contribution", internalError);
     passed = passed && internalError.passed;
 
-    if (nFixedValueFaces)
+    // Global: the check below is collective, so a rank without fixed-value
+    // faces must still take part when another rank has some
+    if (returnReduce(nFixedValueFaces, sumOp<label>()))
     {
         MatHandle boundaryJacobian;
         hofvm::initialiseJacobian
@@ -539,7 +530,6 @@ int main(int argc, char *argv[])
         (
             stabilisation,
             displacement,
-            dummyGrad,
             reconstruction,
             petscHelper,
             boundaryJacobian.get(),

@@ -8,9 +8,14 @@ tutorialsTest*
 regressionTests*
 **/verification/work/
 **/verification/postProcessing/
+**/verification/traction/work/
+**/verification/traction/postProcessing/
 **/validation/work/
 **/validation/postProcessing/
 codex*.md
+
+# Python byte-code
+__pycache__/
 
 # Build log files
 log.Allwmake
@@ -110,3 +115,9 @@ compile_flags.txt
 .cache/
 
 # end-of-file
+
+# Pinned dependency of the advisory AI review scripts (npm ci)
+.github/scripts/node_modules/
+
+# Mesh archive and meshes downloaded by the ArosticaEtAl2025 tutorials
+tutorials/solids/hyperelasticity/ArosticaEtAl2025/data/

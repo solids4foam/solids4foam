@@ -255,7 +255,8 @@ void Foam::solidModel::checkWedges() const
             {
                 FatalErrorIn("void Foam::solidModel::checkWedges() const")
                     << "There are no faces on the wedge patch "
-                    << mesh.boundaryMesh()[patchI].name() << " on this processor:"
+                    << mesh.boundaryMesh()[patchI].name()
+                    << " on this processor:"
                     << nl << "Every processor should have at least one face on "
                     << "each wedge patch"
                     << abort(FatalError);
@@ -592,6 +593,44 @@ Foam::solidModel::pressureLeastSquares() const
         fixedValuePatchMask(p()),
         pressureHighOrderCoeffs()
     );
+}
+
+
+void Foam::solidModel::updateMomentumStabilisation
+(
+    const volVectorField& D,
+    const volTensorField& gradD
+) const
+{
+    const stabilisationModel& stab = momentumStabilisation();
+
+    if (highOrderResidual() && stab.supportsHighOrderResidual())
+    {
+        stab.updateVectorHighOrder(D, displacementLeastSquares());
+    }
+    else
+    {
+        stab.updateVector(D, &gradD);
+    }
+}
+
+
+void Foam::solidModel::updatePressureStabilisation
+(
+    const volScalarField& p,
+    const volVectorField& gradp
+) const
+{
+    const stabilisationModel& stab = pressureStabilisation();
+
+    if (highOrderResidual() && stab.supportsHighOrderResidual())
+    {
+        stab.updateScalarHighOrder(p, pressureLeastSquares());
+    }
+    else
+    {
+        stab.updateScalar(p, &gradp);
+    }
 }
 
 
@@ -1136,7 +1175,10 @@ Foam::solidModel::solidModel
 #ifdef OPENFOAM_COM
       ? solutionAlgorithmNames_.get("solutionAlgorithm", solidModelDict())
 #else
-      ? solutionAlgorithmNames_.read(solidModelDict().lookup("solutionAlgorithm"))
+      ? solutionAlgorithmNames_.read
+        (
+            solidModelDict().lookup("solutionAlgorithm")
+        )
 #endif
       : solutionAlgorithm::IMPLICIT_SEGREGATED
     ),
@@ -1996,7 +2038,10 @@ void Foam::solidModel::readHydrostaticSmoothing() const
     // solid-model setting in all but location: one equation is solved, with
     // the solid model's own momentum diagonal, so one answer is needed for
     // the whole mesh
-    const PtrList<entry> lawEntries(mechanicalProperties().lookup("mechanical"));
+    const PtrList<entry> lawEntries
+    (
+        mechanicalProperties().lookup("mechanical")
+    );
 
     label nRequested = 0;
     word requestingLaw;
@@ -2340,7 +2385,12 @@ void Foam::solidModel::DDisRequired()
     }
 
 #ifdef OPENFOAM_NOT_EXTEND
-    if (incremental() && !restart() && Dheader_.typeHeaderOk<volVectorField>(true))
+    if
+    (
+        incremental()
+     && !restart()
+     && Dheader_.typeHeaderOk<volVectorField>(true)
+    )
 #else
     if (incremental() && !restart() && Dheader_.headerOk())
 #endif

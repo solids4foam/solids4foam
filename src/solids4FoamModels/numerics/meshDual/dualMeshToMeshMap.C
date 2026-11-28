@@ -199,15 +199,16 @@ Foam::dualMeshToMeshMap::dualMeshToMeshMap
                     dualFaceCentres[dFaceID]
                   + 0.0001*minEdgeLength*perturb/mag(perturb);
 
-                // Check if the centre of the dual face dFaceID is within one of the
-                // point cells
+                // Check if the centre of the dual face dFaceID is within one of
+                // the point cells
                 forAll(curPointCells, pcI)
                 {
                     const label cellID = curPointCells[pcI];
 
                     if (debug)
                     {
-                        Info<< "    point cell = " << mesh.cellCentres()[cellID] << endl;
+                        Info<< "    point cell = "
+                            << mesh.cellCentres()[cellID] << endl;
                     }
 
                     if
@@ -392,7 +393,8 @@ Foam::dualMeshToMeshMap::dualMeshToMeshMap
         }
 
         FatalErrorIn("dualMeshToMeshMap::dualMeshToMeshMap(...)")
-            << "gMin(dualCellToPoint_) == -1: problem setting dualCellToPoint map"
+            << "gMin(dualCellToPoint_) == -1: problem setting "
+               "dualCellToPoint map"
             << nl << "There are " << count << " cells not set"
             << abort(FatalError);
     }

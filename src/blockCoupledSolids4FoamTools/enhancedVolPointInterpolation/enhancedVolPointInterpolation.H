@@ -62,7 +62,12 @@ class pointMesh;
 
 class enhancedVolPointInterpolation
 :
-    public MeshObject<fvMesh, UpdateableMeshObject, enhancedVolPointInterpolation>
+    public MeshObject
+    <
+        fvMesh,
+        UpdateableMeshObject,
+        enhancedVolPointInterpolation
+    >
 {
     // Private data
 
@@ -163,7 +168,10 @@ class enhancedVolPointInterpolation
         ) const;
 
         //- No copy construct
-        enhancedVolPointInterpolation(const enhancedVolPointInterpolation&) = delete;
+        enhancedVolPointInterpolation
+        (
+            const enhancedVolPointInterpolation&
+        ) = delete;
 
         //- No copy assignment
         void operator=(const enhancedVolPointInterpolation&) = delete;

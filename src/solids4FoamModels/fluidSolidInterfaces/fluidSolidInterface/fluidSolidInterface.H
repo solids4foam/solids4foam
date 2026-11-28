@@ -191,6 +191,16 @@ class fluidSolidInterface
         //  positive.
         const scalar outerCorrAbsoluteTolerance_;
 
+        //- Transfer the fluid viscous traction and pressure separately, and
+        //  apply the pressure along the solid face normals, instead of
+        //  transferring the total fluid traction. The interface-mean
+        //  pressure is applied exactly on the solid faces and only the
+        //  variation about it is interpolated, so a fluid interface that
+        //  does not reproduce the solid surface (faceted or chamfered edges,
+        //  a different area) no longer turns the mean pressure into a
+        //  spurious net load
+        const Switch separatePressureTransfer_;
+
         //- Pressure-change tolerance for Robin interfaces: the normalised
         //  change in interface pressure between FSI iterations. The default
         //  is 10*outerCorrTolerance, as for the kinematic residual below;

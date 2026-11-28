@@ -46,7 +46,7 @@ if (nonLinear_)
 }
 else
 {
-    // Info << "Calculate linear face forces" << endl;
+    // Info<< "Calculate linear face forces" << endl;
 
     surfaceVectorField nf = mesh().Sf()/mesh().magSf();
     // surfaceVectorField tGradDDn = ((I-sqr(nf)) & (gradDDf_ & nf));

@@ -25,8 +25,7 @@ The geometry is the idealised left ventricle of Land et al. [1]: a truncated
 ellipsoid, with an endocardial surface of semi-axes `7 mm` and `17 mm`, an
 epicardial surface of semi-axes `10 mm` and `20 mm`, and a base plane at
 `z = 5 mm`. The same geometry is used, without fibres or active tension, in the
-[`idealisedVentricle`](../../idealisedVentricle/README.md) tutorial (problem 2
-of the benchmark).
+[`LandEtAl2015/problem2`](../problem2/README.md) tutorial.
 
 The base (`fixed` patch) is held fixed. A pressure is applied to the
 endocardium (`inside` patch), increasing linearly from zero to `15 kPa` over

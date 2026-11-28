@@ -51,8 +51,8 @@ Description
     \endverbatim
 
 Author
-    Based on the custom profile bend of the immersed boundary library contributed to
-    cardiacFoam by Sairam Pamulaparthi Venkata, UCD.
+    Based on the custom profile bend of the immersed boundary library
+    contributed to cardiacFoam by Sairam Pamulaparthi Venkata, UCD.
     Philip Cardiff, UCD.
 
 SourceFiles
