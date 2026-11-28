@@ -531,6 +531,23 @@ The regression test also runs `Test-fvcDdt` on the mesh of the case. It checks
  so the solver results are unaffected, and it must be built and available on
  `PATH`.
 
+## Verification and Convergence Study
+
+The case also provides the data that a high-order (k-exact) finite volume
+ scheme needs. `initialiseTaylorGreenVortex -cellAverage` sets the cell values
+ to the exact cell averages of U and p instead of the cell-centre values, and
+ the `decayingTaylorGreenVortexVelocity` condition gives the exact velocity at
+ the face quadrature points of the high-order least-squares schemes. The
+ default case uses neither the averages nor the quadrature values, so its
+ results are unchanged.
+
+The opt-in `verification/Allverify` study runs the
+ `checkTaylorGreenVortexReconstruction` utility on the uniform and graded
+ meshes. The utility reconstructs U and p from their exact cell averages with
+ `kExactLeastSquares` for polynomial orders 1 to 3, and the study checks that
+ the values converge at order k + 1 and the gradients at order k. See
+ `verification/README.md` for the method and results.
+
 ## References
 
 [^erzincanli2013]: [Erzincanli, B. and Sahin, M. (2013). An arbitrary

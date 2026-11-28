@@ -23,11 +23,39 @@ License
 #include "surfaceFields.H"
 #include "fvcMeshPhi.H"
 #include "patchCorrectionVectors.H"
+#include "fvMeshQuadrature.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
 {
+
+// * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
+
+tmp<vectorField> decayingTaylorGreenVortexFvPatchVectorField::exactVelocity
+(
+    const vectorField& points
+) const
+{
+    const scalar Re = 10;
+    const scalar t = db().time().value();
+    const scalar pi = constant::mathematical::pi;
+    const scalar A = Foam::exp(-2.0*sqr(pi)*t/Re);
+
+    const scalarField x(points.component(vector::X));
+    const scalarField y(points.component(vector::Y));
+
+    return tmp<vectorField>
+    (
+        new vectorField
+        (
+            A*Foam::sin(pi*x)*Foam::cos(pi*y)*vector(1, 0, 0)
+          - A*Foam::cos(pi*x)*Foam::sin(pi*y)*vector(0, 1, 0)
+        )
+    );
+}
+
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
@@ -129,21 +157,7 @@ void decayingTaylorGreenVortexFvPatchVectorField::updateCoeffs()
         return;
     }
 
-    const scalar Re = 10;
-    const scalar t = db().time().value();
-    const scalar pi = constant::mathematical::pi;
-    const scalar A = Foam::exp(-2.0*sqr(pi)*t/Re);
-
-    const scalarField x(patch().Cf().component(vector::X));
-    const scalarField y(patch().Cf().component(vector::Y));
-
-    const vectorField velocity
-    (
-        A*Foam::sin(pi*x)*Foam::cos(pi*y)*vector(1, 0, 0)
-      - A*Foam::cos(pi*x)*Foam::sin(pi*y)*vector(0, 1, 0)
-    );
-
-    operator==(velocity);
+    operator==(exactVelocity(patch().Cf()));
 
     fixedValueFvPatchVectorField::updateCoeffs();
 }
@@ -216,6 +230,47 @@ decayingTaylorGreenVortexFvPatchVectorField::gradientBoundaryCoeffs() const
         return (patch().deltaCoeffs()*(*this));
     }
 }
+
+
+autoPtr<CompactListList<vector>>
+decayingTaylorGreenVortexFvPatchVectorField::quadratureValues
+(
+    const fvMeshQuadrature& quad
+) const
+{
+    // Quadrature points are indexed by global face labels
+    auto& faceQuadPoints = compactListListCRef(quad.faceQuadPoints());
+
+    const label start = patch().patch().start();
+
+    labelList nQpPerFace(size(), 0);
+    forAll(nQpPerFace, faceI)
+    {
+        nQpPerFace[faceI] = faceQuadPoints[faceI + start].size();
+    }
+
+    autoPtr<CompactListList<vector>> tQuadPointsValue
+    (
+        new CompactListList<vector>(nQpPerFace)
+    );
+    CompactListList<vector>& quadPointsValue = autoPtrRef(tQuadPointsValue);
+
+    forAll(nQpPerFace, faceI)
+    {
+        const vectorField velocity
+        (
+            exactVelocity(vectorField(faceQuadPoints[faceI + start]))
+        );
+
+        forAll(velocity, pointI)
+        {
+            quadPointsValue[faceI][pointI] = velocity[pointI];
+        }
+    }
+
+    return tQuadPointsValue;
+}
+
 
 void decayingTaylorGreenVortexFvPatchVectorField::write(Ostream& os) const
 {
