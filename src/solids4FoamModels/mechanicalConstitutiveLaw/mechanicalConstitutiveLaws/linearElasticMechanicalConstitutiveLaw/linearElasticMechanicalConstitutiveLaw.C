@@ -332,14 +332,27 @@ void Foam::linearElasticMechanicalConstitutiveLaw::evaluateElasticPredictor
     const scalar muVal = mu_.value();
     const scalar lambdaVal = lambda_.value();
 
+    // The initial stress is refused here, as logStrain refuses the
+    // framework prestress: the elastic history starts at zero, so a sigma0
+    // would be a Kirchhoff stress added to a stress-free reference, not the
+    // stress of a prestressed one. Each processor checks its own points
     const Field<symmTensor>& sigma0 = state.getSymmTensorField0("sigma0");
+
+    if (sigma0FromDict_ || (sigma0.size() && max(mag(sigma0)) > 0))
+    {
+        FatalErrorInFunction
+            << "An initial stress sigma0 is not supported when "
+            << type() << " is driven by an elastic strain, as under "
+            << "logStrain. Remove sigma0 from the law's dictionary and "
+            << "from the case."
+            << exit(FatalError);
+    }
 
     forAll(sigma, i)
     {
         epsilonE[i] = epsilonETrial[i];
 
-        sigma[i] =
-            2.0*muVal*epsilonE[i] + lambdaVal*tr(epsilonE[i])*I + sigma0[i];
+        sigma[i] = 2.0*muVal*epsilonE[i] + lambdaVal*tr(epsilonE[i])*I;
     }
 
     fillScalarTangent

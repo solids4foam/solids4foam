@@ -75,7 +75,8 @@ entries, as that law documents them.
 - Plane stress is refused. Solve the case in 3-D instead, with a symmetry
   plane at the back and a traction-free front.
 - Prestress is refused: the elastic history starts at zero, not at the
-  prestressed state.
+  prestressed state. This covers both the framework prestress and a
+  sub-law's own initial stress, such as `sigma0` in `linearElastic`.
 - A non-positive Jacobian `J` is a fatal error, since an inverted point has
   no logarithmic strain.
 

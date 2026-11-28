@@ -63,7 +63,8 @@ Description
       - no plane stress, whose out-of-plane stretch would have to be solved
         for at each point;
       - no prestress, since the elastic history starts at zero rather than
-        at the prestressed state;
+        at the prestressed state. This includes a sub-law's own initial
+        stress, such as sigma0 in linearElastic;
       - no mixed displacement-pressure split, and no analytical fourth-order
         tangent (fourthOrderFiniteDifference is available). The scalar
         tangent is the sub-law's small-strain one, which steers the

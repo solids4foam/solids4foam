@@ -124,7 +124,8 @@ inline void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::newtonLoop
 }
 
 
-inline void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::radialReturn
+inline void
+Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::radialReturn
 (
     const symmTensor& sTrial,
     const scalar epsilonPEq0,

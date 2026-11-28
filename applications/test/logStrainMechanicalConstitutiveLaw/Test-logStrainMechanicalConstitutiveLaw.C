@@ -47,6 +47,8 @@ Description
          is written to simpleShear.csv.
       6. A sub-law that cannot be driven by a trial elastic strain is
          refused.
+      7. A sub-law's own initial stress, sigma0 in linearElastic, is
+         refused, as the framework prestress is.
 
 Author
     Philip Cardiff, UCD.
@@ -599,6 +601,42 @@ int main(int argc, char *argv[])
         (
             threw,
             "a sub-law that provides no elastic predictor is refused",
+            threw ? 0 : 1, 0
+        );
+    }
+
+    // 7. A sub-law's own initial stress
+    {
+        Info<< nl << "7. Refused initial stress" << endl;
+
+        bool threw = false;
+
+        try
+        {
+            pointDriver law
+            (
+                mesh,
+                "prestressed",
+                lawDict
+                (
+                    "type logStrain; mechanicalLaw { type linearElastic; "
+                  + elastic
+                  + "sigma0 sigma0 [1 -1 -2 0 0 0 0] (1e6 0 0 0 0 0); }"
+                )
+            );
+
+            ++runTime;
+            law.finiteStrainStep(tensor(I));
+        }
+        catch (const Foam::error&)
+        {
+            threw = true;
+        }
+
+        check
+        (
+            threw,
+            "a sigma0 in the sub-law is refused",
             threw ? 0 : 1, 0
         );
     }
