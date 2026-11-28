@@ -8,9 +8,14 @@ tutorialsTest*
 regressionTests*
 **/verification/work/
 **/verification/postProcessing/
+**/verification/traction/work/
+**/verification/traction/postProcessing/
 **/validation/work/
 **/validation/postProcessing/
 codex*.md
+
+# Python byte-code
+__pycache__/
 
 # Build log files
 log.Allwmake

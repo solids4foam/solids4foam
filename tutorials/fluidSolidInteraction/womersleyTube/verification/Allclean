@@ -5,3 +5,5 @@
 cd "${0%/*}" || exit 1
 
 rm -rf work postProcessing scripts/__pycache__
+rm -rf traction/work traction/postProcessing traction/scripts/__pycache__ \
+    traction/tests/__pycache__
